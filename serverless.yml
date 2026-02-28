@@ -22,17 +22,11 @@ provider:
             - Fn::Sub: 'arn:aws:s3:::${SavesBucket}'
             - Fn::Sub: 'arn:aws:s3:::${SavesBucket}/*'
 
-plugins:
-  - serverless-esbuild
-
-custom:
+build:
   esbuild:
     bundle: true
-    packager: npm
     sourcemap: true
     target: node20
-    platform: node
-    concurrency: 5
 
 functions:
   api:
