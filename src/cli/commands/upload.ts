@@ -1,6 +1,6 @@
 import { select } from "@inquirer/prompts";
 import type { CliDeps } from "@cli/container";
-import { listSaveFilesFromPaths } from "@cli/infrastructure/listSaveFiles";
+import { listAllFilesFromPaths } from "@cli/infrastructure/listSaveFiles";
 
 export async function selectGame(
   deps: CliDeps,
@@ -92,7 +92,7 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
     throw new Error("Game not found");
   }
 
-  const files = listSaveFilesFromPaths([...game.paths]);
+  const files = listAllFilesFromPaths([...game.paths]);
   if (files.length === 0) {
     console.log(`No se encontraron archivos de guardado en las rutas de ${gameId}.`);
     return;

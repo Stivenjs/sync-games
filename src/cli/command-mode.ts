@@ -63,7 +63,7 @@ export async function runCommandMode(
         await commands.runUploadFromArgs(deps, args);
         return 0;
       case "download":
-        await commands.runDownloadInteractive(deps);
+        await commands.runDownloadFromArgs(deps, args);
         return 0;
       default:
         console.error(`Comando desconocido: ${command}`);
