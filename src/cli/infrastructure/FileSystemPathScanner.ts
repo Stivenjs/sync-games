@@ -8,6 +8,10 @@ import {
   BASE_PATH_TEMPLATES_WIN32,
   DEFAULT_STEAM_PATH_WIN32,
 } from "@cli/infrastructure/scanFilters";
+import {
+  resolveAppNames,
+  extractAppId,
+} from "@cli/infrastructure/steamAppNames";
 
 function resolvePathTemplate(template: string): string {
   return template.replace(/%([^%]+)%/g, (_, name) => process.env[name] ?? "");
@@ -108,6 +112,73 @@ function findSteamLibraryCandidates(libraryPath: string): PathCandidate[] {
   return candidates;
 }
 
+// ─── Cracks (EMPRESS, CODEX, Goldberg, etc.) ───────────────────────────────
+
+/**
+ * Rutas conocidas donde los cracks populares guardan saves.
+ * Cada entrada tiene la ruta base y un label para mostrar al usuario.
+ * Dentro, cada subcarpeta suele ser un AppID de Steam.
+ */
+const CRACK_SAVE_LOCATIONS = [
+  { path: "C:\\Users\\Public\\Documents\\EMPRESS", label: "EMPRESS" },
+  { path: "C:\\Users\\Public\\Documents\\Steam", label: "CODEX/Steam emu" },
+  { path: "%APPDATA%\\Goldberg SteamEmu Saves", label: "Goldberg" },
+  { path: "%APPDATA%\\CODEX", label: "CODEX" },
+  { path: "%APPDATA%\\CPY_SAVES", label: "CPY (Conspir4cy)" },
+  { path: "%APPDATA%\\Skidrow", label: "Skidrow" },
+  { path: "%LOCALAPPDATA%\\CODEX", label: "CODEX (Local)" },
+  { path: "%USERPROFILE%\\Documents\\CPY_SAVES", label: "CPY (Documents)" },
+];
+
+/**
+ * Busca saves en las carpetas de cracks conocidos.
+ * Apunta a la carpeta del AppID completa (no la subcarpeta más profunda),
+ * para que al sincronizar se incluya toda la estructura de archivos.
+ */
+function findCrackSaveCandidates(): PathCandidate[] {
+  const candidates: PathCandidate[] = [];
+
+  for (const loc of CRACK_SAVE_LOCATIONS) {
+    const basePath = resolvePathTemplate(loc.path);
+    if (!basePath || !existsSync(basePath)) continue;
+
+    const appDirs = listSubdirs(basePath);
+    for (const appDir of appDirs) {
+      if (appDir.name === "steam_settings" || appDir.name === "settings")
+        continue;
+      if (!containsSavesAtAnyDepth(appDir.path)) continue;
+      candidates.push({
+        path: appDir.path,
+        folderName: `${loc.label} — ${appDir.name}`,
+        basePath: `${loc.label} (${basePath})`,
+      });
+    }
+  }
+
+  return candidates;
+}
+
+/**
+ * Verifica si una carpeta contiene archivos de guardado en cualquier nivel
+ * de profundidad (hasta 5 niveles). Útil para cracks que anidan bastante.
+ */
+function containsSavesAtAnyDepth(dirPath: string, depth = 0): boolean {
+  if (depth > 5 || !existsSync(dirPath)) return false;
+  if (folderContainsSaveLikeFiles(dirPath)) return true;
+
+  try {
+    const subdirs = listSubdirs(dirPath);
+    for (const sub of subdirs) {
+      if (sub.name === "steam_settings" || sub.name === "settings") continue;
+      if (containsSavesAtAnyDepth(sub.path, depth + 1)) return true;
+    }
+  } catch {
+    /* sin permiso */
+  }
+
+  return false;
+}
+
 // ─── Scanner principal ──────────────────────────────────────────────────────
 
 export class FileSystemPathScanner implements PathScanner {
@@ -134,6 +205,7 @@ export class FileSystemPathScanner implements PathScanner {
 
     if (process.platform === "win32") {
       this.scanSteam(addCandidate);
+      this.scanCracks(addCandidate);
     }
 
     if (extraPaths) {
@@ -146,7 +218,47 @@ export class FileSystemPathScanner implements PathScanner {
       }
     }
 
+    await this.resolveNumericNames(candidates);
     return candidates;
+  }
+
+  /**
+   * Reemplaza folderNames con AppIDs numéricos por nombres reales de Steam.
+   * "Steam App 2551020" → "Darktide (2551020)"
+   * "EMPRESS — 2050650" → "EMPRESS — Resident Evil 4 (2050650)"
+   */
+  private async resolveNumericNames(
+    candidates: PathCandidate[]
+  ): Promise<void> {
+    const idsToResolve: string[] = [];
+
+    for (const c of candidates) {
+      const appId = extractAppId(c.folderName);
+      if (appId) idsToResolve.push(appId);
+    }
+
+    if (idsToResolve.length === 0) return;
+
+    const names = await resolveAppNames([...new Set(idsToResolve)]);
+    if (names.size === 0) return;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const appId = extractAppId(candidates[i].folderName);
+      if (!appId || !names.has(appId)) continue;
+
+      const gameName = names.get(appId)!;
+      const oldName = candidates[i].folderName;
+
+      let newName: string;
+      if (oldName.startsWith("Steam App ")) {
+        newName = `${gameName} (${appId})`;
+      } else {
+        const prefix = oldName.split("—")[0].trim();
+        newName = `${prefix} — ${gameName} (${appId})`;
+      }
+
+      candidates[i] = { ...candidates[i], folderName: newName };
+    }
   }
 
   private scanSteam(addCandidate: (c: PathCandidate) => void): void {
@@ -166,6 +278,12 @@ export class FileSystemPathScanner implements PathScanner {
       for (const c of findSteamLibraryCandidates(lib)) {
         addCandidate(c);
       }
+    }
+  }
+
+  private scanCracks(addCandidate: (c: PathCandidate) => void): void {
+    for (const c of findCrackSaveCandidates()) {
+      addCandidate(c);
     }
   }
 
