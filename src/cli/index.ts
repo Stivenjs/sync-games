@@ -9,6 +9,19 @@ import { runCommandMode, showHelp } from "./command-mode";
 import { runInteractiveLoop } from "./menu";
 import { waitForKeypressOnWindowsIfNeeded, isExitPromptError } from "./utils";
 
+process.on("uncaughtException", async (err) => {
+  console.error("\n❌ Error fatal:", err.message);
+  await waitForKeypressOnWindowsIfNeeded();
+  process.exit(1);
+});
+
+process.on("unhandledRejection", async (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error("\n❌ Error no manejado:", msg);
+  await waitForKeypressOnWindowsIfNeeded();
+  process.exit(1);
+});
+
 const args = getCliArgs();
 const command = args[0];
 const isInteractive = !command && process.stdin.isTTY;
@@ -21,8 +34,6 @@ async function main(): Promise<void> {
       await runInteractiveLoop(deps);
     } else if (!command) {
       showHelp();
-      await waitForKeypressOnWindowsIfNeeded();
-      process.exit(0);
     } else {
       const code = await runCommandMode(deps, command, args);
       await waitForKeypressOnWindowsIfNeeded();
@@ -30,12 +41,14 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     if (isExitPromptError(err)) {
+      console.log("");
+      await waitForKeypressOnWindowsIfNeeded();
       process.exit(0);
     }
-    console.error(err instanceof Error ? err.message : String(err));
-    await waitForKeypressOnWindowsIfNeeded();
-    process.exit(1);
+    console.error("\n❌ Error:", err instanceof Error ? err.message : String(err));
   }
+
+  await waitForKeypressOnWindowsIfNeeded();
 }
 
 main();

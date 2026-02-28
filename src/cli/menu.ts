@@ -1,10 +1,11 @@
 import { select, confirm, Separator } from "@inquirer/prompts";
 import type { MainAction } from "@cli/constants";
 import type { CliDeps } from "@cli/container";
+import { isExitPromptError } from "@cli/utils";
 import * as commands from "@cli/commands";
 
-export async function showMainMenu(): Promise<MainAction> {
-  const action = await select<MainAction>({
+async function showMainMenu(): Promise<MainAction> {
+  return select<MainAction>({
     message: "¿Qué quieres hacer?",
     pageSize: 12,
     choices: [
@@ -22,7 +23,6 @@ export async function showMainMenu(): Promise<MainAction> {
       { name: "Salir", value: "exit" },
     ],
   });
-  return action;
 }
 
 async function runAction(deps: CliDeps, action: MainAction): Promise<void> {
@@ -57,6 +57,18 @@ async function runAction(deps: CliDeps, action: MainAction): Promise<void> {
   }
 }
 
+async function askReturnToMenu(): Promise<boolean> {
+  try {
+    return await confirm({
+      message: "¿Volver al menú?",
+      default: true,
+    });
+  } catch (err) {
+    if (isExitPromptError(err)) return false;
+    return false;
+  }
+}
+
 export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
   try {
     const { printWelcomeBanner } = await import("@cli/banner");
@@ -64,17 +76,43 @@ export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
   } catch {
     console.log("\n  sync-games — Guardados en la nube\n");
   }
+
   while (true) {
-    const action = await showMainMenu();
-    await runAction(deps, action);
+    let action: MainAction;
+
+    try {
+      action = await showMainMenu();
+    } catch (err) {
+      if (isExitPromptError(err)) {
+        console.log("\nHasta luego.\n");
+        return;
+      }
+      console.error(
+        "\nError inesperado:",
+        err instanceof Error ? err.message : err
+      );
+      return;
+    }
+
+    try {
+      await runAction(deps, action);
+    } catch (err) {
+      if (isExitPromptError(err)) {
+        console.log("\n↩️  Operación cancelada.\n");
+      } else {
+        console.error(
+          "\n❌ Error:",
+          err instanceof Error ? err.message : err,
+          "\n"
+        );
+      }
+    }
+
     if (action !== "exit") {
-      const again = await confirm({
-        message: "¿Volver al menú?",
-        default: true,
-      });
+      const again = await askReturnToMenu();
       if (!again) {
         console.log("Hasta luego.\n");
-        process.exit(0);
+        return;
       }
     }
   }
