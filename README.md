@@ -42,15 +42,15 @@ Instalación: `bun install`
 
 ## Cómo ejecutar el CLI
 
-1. **Desde el repo (desarrollo):**  
-   `bun run cli -- <comando> [opciones]`  
-   Ejemplo: `bun run cli -- add elden-ring "%APPDATA%/EldenRing"`
+- **Menú interactivo:** ejecuta `sync-games` (o `bun run cli`) **sin argumentos** → se abre un menú con flechas para elegir: añadir juego, listar, analizar rutas, subir/descargar guardados, ver config, salir. Usa **@inquirer/prompts** (select, input, confirm).
 
-2. **Comando global (si enlazas el paquete):**  
-   `bun link` en el proyecto → luego en cualquier sitio: `sync-games add ...`
+- **Modo comando (scripting):**  
+  `sync-games <comando> [opciones]`  
+  Ejemplo: `sync-games add elden-ring "%APPDATA%/EldenRing"` o `sync-games upload`
 
-3. **Ejecutable único (sin instalar Bun):**  
-   `bun run build:cli` → se genera `dist/sync-games` (en Windows `dist/sync-games.exe`). Copia ese archivo donde quieras y ejecútalo; no hace falta tener Bun instalado.
+1. **Desde el repo:** `bun run cli` (menú) o `bun run cli -- add ...` (comando).
+2. **Comando global:** `bun link` → en cualquier sitio: `sync-games` (menú) o `sync-games list`.
+3. **Ejecutable único:** `bun run build:cli` → `dist/sync-games.exe`; al ejecutarlo sin args se abre el menú.
 
 ## Estructura del CLI (Clean Architecture)
 
