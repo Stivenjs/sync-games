@@ -1,0 +1,68 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname } from "path";
+import type { Config } from "@cli/domain/entities/Config";
+import type { ConfigRepository } from "@cli/domain/ports/ConfigRepository";
+
+const CONFIG_DIR_NAME = "sync-games";
+const CONFIG_FILE_NAME = "config.json";
+
+function getConfigDir(): string {
+  const base =
+    process.env.APPDATA ||
+    (process.platform === "darwin"
+      ? `${process.env.HOME}/Library/Application Support`
+      : `${process.env.HOME}/.config`);
+  return `${base}/${CONFIG_DIR_NAME}`;
+}
+
+/**
+ * Implementación del puerto ConfigRepository: archivo JSON en directorio de config del SO.
+ * Windows: %APPDATA%/sync-games/config.json
+ * macOS: ~/Library/Application Support/sync-games/config.json
+ * Linux: ~/.config/sync-games/config.json
+ */
+export class FileConfigRepository implements ConfigRepository {
+  private readonly configPath: string;
+
+  constructor() {
+    this.configPath = `${getConfigDir()}/${CONFIG_FILE_NAME}`;
+  }
+
+  getConfigPath(): string {
+    return this.configPath;
+  }
+
+  async load(): Promise<Config> {
+    if (!existsSync(this.configPath)) {
+      return { games: [] };
+    }
+    const raw = readFileSync(this.configPath, "utf-8");
+    const parsed = JSON.parse(raw) as {
+      apiBaseUrl?: string;
+      userId?: string;
+      games?: Array<{ id: string; paths: string[] }>;
+    };
+    return {
+      apiBaseUrl: parsed.apiBaseUrl,
+      userId: parsed.userId,
+      games: Array.isArray(parsed.games) ? parsed.games : [],
+    };
+  }
+
+  async save(config: Config): Promise<void> {
+    const dir = dirname(this.configPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    const json = JSON.stringify(
+      {
+        apiBaseUrl: config.apiBaseUrl,
+        userId: config.userId,
+        games: config.games,
+      },
+      null,
+      2
+    );
+    writeFileSync(this.configPath, json, "utf-8");
+  }
+}
