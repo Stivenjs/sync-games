@@ -1,0 +1,57 @@
+service: sync-games
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-2
+  stage: ${opt:stage, 'dev'}
+  environment:
+    BUCKET_NAME: { Ref: SavesBucket }
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:ListBucket
+            - s3:DeleteObject
+          Resource:
+            - Fn::Sub: 'arn:aws:s3:::${SavesBucket}'
+            - Fn::Sub: 'arn:aws:s3:::${SavesBucket}/*'
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  esbuild:
+    bundle: true
+    packager: npm
+    sourcemap: true
+    target: node20
+    platform: node
+    concurrency: 5
+
+functions:
+  api:
+    handler: src/interfaces/lambda/handler.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: ANY
+
+resources:
+  Resources:
+    SavesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, HEAD]
+              AllowedOrigins: ['*']
