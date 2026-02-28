@@ -21,15 +21,19 @@ async function main(): Promise<void> {
       await runInteractiveLoop(deps);
     } else if (!command) {
       showHelp();
-    } else {
-      await runCommandMode(deps, command, args);
       await waitForKeypressOnWindowsIfNeeded();
+      process.exit(0);
+    } else {
+      const code = await runCommandMode(deps, command, args);
+      await waitForKeypressOnWindowsIfNeeded();
+      process.exit(code);
     }
   } catch (err) {
     if (isExitPromptError(err)) {
       process.exit(0);
     }
     console.error(err instanceof Error ? err.message : String(err));
+    await waitForKeypressOnWindowsIfNeeded();
     process.exit(1);
   }
 }

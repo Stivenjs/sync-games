@@ -50,7 +50,12 @@ async function runAction(deps: CliDeps, action: MainAction): Promise<void> {
 }
 
 export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
-  console.log("\n🎮 sync-games — Guardados en la nube\n");
+  try {
+    const { printWelcomeBanner } = await import("@cli/banner");
+    await printWelcomeBanner();
+  } catch {
+    console.log("\n  sync-games — Guardados en la nube\n");
+  }
   while (true) {
     const action = await showMainMenu();
     await runAction(deps, action);

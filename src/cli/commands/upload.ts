@@ -39,7 +39,7 @@ export async function runUploadFromArgs(
     gameId = await selectGame(deps, "Elige el juego del que subir guardados");
     if (!gameId) {
       console.error("No se seleccionó ningún juego.");
-      process.exit(1);
+      throw new Error("No game selected");
     }
   }
   console.log("Subiendo guardados de:", gameId);

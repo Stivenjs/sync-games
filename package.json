@@ -22,7 +22,9 @@
     "@fastify/aws-lambda": "^4.0.0",
     "@fastify/cors": "^10.0.0",
     "@inquirer/prompts": "^8.3.0",
-    "fastify": "^5.0.0"
+    "fastify": "^5.0.0",
+    "figlet": "^1.10.0",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",

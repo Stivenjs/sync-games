@@ -26,7 +26,7 @@ export async function runAddFromArgs(
   const path = args[2];
   if (!gameId || !path) {
     console.error("Uso: sync-games add <game-id> <ruta>");
-    process.exit(1);
+    throw new Error("Arguments are missing");
   }
   await deps.addGameUseCase.execute({ gameId, path });
   console.log("Añadido:", gameId, "→", path);
