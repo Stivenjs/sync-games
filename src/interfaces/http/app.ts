@@ -21,6 +21,19 @@ export async function buildApp(
 
   await app.register(cors, { origin: true });
 
+  const expectedApiKey = process.env.API_KEY;
+
+  if (expectedApiKey) {
+    app.addHook("onRequest", async (request, reply) => {
+      if (request.url === "/health") return;
+
+      const key = request.headers["x-api-key"];
+      if (key !== expectedApiKey) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+    });
+  }
+
   const getUploadUrlUseCase = new GetUploadUrlUseCase(deps.saveRepository);
   const getDownloadUrlUseCase = new GetDownloadUrlUseCase(deps.saveRepository);
   const listSavesUseCase = new ListSavesUseCase(deps.saveRepository);

@@ -9,6 +9,7 @@ provider:
   stage: ${opt:stage, 'dev'}
   environment:
     BUCKET_NAME: { Ref: SavesBucket }
+    API_KEY: ${env:SYNC_GAMES_API_KEY, ''}
   iam:
     role:
       statements:
@@ -17,7 +18,6 @@ provider:
             - s3:GetObject
             - s3:PutObject
             - s3:ListBucket
-            - s3:DeleteObject
           Resource:
             - Fn::Sub: 'arn:aws:s3:::${SavesBucket}'
             - Fn::Sub: 'arn:aws:s3:::${SavesBucket}/*'
@@ -44,8 +44,12 @@ resources:
     SavesBucket:
       Type: AWS::S3::Bucket
       Properties:
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
         CorsConfiguration:
           CorsRules:
-            - AllowedHeaders: ['*']
+            - AllowedHeaders: ['Content-Type', 'x-user-id', 'x-api-key']
               AllowedMethods: [GET, PUT, HEAD]
               AllowedOrigins: ['*']

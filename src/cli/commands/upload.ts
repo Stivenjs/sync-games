@@ -24,6 +24,7 @@ export async function selectGame(
 async function uploadFileToS3(
   apiBaseUrl: string,
   userId: string,
+  apiKey: string,
   gameId: string,
   filePath: string,
   filename: string
@@ -34,6 +35,7 @@ async function uploadFileToS3(
     headers: {
       "Content-Type": "application/json",
       "x-user-id": userId,
+      "x-api-key": apiKey,
     },
     body: JSON.stringify({ gameId, filename }),
   });
@@ -106,6 +108,7 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
       await uploadFileToS3(
         config.apiBaseUrl!,
         config.userId!,
+        config.apiKey ?? "",
         gameId,
         absolute,
         relative

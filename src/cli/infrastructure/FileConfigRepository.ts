@@ -8,6 +8,7 @@ const CONFIG_DIR_NAME = "sync-games";
 const CONFIG_FILE_NAME = "config.json";
 
 const DEFAULT_API_BASE_URL = process.env.SYNC_GAMES_API_URL ?? "";
+const DEFAULT_API_KEY = process.env.SYNC_GAMES_API_KEY ?? "";
 
 function getDefaultUserId(): string {
   return (
@@ -48,6 +49,7 @@ export class FileConfigRepository implements ConfigRepository {
     if (!existsSync(this.configPath)) {
       return {
         apiBaseUrl: DEFAULT_API_BASE_URL,
+        apiKey: DEFAULT_API_KEY,
         userId: getDefaultUserId(),
         games: [],
       };
@@ -55,12 +57,14 @@ export class FileConfigRepository implements ConfigRepository {
     const raw = readFileSync(this.configPath, "utf-8");
     const parsed = JSON.parse(raw) as {
       apiBaseUrl?: string;
+      apiKey?: string;
       userId?: string;
       games?: Array<{ id: string; paths: string[] }>;
       customScanPaths?: string[];
     };
     return {
       apiBaseUrl: parsed.apiBaseUrl || DEFAULT_API_BASE_URL,
+      apiKey: parsed.apiKey || DEFAULT_API_KEY,
       userId: parsed.userId || getDefaultUserId(),
       games: Array.isArray(parsed.games) ? parsed.games : [],
       customScanPaths: Array.isArray(parsed.customScanPaths)

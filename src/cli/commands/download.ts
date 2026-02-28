@@ -14,11 +14,12 @@ interface RemoteSave {
 
 async function fetchRemoteSaves(
   apiBaseUrl: string,
-  userId: string
+  userId: string,
+  apiKey: string
 ): Promise<RemoteSave[]> {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(`${base}/saves`, {
-    headers: { "x-user-id": userId },
+    headers: { "x-user-id": userId, "x-api-key": apiKey },
   });
   if (!res.ok) {
     throw new Error(`API /saves: ${res.status} ${await res.text()}`);
@@ -45,6 +46,7 @@ async function fetchRemoteSaves(
 async function fetchDownloadUrl(
   apiBaseUrl: string,
   userId: string,
+  apiKey: string,
   gameId: string,
   key: string
 ): Promise<string> {
@@ -54,6 +56,7 @@ async function fetchDownloadUrl(
     headers: {
       "Content-Type": "application/json",
       "x-user-id": userId,
+      "x-api-key": apiKey,
     },
     body: JSON.stringify({ gameId, key }),
   });
@@ -97,7 +100,7 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   }
 
   console.log("\n☁️  Consultando guardados en la nube...\n");
-  const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!);
+  const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!, config.apiKey ?? "");
 
   if (allSaves.length === 0) {
     console.log("No hay guardados en la nube.\n");
@@ -164,6 +167,7 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   await doDownload(
     config.apiBaseUrl!,
     config.userId!,
+    config.apiKey ?? "",
     selectedGameId,
     saves,
     destBase
@@ -202,7 +206,7 @@ export async function runDownloadFromArgs(
   }
 
   console.log("\n☁️  Consultando guardados en la nube...\n");
-  const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!);
+  const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!, config.apiKey ?? "");
   const saves = allSaves.filter(
     (s) => s.gameId.toLowerCase() === gameId!.toLowerCase()
   );
@@ -216,6 +220,7 @@ export async function runDownloadFromArgs(
   await doDownload(
     config.apiBaseUrl!,
     config.userId!,
+    config.apiKey ?? "",
     gameId!,
     saves,
     destBase
@@ -225,6 +230,7 @@ export async function runDownloadFromArgs(
 async function doDownload(
   apiBaseUrl: string,
   userId: string,
+  apiKey: string,
   gameId: string,
   saves: RemoteSave[],
   destBase: string
@@ -237,7 +243,7 @@ async function doDownload(
   for (const save of saves) {
     const destPath = join(destBase, save.filename);
     try {
-      const url = await fetchDownloadUrl(apiBaseUrl, userId, gameId, save.key);
+      const url = await fetchDownloadUrl(apiBaseUrl, userId, apiKey, gameId, save.key);
       await downloadFileFromUrl(url, destPath);
       console.log("  ✓", save.filename);
       ok++;

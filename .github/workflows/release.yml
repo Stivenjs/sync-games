@@ -12,6 +12,9 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    env:
+      DEFINE_API_URL: "process.env.SYNC_GAMES_API_URL='${{ secrets.SYNC_GAMES_API_URL }}'"
+      DEFINE_API_KEY: "process.env.SYNC_GAMES_API_KEY='${{ secrets.SYNC_GAMES_API_KEY }}'"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,22 +31,22 @@ jobs:
         run: |
           mkdir -p dist
           bun build src/cli/index.ts --compile --target=bun-windows-x64 --outfile dist/sync-games-windows-x64.exe \
-            --define "process.env.SYNC_GAMES_API_URL='${{ secrets.SYNC_GAMES_API_URL }}'"
+            --define "$DEFINE_API_URL" --define "$DEFINE_API_KEY"
 
       - name: Build CLI (Linux x64)
         run: |
           bun build src/cli/index.ts --compile --target=bun-linux-x64 --outfile dist/sync-games-linux-x64 \
-            --define "process.env.SYNC_GAMES_API_URL='${{ secrets.SYNC_GAMES_API_URL }}'"
+            --define "$DEFINE_API_URL" --define "$DEFINE_API_KEY"
 
       - name: Build CLI (macOS arm64)
         run: |
           bun build src/cli/index.ts --compile --target=bun-darwin-arm64 --outfile dist/sync-games-darwin-arm64 \
-            --define "process.env.SYNC_GAMES_API_URL='${{ secrets.SYNC_GAMES_API_URL }}'"
+            --define "$DEFINE_API_URL" --define "$DEFINE_API_KEY"
 
       - name: Build CLI (macOS x64)
         run: |
           bun build src/cli/index.ts --compile --target=bun-darwin-x64 --outfile dist/sync-games-darwin-x64 \
-            --define "process.env.SYNC_GAMES_API_URL='${{ secrets.SYNC_GAMES_API_URL }}'"
+            --define "$DEFINE_API_URL" --define "$DEFINE_API_KEY"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
