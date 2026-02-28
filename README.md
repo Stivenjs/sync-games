@@ -81,3 +81,38 @@ Config por defecto: `%APPDATA%/sync-games/config.json` (Windows) o `~/.config/sy
 - `POST /saves/download-url` — Body: `{ "gameId", "key" }` → devuelve `downloadUrl`
 
 El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas.
+
+## Probar que los guardados se suben a S3
+
+1. **API en local** (necesitas AWS con un bucket S3 y credenciales configuradas):
+   ```bash
+   export BUCKET_NAME=tu-bucket-sync-games   # o el que uses en dev
+   export AWS_REGION=us-east-2
+   bun run dev
+   ```
+   La API queda en `http://localhost:3000`.
+
+2. **Configurar el CLI** con la URL de la API y un `userId`:
+   - Ejecuta `sync-games config` (o `bun run cli -- config`) para ver la ruta del archivo de config.
+   - Edita ese JSON y añade:
+     ```json
+     {
+       "apiBaseUrl": "http://localhost:3000",
+       "userId": "test-user",
+       "games": []
+     }
+     ```
+   - Añade un juego con una ruta donde tengas archivos de guardado (o una carpeta de prueba con un `.sav` o `.json`):
+     ```bash
+     bun run cli -- add mi-juego "./ruta/a/tus/guardados"
+     ```
+
+3. **Subir**:
+   ```bash
+   bun run cli -- upload mi-juego
+   ```
+   O abre el menú (`bun run cli`) y elige «Subir guardados a la nube». Deberías ver algo como `✓ archivo.sav` por cada archivo subido.
+
+4. **Comprobar en S3**: en la consola de AWS S3, entra al bucket y revisa que exista la clave `test-user/mi-juego/<nombre-del-archivo>`.
+
+Si desplegaste la API en AWS (`bun run deploy:dev`), pon en el config `apiBaseUrl` con la URL del API Gateway (ej. `https://xxxx.execute-api.us-east-2.amazonaws.com`) y repite los pasos 2–4.
