@@ -10,7 +10,7 @@
     "build": "tsc",
     "dev": "bun --watch src/interfaces/http/server.ts",
     "cli": "bun src/cli/index.ts",
-    "build:cli": "bun build src/cli/index.ts --compile --outfile dist/sync-games",
+    "build:cli": "bun run scripts/build-cli.ts",
     "deploy": "serverless deploy",
     "deploy:dev": "serverless deploy --stage dev",
     "invoke:local": "serverless invoke local -f api",

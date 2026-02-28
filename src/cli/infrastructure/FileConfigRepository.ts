@@ -1,10 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { userInfo } from "os";
 import { dirname } from "path";
 import type { Config } from "@cli/domain/entities/Config";
 import type { ConfigRepository } from "@cli/domain/ports/ConfigRepository";
 
 const CONFIG_DIR_NAME = "sync-games";
 const CONFIG_FILE_NAME = "config.json";
+
+const DEFAULT_API_BASE_URL = process.env.SYNC_GAMES_API_URL ?? "";
+
+function getDefaultUserId(): string {
+  return (
+    userInfo().username ||
+    process.env.USERNAME ||
+    process.env.USER ||
+    "default-user"
+  ).toLowerCase();
+}
 
 function getConfigDir(): string {
   const base =
@@ -34,7 +46,11 @@ export class FileConfigRepository implements ConfigRepository {
 
   async load(): Promise<Config> {
     if (!existsSync(this.configPath)) {
-      return { games: [] };
+      return {
+        apiBaseUrl: DEFAULT_API_BASE_URL,
+        userId: getDefaultUserId(),
+        games: [],
+      };
     }
     const raw = readFileSync(this.configPath, "utf-8");
     const parsed = JSON.parse(raw) as {
@@ -44,8 +60,8 @@ export class FileConfigRepository implements ConfigRepository {
       customScanPaths?: string[];
     };
     return {
-      apiBaseUrl: parsed.apiBaseUrl,
-      userId: parsed.userId,
+      apiBaseUrl: parsed.apiBaseUrl || DEFAULT_API_BASE_URL,
+      userId: parsed.userId || getDefaultUserId(),
       games: Array.isArray(parsed.games) ? parsed.games : [],
       customScanPaths: Array.isArray(parsed.customScanPaths)
         ? parsed.customScanPaths
