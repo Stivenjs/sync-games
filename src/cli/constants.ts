@@ -3,6 +3,7 @@
  */
 export const KNOWN_COMMANDS = [
   "add",
+  "remove",
   "list",
   "config",
   "scan",
@@ -17,6 +18,7 @@ export const KNOWN_COMMANDS = [
  */
 export type MainAction =
   | "add"
+  | "remove"
   | "list"
   | "scan"
   | "upload"

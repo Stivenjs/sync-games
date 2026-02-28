@@ -9,6 +9,7 @@ export async function showMainMenu(): Promise<MainAction> {
     pageSize: 12,
     choices: [
       { name: "➕  Añadir un juego (ruta de guardados)", value: "add" },
+      { name: "🗑️  Eliminar un juego o ruta", value: "remove" },
       { name: "📋  Listar juegos configurados", value: "list" },
       { name: "🔍  Analizar rutas (buscar candidatos)", value: "scan" },
       new Separator(),
@@ -27,6 +28,9 @@ async function runAction(deps: CliDeps, action: MainAction): Promise<void> {
   switch (action) {
     case "add":
       await commands.runAddInteractive(deps);
+      break;
+    case "remove":
+      await commands.runRemoveInteractive(deps);
       break;
     case "list":
       await commands.runList(deps);

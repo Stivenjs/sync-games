@@ -11,6 +11,7 @@ Uso:
 
 Comandos:
   add <game-id> <ruta>    Añade un juego
+  remove <game-id> [ruta] Elimina un juego o una ruta
   list                    Lista juegos configurados
   scan                    Analiza rutas candidatas
   upload [game-id]        Sube guardados (pide juego si no se indica)
@@ -41,6 +42,9 @@ export async function runCommandMode(
     switch (command) {
       case "add":
         await commands.runAddFromArgs(deps, args);
+        return 0;
+      case "remove":
+        await commands.runRemoveFromArgs(deps, args);
         return 0;
       case "list":
         await commands.runList(deps);

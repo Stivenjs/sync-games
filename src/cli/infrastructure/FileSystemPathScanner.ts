@@ -1,109 +1,161 @@
 import { existsSync, readdirSync } from "fs";
-import { join } from "path";
+import { join, normalize } from "path";
 import type { PathCandidate } from "@cli/domain/entities/PathCandidate";
 import type { PathScanner } from "@cli/domain/ports/PathScanner";
 
 /**
- * Extensiones que suelen usar los juegos para guardados (no hay estándar único).
- * Incluimos carpeta si contiene al menos un archivo con una de estas extensiones.
+ * Extensiones exclusivas de guardados de juegos — alta confianza.
  */
-const SAVE_EXTENSIONS = [
+const STRONG_SAVE_EXTENSIONS = [
   ".sav",
   ".savx",
   ".save",
-  ".sl2", // FromSoftware (Sekiro, Dark Souls, Elden Ring)
-  ".dat",
-  ".bin",
-  ".json",
-  ".bak", // copias de guardado
-  ".db",
-  ".sqlite",
+  ".sl2",
   ".state",
-  ".xml",
-  ".cfg",
-  ".ini", // config/guardado en algunos juegos
   ".sr",
-  ".sav.", // ej. archivo.sav.001
 ];
 
-function looksLikeSaveFile(name: string): boolean {
+/**
+ * Extensiones que pueden ser guardados pero también las usan apps normales.
+ * Solo cuentan si hay al menos 2 archivos con estas extensiones o si se
+ * combinan con un nombre sospechoso (save, slot, profile, etc.).
+ */
+const WEAK_SAVE_EXTENSIONS = [".dat", ".bin", ".bak"];
+
+const SAVE_NAME_HINTS = [
+  "save",
+  "slot",
+  "profile",
+  "progress",
+  "checkpoint",
+  "autosave",
+  "quicksave",
+  "player",
+  "game",
+];
+
+function isStrongSaveFile(name: string): boolean {
   const lower = name.toLowerCase();
-  return SAVE_EXTENSIONS.some(
-    (ext) => lower.endsWith(ext) || (ext.length > 1 && lower.includes(ext))
+  return STRONG_SAVE_EXTENSIONS.some(
+    (ext) => lower.endsWith(ext) || lower.includes(ext + ".")
   );
 }
 
+function isWeakSaveFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return WEAK_SAVE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+function nameHintsSave(name: string): boolean {
+  const lower = name.toLowerCase();
+  return SAVE_NAME_HINTS.some((h) => lower.includes(h));
+}
+
 /**
- * Comprueba si la carpeta (o un nivel de subcarpetas) contiene algún archivo que parezca guardado.
+ * Evalúa si una carpeta (hasta 1 nivel de profundidad) parece contener guardados de juego.
+ * Requiere extensiones fuertes, o múltiples archivos débiles, o archivos débiles con nombre sospechoso.
  */
 function folderContainsSaveLikeFiles(dirPath: string): boolean {
   if (!existsSync(dirPath)) return false;
   try {
-    const entries = readdirSync(dirPath, { withFileTypes: true });
-    for (const e of entries) {
-      if (e.isFile() && looksLikeSaveFile(e.name)) return true;
-      if (e.isDirectory() && !e.name.startsWith(".")) {
-        const subPath = join(dirPath, e.name);
-        const subEntries = readdirSync(subPath, { withFileTypes: true });
-        if (subEntries.some((s) => s.isFile() && looksLikeSaveFile(s.name)))
-          return true;
+    const filesToCheck = collectFiles(dirPath);
+    let weakCount = 0;
+    for (const name of filesToCheck) {
+      if (isStrongSaveFile(name)) return true;
+      if (isWeakSaveFile(name)) {
+        if (nameHintsSave(name)) return true;
+        weakCount++;
       }
     }
+    return weakCount >= 3;
   } catch {
-    // sin permiso o no es directorio
+    return false;
   }
-  return false;
+}
+
+function collectFiles(dirPath: string): string[] {
+  const names: string[] = [];
+  const entries = readdirSync(dirPath, { withFileTypes: true });
+  for (const e of entries) {
+    if (e.isFile()) {
+      names.push(e.name);
+    } else if (e.isDirectory() && !e.name.startsWith(".")) {
+      try {
+        const subEntries = readdirSync(join(dirPath, e.name), {
+          withFileTypes: true,
+        });
+        for (const s of subEntries) {
+          if (s.isFile()) names.push(s.name);
+        }
+      } catch {
+        /* sin permiso */
+      }
+    }
+  }
+  return names;
 }
 
 /**
- * Nombres de carpeta que no son juegos (editores, apps, sistema).
- * Se excluyen para reducir ruido en el scan. Comparación en minúsculas.
+ * Nombres de carpeta que no son juegos (editores, apps, sistema, launchers).
+ * Comparación en minúsculas.
  */
 const EXCLUDED_FOLDER_NAMES = new Set([
+  // Editores / IDEs
   "code",
   "cursor",
+  "visual studio setup",
+  "git extensions",
+  "gitextensions",
+  "github-copilot",
+  "cmaketools",
+  "visualstudiodiscordrpc",
+  // Comunicación / social
   "discord",
+  "spotify",
+  // Navegadores / sistema
   "google",
   "microsoft",
-  "spotify",
+  "nvidia corporation",
+  "connecteddevicesplatform",
+  // Gestores de paquetes / dev
   "npm",
   "pnpm",
+  "pnpm-state",
   "node_modules",
+  "packages",
   "amplify",
   "turborepo",
   "nextjs-nodejs",
+  "theme-liquid-docs-nodejs",
+  // Utilidades
   "obs-studio",
   "qbittorrent",
   "utorrent web",
   "winrar",
   "process hacker 2",
-  "sklauncher",
-  "visual studio setup",
-  "wago-app",
-  "wago-app-updater",
   "xdg.config",
+  // Launchers / plataformas (no son juegos en sí)
+  "steam",
+  "sklauncher",
   "riot-client-ux",
   "firestorm launcher",
-  "git extensions",
-  "gitextensions",
-  "github-copilot",
-  "cmaketools",
-  "connecteddevicesplatform",
   "launcher-updater",
   "overwolf",
   "overframe-ow-app-updater",
-  "pnpm-state",
-  "programs",
-  "temp",
-  "theme-liquid-docs-nodejs",
-  "visualstudiodiscordrpc",
+  "overframe",
+  "wago-app",
+  "wago-app-updater",
   "battleye",
-  "nvidia corporation",
+  // Roblox (plataforma, no un juego con saves locales)
+  "roblox",
   "robloxpcgdk",
-  "packages",
+  // Temp / basura
+  "temp",
   "crashdumps",
   "squirreltemp",
-  "steam",
+  "programs",
+  // sync-games (nuestro propio config)
+  "sync-games",
 ]);
 
 function isExcludedFolderName(folderName: string): boolean {
@@ -153,6 +205,7 @@ export class FileSystemPathScanner implements PathScanner {
         ? BASE_PATH_TEMPLATES_WIN32
         : this.getUnixTemplates();
     const candidates: PathCandidate[] = [];
+    const seenPaths = new Set<string>();
 
     for (const template of templates) {
       const basePath = resolvePathTemplate(template);
@@ -160,8 +213,11 @@ export class FileSystemPathScanner implements PathScanner {
 
       const subdirs = listSubdirs(basePath);
       for (const { path: fullPath, name } of subdirs) {
+        const normalizedFull = normalize(fullPath).toLowerCase();
+        if (seenPaths.has(normalizedFull)) continue;
         if (isExcludedFolderName(name)) continue;
         if (!folderContainsSaveLikeFiles(fullPath)) continue;
+        seenPaths.add(normalizedFull);
         candidates.push({
           path: fullPath,
           folderName: name,
