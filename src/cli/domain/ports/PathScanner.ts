@@ -5,5 +5,5 @@ import type { PathCandidate } from "@cli/domain/entities/PathCandidate";
  * que podrían contener guardados de juegos.
  */
 export interface PathScanner {
-  scan(): Promise<PathCandidate[]>;
+  scan(extraPaths?: readonly string[]): Promise<PathCandidate[]>;
 }

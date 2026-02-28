@@ -7,6 +7,7 @@ export const KNOWN_COMMANDS = [
   "list",
   "config",
   "scan",
+  "scan-paths",
   "upload",
   "download",
   "--help",
@@ -21,6 +22,7 @@ export type MainAction =
   | "remove"
   | "list"
   | "scan"
+  | "scan-paths"
   | "upload"
   | "download"
   | "config"

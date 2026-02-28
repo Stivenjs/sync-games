@@ -41,11 +41,15 @@ export class FileConfigRepository implements ConfigRepository {
       apiBaseUrl?: string;
       userId?: string;
       games?: Array<{ id: string; paths: string[] }>;
+      customScanPaths?: string[];
     };
     return {
       apiBaseUrl: parsed.apiBaseUrl,
       userId: parsed.userId,
       games: Array.isArray(parsed.games) ? parsed.games : [],
+      customScanPaths: Array.isArray(parsed.customScanPaths)
+        ? parsed.customScanPaths
+        : [],
     };
   }
 
@@ -59,6 +63,7 @@ export class FileConfigRepository implements ConfigRepository {
         apiBaseUrl: config.apiBaseUrl,
         userId: config.userId,
         games: config.games,
+        customScanPaths: config.customScanPaths,
       },
       null,
       2

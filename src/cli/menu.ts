@@ -16,6 +16,7 @@ export async function showMainMenu(): Promise<MainAction> {
       { name: "☁️  Subir guardados a la nube", value: "upload" },
       { name: "⬇️  Descargar guardados", value: "download" },
       new Separator(),
+      { name: "📂  Rutas de escaneo personalizadas", value: "scan-paths" },
       { name: "⚙️  Ver ruta del archivo de config", value: "config" },
       new Separator(),
       { name: "Salir", value: "exit" },
@@ -37,6 +38,9 @@ async function runAction(deps: CliDeps, action: MainAction): Promise<void> {
       break;
     case "scan":
       await commands.runScan(deps);
+      break;
+    case "scan-paths":
+      await commands.runScanPathsInteractive(deps);
       break;
     case "upload":
       await commands.runUploadInteractive(deps);

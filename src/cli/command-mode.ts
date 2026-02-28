@@ -14,6 +14,7 @@ Comandos:
   remove <game-id> [ruta] Elimina un juego o una ruta
   list                    Lista juegos configurados
   scan                    Analiza rutas candidatas
+  scan-paths              Gestiona rutas de escaneo personalizadas
   upload [game-id]        Sube guardados (pide juego si no se indica)
   download [game-id]      Descarga guardados
   config                  Muestra ruta del config
@@ -54,6 +55,9 @@ export async function runCommandMode(
         return 0;
       case "scan":
         await commands.runScan(deps);
+        return 0;
+      case "scan-paths":
+        await commands.runScanPathsInteractive(deps);
         return 0;
       case "upload":
         await commands.runUploadFromArgs(deps, args);

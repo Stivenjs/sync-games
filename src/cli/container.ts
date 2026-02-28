@@ -29,6 +29,6 @@ export function createContainer(): CliDeps {
     listGamesUseCase: new ListGamesUseCase(configRepository),
     getConfigPathUseCase: new GetConfigPathUseCase(configRepository),
     getConfigUseCase: new GetConfigUseCase(configRepository),
-    scanForPathCandidatesUseCase: new ScanForPathCandidatesUseCase(pathScanner),
+    scanForPathCandidatesUseCase: new ScanForPathCandidatesUseCase(pathScanner, configRepository),
   };
 }
