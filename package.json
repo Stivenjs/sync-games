@@ -14,7 +14,9 @@
     "deploy": "serverless deploy",
     "deploy:dev": "serverless deploy --stage dev",
     "invoke:local": "serverless invoke local -f api",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "desktop": "bun run --cwd apps/sync-games-desktop tauri dev",
+    "desktop:build": "bun run --cwd apps/sync-games-desktop tauri build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
