@@ -1,3 +1,4 @@
+import { Loader2, RefreshCw } from "lucide-react";
 import { useConfig } from "@hooks/useConfig";
 import { GamesList } from "@features/games/GamesList";
 
@@ -7,6 +8,7 @@ export function GamesPage() {
   if (loading) {
     return (
       <div className="page page--center">
+        <Loader2 className="page__spinner" size={32} strokeWidth={2} />
         <p className="page__muted">Cargando configuración...</p>
       </div>
     );
@@ -17,6 +19,7 @@ export function GamesPage() {
       <div className="page page--center">
         <p className="page__error">{error}</p>
         <button type="button" className="btn" onClick={() => refetch?.()}>
+          <RefreshCw size={16} />
           Reintentar
         </button>
       </div>
@@ -32,6 +35,7 @@ export function GamesPage() {
           className="btn btn--secondary"
           onClick={() => refetch?.()}
         >
+          <RefreshCw size={16} />
           Actualizar
         </button>
       </header>

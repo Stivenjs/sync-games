@@ -55,8 +55,8 @@ body {
 }
 
 .sidebar__logo {
-  font-size: 1.5rem;
-  line-height: 1;
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .sidebar__title {
@@ -126,6 +126,17 @@ body {
   color: #fff;
 }
 
+.page__spinner {
+  color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .page__muted {
   color: var(--text-muted);
 }
@@ -136,6 +147,9 @@ body {
 
 /* Buttons */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 1rem;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -181,10 +195,18 @@ body {
 }
 
 .games-list__id {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 600;
   font-size: 1rem;
   color: #fff;
   margin-bottom: 0.5rem;
+}
+
+.games-list__icon {
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .games-list__paths {
@@ -196,17 +218,36 @@ body {
 }
 
 .games-list__path {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.25rem 0;
   font-family: ui-monospace, monospace;
 }
 
+.games-list__path-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+
 /* Empty state */
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 3rem 2rem;
   background: var(--sidebar-bg);
   border: 1px dashed var(--border);
   border-radius: 12px;
+}
+
+.empty-state__icon {
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-bottom: 1rem;
 }
 
 .empty-state__text {

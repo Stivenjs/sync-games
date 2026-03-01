@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Gamepad2 } from "lucide-react";
 
 export interface NavItem {
   id: string;
@@ -16,9 +17,7 @@ export function Sidebar({ items, activeId, onSelect }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <div className="sidebar__logo" aria-hidden="true">
-          🎮
-        </div>
+        <Gamepad2 className="sidebar__logo" size={24} aria-hidden="true" />
         <span className="sidebar__title">sync-games</span>
       </div>
       <nav className="sidebar__nav">
@@ -31,7 +30,7 @@ export function Sidebar({ items, activeId, onSelect }: SidebarProps) {
             }`}
             onClick={() => onSelect(item.id)}
           >
-            {item.icon}
+            {item.icon ?? null}
             <span>{item.label}</span>
           </button>
         ))}

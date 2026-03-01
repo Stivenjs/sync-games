@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Gamepad2 } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { GamesPage } from "@features/games";
 import "./App.css";
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "games", label: "Juegos" },
+  { id: "games", label: "Juegos", icon: <Gamepad2 size={18} /> },
   // Más secciones: Añadir, Subir, Descargar, Config...
 ];
 
