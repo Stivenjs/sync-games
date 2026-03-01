@@ -1,0 +1,67 @@
+# Compila la app desktop Tauri y publica una release con los ejecutables al crear un tag desktop-v*
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+            rustTargets: ""
+          - platform: ubuntu-22.04
+            args: ""
+            rustTargets: ""
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            rustTargets: aarch64-apple-darwin
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            rustTargets: x86_64-apple-darwin
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rustTargets }}
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: apps/sync-games-desktop
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@action-v0.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/sync-games-desktop
+          tauriScript: bun run tauri
+          tagName: desktop-v__VERSION__
+          releaseName: "sync-games Desktop v__VERSION__"
+          releaseBody: "App de escritorio para gestionar y sincronizar juegos."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
