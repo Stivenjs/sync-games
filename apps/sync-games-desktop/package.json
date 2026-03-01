@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "icon": "bun run scripts/make-icon-square.ts && tauri icon src-tauri/icons/icon-square.png"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -17,11 +18,12 @@
     "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "sharp": "^0.34.5",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4",
-    "@tauri-apps/cli": "^2"
+    "vite": "^7.0.4"
   }
 }
