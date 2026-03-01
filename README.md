@@ -36,7 +36,7 @@ Las dependencias apuntan hacia dentro: `interfaces` → `application` → `domai
 - `bun run deploy:dev` — Despliega al stage `dev`
 - `bun run invoke:local` — Invoca la función Lambda en local
 - `bun run cli` — Ejecuta el CLI (ej.: `bun run cli -- add elden-ring "%APPDATA%/EldenRing"`)
-- `bun run build:cli` — Genera un ejecutable en `dist/sync-games` (o `sync-games.exe` en Windows)
+- `bun run build:cli` — Genera un ejecutable en `dist/sync-games` (o `sync-games.exe` en Windows). Si existe `assets/icon.ico`, se usa como icono del .exe.
 
 Instalación: `bun install`
 

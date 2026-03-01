@@ -21,29 +21,46 @@ if (!apiUrl || !apiKey) {
   process.exit(1);
 }
 
+const pkg = (await Bun.file("package.json").json()) as { version: string };
+const iconPath = "assets/icon.ico";
+const hasIcon = await Bun.file(iconPath).exists();
+
 console.log(`\n${figures.bullet} Compilando CLI...`);
 console.log(`   API URL: ${apiUrl}`);
-console.log(`   API Key: ${"*".repeat(apiKey.length)}\n`);
+console.log(`   API Key: ${"*".repeat(apiKey.length)}`);
+if (hasIcon) console.log(`   Icono: ${iconPath}`);
+console.log(`   Metadatos: título, versión, descripción`);
+console.log(`   Bytecode: activado (arranque rápido)`);
+console.log(`   Sourcemap: vinculado\n`);
 
-const proc = Bun.spawn(
-  [
-    "bun",
-    "build",
-    "src/cli/index.ts",
-    "--compile",
-    "--outfile",
-    "dist/sync-games",
-    "--define",
-    `process.env.SYNC_GAMES_API_URL=${JSON.stringify(apiUrl)}`,
-    "--define",
-    `process.env.SYNC_GAMES_API_KEY=${JSON.stringify(apiKey)}`,
-  ],
-  { stdout: "inherit", stderr: "inherit" }
-);
+const result = await Bun.build({
+  entrypoints: ["src/cli/index.ts"],
+  minify: true,
+  bytecode: true,
+  sourcemap: "linked",
+  define: {
+    "process.env.SYNC_GAMES_API_URL": JSON.stringify(apiUrl),
+    "process.env.SYNC_GAMES_API_KEY": JSON.stringify(apiKey),
+  },
+  compile: {
+    outfile: "dist/sync-games",
+    ...(process.platform === "win32" && {
+      windows: {
+        ...(hasIcon && { icon: iconPath }),
+        title: "Sync Games",
+        version: pkg.version,
+        description: "CLI para sincronizar guardados de juegos en la nube (S3)",
+        publisher: "Stifts",
+        copyright: `Copyright ${new Date().getFullYear()}`,
+      },
+    }),
+  },
+});
 
-const exitCode = await proc.exited;
-if (exitCode !== 0) {
-  process.exit(exitCode);
+if (!result.success) {
+  console.error(`${figures.cross} Build fallido:`);
+  for (const msg of result.logs) console.error(msg);
+  process.exit(1);
 }
 
 console.log(`\n${figures.tick} Build completado: dist/sync-games\n`);
