@@ -41,10 +41,17 @@ pub struct Config {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfiguredGame {
     pub id: String,
     #[serde(default)]
     pub paths: Vec<String>,
+    /// Steam App ID: si está definido, se usa la imagen del CDN de Steam.
+    #[serde(default)]
+    pub steam_app_id: Option<String>,
+    /// URL personalizada de imagen. Prioridad sobre steam_app_id. Para juegos no-Steam.
+    #[serde(default)]
+    pub image_url: Option<String>,
 }
 
 /// Lee el archivo de config desde disco.

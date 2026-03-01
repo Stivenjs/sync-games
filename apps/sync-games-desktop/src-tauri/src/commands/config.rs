@@ -1,6 +1,7 @@
 //! Comandos relacionados con la configuración.
 
 use crate::config;
+use crate::steam;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -14,9 +15,12 @@ pub struct ConfigDto {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameDto {
     pub id: String,
     pub paths: Vec<String>,
+    pub steam_app_id: Option<String>,
+    pub image_url: Option<String>,
 }
 
 #[tauri::command]
@@ -29,9 +33,20 @@ pub fn get_config() -> ConfigDto {
         games: cfg
             .games
             .into_iter()
-            .map(|g| GameDto {
-                id: g.id,
-                paths: g.paths,
+            .map(|g| {
+                let steam_app_id = g.steam_app_id.clone().or_else(|| {
+                    if g.image_url.is_none() {
+                        steam::resolve_app_id_for_game(&g.paths)
+                    } else {
+                        None
+                    }
+                });
+                GameDto {
+                    id: g.id,
+                    paths: g.paths,
+                    steam_app_id,
+                    image_url: g.image_url,
+                }
             })
             .collect(),
         custom_scan_paths: cfg.custom_scan_paths,
