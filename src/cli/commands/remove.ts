@@ -1,4 +1,5 @@
 import { select, confirm, Separator } from "@inquirer/prompts";
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 
 const CANCEL_OPTION = "__cancel__";
@@ -18,7 +19,7 @@ export async function runRemoveInteractive(deps: CliDeps): Promise<void> {
       value: g.id,
     })),
     new Separator(),
-    { name: "↩️  Cancelar", value: CANCEL_OPTION },
+    { name: `${figures.arrowLeft} Cancelar`, value: CANCEL_OPTION },
   ];
 
   const selectedGameId = await select<string>({
@@ -47,13 +48,13 @@ export async function runRemoveInteractive(deps: CliDeps): Promise<void> {
 
   const pathChoices = [
     {
-      name: "🗑️  Eliminar el juego completo (todas las rutas)",
+      name: `${figures.cross} Eliminar el juego completo (todas las rutas)`,
       value: REMOVE_ALL,
     },
     new Separator(`── Rutas de ${game.id} ──`),
     ...game.paths.map((p) => ({ name: `→ ${p}`, value: p })),
     new Separator(),
-    { name: "↩️  Cancelar", value: CANCEL_OPTION },
+    { name: `${figures.arrowLeft} Cancelar`, value: CANCEL_OPTION },
   ];
 
   const selectedPath = await select<string>({
@@ -96,12 +97,12 @@ function printResult(
 ): void {
   if (result.removedGame && result.removedPath) {
     console.log(
-      `\n🗑️  Ruta eliminada. "${gameId}" ya no tenía rutas y fue eliminado.\n`
+      `\n${figures.tick} Ruta eliminada. "${gameId}" ya no tenía rutas y fue eliminado.\n`
     );
   } else if (result.removedGame) {
-    console.log(`\n🗑️  Juego "${gameId}" eliminado completamente.\n`);
+    console.log(`\n${figures.tick} Juego "${gameId}" eliminado completamente.\n`);
   } else if (result.removedPath) {
-    console.log(`\n🗑️  Ruta eliminada de "${gameId}".\n`);
+    console.log(`\n${figures.tick} Ruta eliminada de "${gameId}".\n`);
   }
 }
 

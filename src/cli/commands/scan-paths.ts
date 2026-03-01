@@ -1,6 +1,7 @@
 import { select, confirm, Separator } from "@inquirer/prompts";
 import { execSync } from "child_process";
 import { existsSync } from "fs";
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import type { Config } from "@cli/domain/entities/Config";
 
@@ -87,14 +88,14 @@ export async function runScanPathsInteractive(deps: CliDeps): Promise<void> {
   const action = await select<string>({
     message: "Rutas de escaneo personalizadas",
     choices: [
-      { name: "➕  Añadir ruta de escaneo", value: "add" },
+      { name: `${figures.pointer} Añadir ruta de escaneo`, value: "add" },
       {
-        name: `📋  Ver rutas configuradas (${currentPaths.length})`,
+        name: `${figures.hamburger} Ver rutas configuradas (${currentPaths.length})`,
         value: "list",
       },
-      { name: "🗑️  Eliminar ruta de escaneo", value: "remove" },
+      { name: `${figures.cross} Eliminar ruta de escaneo`, value: "remove" },
       new Separator(),
-      { name: "↩️  Volver", value: CANCEL_OPTION },
+      { name: `${figures.arrowLeft} Volver`, value: CANCEL_OPTION },
     ],
   });
 
@@ -130,7 +131,7 @@ async function addScanPath(
   const choices = drives
     .filter((d) => !alreadySet.has(d.path.toLowerCase()))
     .map((d) => ({
-      name: `💾  ${d.letter}  (${d.path})`,
+      name: `${figures.squareSmallFilled} ${d.letter}  (${d.path})`,
       value: d.path,
     }));
 
@@ -146,7 +147,7 @@ async function addScanPath(
   const driveChoices = [
     ...choices.filter((c) => c.value),
     new Separator(),
-    { name: "↩️  Cancelar", value: CANCEL_OPTION },
+    { name: `${figures.arrowLeft} Cancelar`, value: CANCEL_OPTION },
   ];
 
   const selected = await select<string>({
@@ -158,7 +159,7 @@ async function addScanPath(
 
   const newPaths = [...currentPaths, selected];
   await deps.getConfigUseCase.save({ ...config, customScanPaths: newPaths });
-  console.log(`\n✅ Ruta añadida: ${selected}\n`);
+  console.log(`\n${figures.tick} Ruta añadida: ${selected}\n`);
 }
 
 function listScanPaths(currentPaths: readonly string[]): void {
@@ -166,7 +167,7 @@ function listScanPaths(currentPaths: readonly string[]): void {
     console.log("\nNo hay rutas personalizadas configuradas.\n");
     return;
   }
-  console.log("\n📋 Rutas de escaneo personalizadas:\n");
+  console.log(`\n${figures.hamburger} Rutas de escaneo personalizadas:\n`);
   for (const p of currentPaths) {
     console.log(`  • ${p}`);
   }
@@ -186,7 +187,7 @@ async function removeScanPath(
   const choices = [
     ...currentPaths.map((p) => ({ name: `→ ${p}`, value: p })),
     new Separator(),
-    { name: "↩️  Cancelar", value: CANCEL_OPTION },
+    { name: `${figures.arrowLeft} Cancelar`, value: CANCEL_OPTION },
   ];
 
   const selected = await select<string>({
@@ -204,5 +205,5 @@ async function removeScanPath(
 
   const newPaths = currentPaths.filter((p) => p !== selected);
   await deps.getConfigUseCase.save({ ...config, customScanPaths: newPaths });
-  console.log(`\n🗑️  Ruta eliminada: ${selected}\n`);
+  console.log(`\n${figures.tick} Ruta eliminada: ${selected}\n`);
 }

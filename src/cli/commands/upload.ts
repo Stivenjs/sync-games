@@ -1,4 +1,5 @@
 import { select } from "@inquirer/prompts";
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import { listAllFilesFromPaths } from "@cli/infrastructure/listSaveFiles";
 
@@ -100,7 +101,7 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
     return;
   }
 
-  console.log(`\n☁️  Subiendo ${files.length} archivo(s) de: ${gameId}\n`);
+  console.log(`\n${figures.arrowUp} Subiendo ${files.length} archivo(s) de: ${gameId}\n`);
   let ok = 0;
   let err = 0;
   for (const { absolute, relative } of files) {
@@ -113,10 +114,10 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
         absolute,
         relative
       );
-      console.log("  ✓", relative);
+      console.log(` ${figures.tick}`, relative);
       ok++;
     } catch (e) {
-      console.error("  ✗", relative, "-", e instanceof Error ? e.message : e);
+      console.error(` ${figures.cross}`, relative, "-", e instanceof Error ? e.message : e);
       err++;
     }
   }

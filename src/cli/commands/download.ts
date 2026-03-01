@@ -1,6 +1,7 @@
 import { select, confirm } from "@inquirer/prompts";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import { expandPath } from "@cli/infrastructure/listSaveFiles";
 
@@ -99,7 +100,7 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
     return;
   }
 
-  console.log("\n☁️  Consultando guardados en la nube...\n");
+  console.log(`\n${figures.arrowDown} Consultando guardados en la nube...\n`);
   const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!, config.apiKey ?? "");
 
   if (allSaves.length === 0) {
@@ -127,7 +128,7 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   const CANCEL = "__cancel__";
   const selectedGameId = await select<string>({
     message: "¿De qué juego quieres restaurar los guardados?",
-    choices: [...gameChoices, { name: "↩️  Cancelar", value: CANCEL }],
+    choices: [...gameChoices, { name: `${figures.arrowLeft} Cancelar`, value: CANCEL }],
   });
 
   if (selectedGameId === CANCEL) return;
@@ -150,13 +151,13 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   const destBase = resolve(expandPath(game.paths[0]));
 
   console.log(
-    `\n📦 ${saves.length} archivo(s) de "${selectedGameId}" en la nube:`
+    `\n${figures.squareSmallFilled} ${saves.length} archivo(s) de "${selectedGameId}" en la nube:`
   );
   for (const s of saves) {
     const sizeStr = s.size ? ` (${formatSize(s.size)})` : "";
     console.log(`  • ${s.filename}${sizeStr}`);
   }
-  console.log(`\n📁 Destino: ${destBase}\n`);
+  console.log(`\n${figures.arrowRight} Destino: ${destBase}\n`);
 
   const sure = await confirm({
     message: `¿Descargar y restaurar ${saves.length} archivo(s)?`,
@@ -205,7 +206,7 @@ export async function runDownloadFromArgs(
     throw new Error("Game not found");
   }
 
-  console.log("\n☁️  Consultando guardados en la nube...\n");
+  console.log(`\n${figures.arrowDown} Consultando guardados en la nube...\n`);
   const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!, config.apiKey ?? "");
   const saves = allSaves.filter(
     (s) => s.gameId.toLowerCase() === gameId!.toLowerCase()
@@ -235,7 +236,7 @@ async function doDownload(
   saves: RemoteSave[],
   destBase: string
 ): Promise<void> {
-  console.log(`\n⬇️  Descargando ${saves.length} archivo(s) de: ${gameId}\n`);
+  console.log(`\n${figures.arrowDown} Descargando ${saves.length} archivo(s) de: ${gameId}\n`);
 
   let ok = 0;
   let err = 0;
@@ -245,11 +246,11 @@ async function doDownload(
     try {
       const url = await fetchDownloadUrl(apiBaseUrl, userId, apiKey, gameId, save.key);
       await downloadFileFromUrl(url, destPath);
-      console.log("  ✓", save.filename);
+      console.log(` ${figures.tick}`, save.filename);
       ok++;
     } catch (e) {
       console.error(
-        "  ✗",
+        ` ${figures.cross}`,
         save.filename,
         "-",
         e instanceof Error ? e.message : e
@@ -259,5 +260,5 @@ async function doDownload(
   }
 
   console.log(`\nListo: ${ok} descargado(s), ${err} error(es).`);
-  console.log(`📁 Restaurados en: ${destBase}\n`);
+  console.log(`${figures.arrowRight} Restaurados en: ${destBase}\n`);
 }

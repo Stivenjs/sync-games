@@ -1,4 +1,5 @@
 import { input, select, Separator } from "@inquirer/prompts";
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import type { PathCandidate } from "@cli/domain/entities/PathCandidate";
 
@@ -12,7 +13,7 @@ function toGameId(folderName: string): string {
 }
 
 export async function runAddInteractive(deps: CliDeps): Promise<void> {
-  console.log("\n🔍 Buscando juegos en rutas conocidas...\n");
+  console.log(`\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`);
   const candidates = await deps.scanForPathCandidatesUseCase.execute();
 
   let selectedPath: string;
@@ -47,7 +48,7 @@ export async function runAddInteractive(deps: CliDeps): Promise<void> {
   const path = selectedPath.trim();
 
   await deps.addGameUseCase.execute({ gameId, path });
-  console.log("\n✅ Añadido:", gameId, "→", path);
+  console.log(`\n${figures.tick} Añadido:`, gameId, figures.arrowRight, path);
 }
 
 function buildCandidateChoices(candidates: PathCandidate[]) {
@@ -68,7 +69,7 @@ function buildCandidateChoices(candidates: PathCandidate[]) {
   }
 
   choices.push(new Separator());
-  choices.push({ name: "✏️  Escribir manualmente", value: MANUAL_OPTION });
+  choices.push({ name: `${figures.pointer} Escribir manualmente`, value: MANUAL_OPTION });
   return choices;
 }
 

@@ -1,4 +1,5 @@
 import { select, confirm, Separator } from "@inquirer/prompts";
+import figures from "figures";
 import type { MainAction } from "@cli/constants";
 import type { CliDeps } from "@cli/container";
 import { isExitPromptError } from "@cli/utils";
@@ -9,16 +10,16 @@ async function showMainMenu(): Promise<MainAction> {
     message: "¿Qué quieres hacer?",
     pageSize: 12,
     choices: [
-      { name: "➕  Añadir un juego (ruta de guardados)", value: "add" },
-      { name: "🗑️  Eliminar un juego o ruta", value: "remove" },
-      { name: "📋  Listar juegos configurados", value: "list" },
-      { name: "🔍  Analizar rutas (buscar candidatos)", value: "scan" },
+      { name: `${figures.pointer} Añadir un juego (ruta de guardados)`, value: "add" },
+      { name: `${figures.cross} Eliminar un juego o ruta`, value: "remove" },
+      { name: `${figures.hamburger} Listar juegos configurados`, value: "list" },
+      { name: `${figures.arrowRight} Analizar rutas (buscar candidatos)`, value: "scan" },
       new Separator(),
-      { name: "☁️  Subir guardados a la nube", value: "upload" },
-      { name: "⬇️  Descargar guardados", value: "download" },
+      { name: `${figures.arrowUp} Subir guardados a la nube`, value: "upload" },
+      { name: `${figures.arrowDown} Descargar guardados`, value: "download" },
       new Separator(),
-      { name: "📂  Rutas de escaneo personalizadas", value: "scan-paths" },
-      { name: "⚙️  Ver ruta del archivo de config", value: "config" },
+      { name: `${figures.lozenge} Rutas de escaneo personalizadas`, value: "scan-paths" },
+      { name: `${figures.bullet} Ver ruta del archivo de config`, value: "config" },
       new Separator(),
       { name: "Salir", value: "exit" },
     ],
@@ -98,10 +99,10 @@ export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
       await runAction(deps, action);
     } catch (err) {
       if (isExitPromptError(err)) {
-        console.log("\n↩️  Operación cancelada.\n");
+        console.log(`\n${figures.arrowLeft} Operación cancelada.\n`);
       } else {
         console.error(
-          "\n❌ Error:",
+          `\n${figures.cross} Error:`,
           err instanceof Error ? err.message : err,
           "\n"
         );

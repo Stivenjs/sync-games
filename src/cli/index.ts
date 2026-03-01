@@ -8,16 +8,17 @@ import { createContainer } from "./container";
 import { runCommandMode, showHelp } from "./command-mode";
 import { runInteractiveLoop } from "./menu";
 import { waitForKeypressOnWindowsIfNeeded, isExitPromptError } from "./utils";
+import figures from "figures";
 
 process.on("uncaughtException", async (err) => {
-  console.error("\n❌ Error fatal:", err.message);
+  console.error(`\n${figures.cross} Error fatal:`, err.message);
   await waitForKeypressOnWindowsIfNeeded();
   process.exit(1);
 });
 
 process.on("unhandledRejection", async (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
-  console.error("\n❌ Error no manejado:", msg);
+  console.error(`\n${figures.cross} Error no manejado:`, msg);
   await waitForKeypressOnWindowsIfNeeded();
   process.exit(1);
 });
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
       await waitForKeypressOnWindowsIfNeeded();
       process.exit(0);
     }
-    console.error("\n❌ Error:", err instanceof Error ? err.message : String(err));
+    console.error(`\n${figures.cross} Error:`, err instanceof Error ? err.message : String(err));
   }
 
   await waitForKeypressOnWindowsIfNeeded();

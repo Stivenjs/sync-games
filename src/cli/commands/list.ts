@@ -1,3 +1,4 @@
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 
 export async function runList(deps: CliDeps): Promise<void> {
@@ -8,7 +9,7 @@ export async function runList(deps: CliDeps): Promise<void> {
     );
     return;
   }
-  console.log("\n📋 Juegos configurados:\n");
+  console.log(`\n${figures.hamburger} Juegos configurados:\n`);
   for (const g of games) {
     console.log(`  • ${g.id}`);
     for (const p of g.paths) console.log(`      → ${p}`);

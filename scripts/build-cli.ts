@@ -4,13 +4,15 @@
  * Uso:
  *   SYNC_GAMES_API_URL=https://... SYNC_GAMES_API_KEY=tu-key bun run build:cli
  */
+import figures from "figures";
+
 export {};
 
 const apiUrl = process.env.SYNC_GAMES_API_URL;
 const apiKey = process.env.SYNC_GAMES_API_KEY;
 
 if (!apiUrl || !apiKey) {
-  console.error("❌ Faltan variables de entorno:");
+  console.error(`${figures.cross} Faltan variables de entorno:`);
   if (!apiUrl) console.error("   - SYNC_GAMES_API_URL");
   if (!apiKey) console.error("   - SYNC_GAMES_API_KEY");
   console.error(
@@ -19,7 +21,7 @@ if (!apiUrl || !apiKey) {
   process.exit(1);
 }
 
-console.log(`\n🔧 Compilando CLI...`);
+console.log(`\n${figures.bullet} Compilando CLI...`);
 console.log(`   API URL: ${apiUrl}`);
 console.log(`   API Key: ${"*".repeat(apiKey.length)}\n`);
 
@@ -44,4 +46,4 @@ if (exitCode !== 0) {
   process.exit(exitCode);
 }
 
-console.log("\n✅ Build completado: dist/sync-games\n");
+console.log(`\n${figures.tick} Build completado: dist/sync-games\n`);

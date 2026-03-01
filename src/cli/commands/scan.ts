@@ -1,7 +1,8 @@
+import figures from "figures";
 import type { CliDeps } from "@cli/container";
 
 export async function runScan(deps: CliDeps): Promise<void> {
-  console.log("\n🔍 Analizando rutas típicas...\n");
+  console.log(`\n${figures.arrowRight} Analizando rutas típicas...\n`);
   const candidates = await deps.scanForPathCandidatesUseCase.execute();
   if (candidates.length === 0) {
     console.log("No se encontraron carpetas candidatas.");
