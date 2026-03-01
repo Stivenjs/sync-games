@@ -59,3 +59,59 @@ pub fn get_config_path() -> String {
         .and_then(|p| p.into_os_string().into_string().ok())
         .unwrap_or_else(|| "".to_string())
 }
+
+#[tauri::command]
+pub fn add_game(game_id: String, path: String) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    let game_id = game_id.trim().to_string();
+    let path = path.trim().to_string();
+
+    if game_id.is_empty() || path.is_empty() {
+        return Err("gameId and path are required".to_string());
+    }
+
+    if let Some(g) = cfg
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+    {
+        if !g.paths.contains(&path) {
+            g.paths.push(path);
+        }
+    } else {
+        cfg.games.push(config::ConfiguredGame {
+            id: game_id,
+            paths: vec![path],
+            steam_app_id: None,
+            image_url: None,
+        });
+    }
+
+    config::save_config(&cfg)
+}
+
+#[tauri::command]
+pub fn remove_game(game_id: String, path: Option<String>) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    let game_id = game_id.trim();
+    let path = path.as_deref().map(|s| s.trim());
+
+    let idx = cfg
+        .games
+        .iter()
+        .position(|g| g.id.eq_ignore_ascii_case(game_id));
+    let Some(idx) = idx else {
+        return Err(format!("Juego no encontrado: {}", game_id));
+    };
+
+    if let Some(p) = path {
+        cfg.games[idx].paths.retain(|x| x != p);
+        if cfg.games[idx].paths.is_empty() {
+            cfg.games.remove(idx);
+        }
+    } else {
+        cfg.games.remove(idx);
+    }
+
+    config::save_config(&cfg)
+}

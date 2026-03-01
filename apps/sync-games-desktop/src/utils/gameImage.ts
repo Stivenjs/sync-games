@@ -41,6 +41,17 @@ export function extractAppIdFromId(id: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Convierte un nombre de carpeta en un id de juego (ej. "Elden Ring" → "elden-ring"). */
+export function toGameId(folderName: string): string {
+  return (
+    folderName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "game"
+  );
+}
+
 /** Comprueba si el id parece un Steam App ID (solo dígitos). */
 export function isSteamAppId(id: string): boolean {
   return /^\d{4,10}$/.test(id.trim());

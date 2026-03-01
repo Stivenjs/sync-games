@@ -1,7 +1,7 @@
 //! Lógica de rutas y lectura del archivo de configuración.
 //! Compatible con la ubicación usada por el CLI.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
@@ -25,7 +25,7 @@ pub fn config_path() -> Option<PathBuf> {
 }
 
 /// Estructura mínima para deserializar el config del CLI.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default)]
@@ -40,7 +40,7 @@ pub struct Config {
     pub custom_scan_paths: Vec<String>,
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfiguredGame {
     pub id: String,
@@ -68,4 +68,16 @@ pub fn load_config() -> Config {
     };
 
     serde_json::from_str(&contents).unwrap_or_default()
+}
+
+/// Guarda el config en disco.
+/// Usada por commands::add_game y commands::remove_game.
+#[allow(dead_code)]
+pub fn save_config(cfg: &Config) -> Result<(), String> {
+    let path = config_path().ok_or_else(|| "No config path".to_string())?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
 }

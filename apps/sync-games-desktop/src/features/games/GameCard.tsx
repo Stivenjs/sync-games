@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardFooter, Skeleton } from "@heroui/react";
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Trash2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
 
@@ -10,6 +10,8 @@ export interface GameCardProps {
   resolvedSteamAppId?: string | null;
   /** Muestra skeleton mientras se resuelve Steam ID o carga la imagen. */
   isLoading?: boolean;
+  /** Callback al eliminar el juego. Si no se pasa, no se muestra el botón. */
+  onRemove?: (game: ConfiguredGame) => void;
 }
 
 /**
@@ -21,6 +23,7 @@ export function GameCard({
   game,
   resolvedSteamAppId,
   isLoading: externalLoading,
+  onRemove,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -47,9 +50,22 @@ export function GameCard({
   return (
     <Card
       isFooterBlurred
-      className="overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
+      className="group relative overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
       radius="lg"
     >
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(game);
+          }}
+          className="absolute right-2 top-2 z-20 rounded-lg bg-black/60 p-2 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
+          aria-label={`Eliminar ${game.id}`}
+        >
+          <Trash2 size={18} />
+        </button>
+      )}
       {showImage ? (
         <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large">
           <img

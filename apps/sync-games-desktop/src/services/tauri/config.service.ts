@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Config } from "@app-types/config";
 
+export interface PathCandidate {
+  path: string;
+  folderName: string;
+  basePath: string;
+}
+
 /** Obtiene la configuración desde el archivo compartido con el CLI */
 export async function getConfig(): Promise<Config> {
   return invoke<Config>("get_config");
@@ -14,4 +20,19 @@ export async function getConfigPath(): Promise<string> {
 /** Busca Steam App ID por nombre de juego (scraping dinámico) */
 export async function searchSteamAppId(query: string): Promise<string | null> {
   return invoke<string | null>("search_steam_app_id", { query });
+}
+
+/** Añade un juego a la configuración */
+export async function addGame(gameId: string, path: string): Promise<void> {
+  await invoke("add_game", { gameId, path });
+}
+
+/** Elimina un juego (o una ruta concreta) de la configuración */
+export async function removeGame(gameId: string, path?: string): Promise<void> {
+  await invoke("remove_game", { gameId, path });
+}
+
+/** Escanea el sistema en busca de carpetas candidatas para guardados */
+export async function scanPathCandidates(): Promise<PathCandidate[]> {
+  return invoke<PathCandidate[]>("scan_path_candidates");
 }

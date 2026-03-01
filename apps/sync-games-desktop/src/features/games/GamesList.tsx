@@ -9,9 +9,11 @@ interface GamesListProps {
   games: readonly ConfiguredGame[];
   /** Mensaje cuando la lista está vacía por filtros (en lugar del mensaje por defecto). */
   emptyFilterMessage?: string;
+  /** Callback al eliminar un juego. Si no se pasa, no se muestra el botón de eliminar. */
+  onRemove?: (game: ConfiguredGame) => void;
 }
 
-export function GamesList({ games, emptyFilterMessage }: GamesListProps) {
+export function GamesList({ games, emptyFilterMessage, onRemove }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
 
   if (games.length === 0) {
@@ -45,6 +47,7 @@ export function GamesList({ games, emptyFilterMessage }: GamesListProps) {
           isLoading={
             needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined
           }
+          onRemove={onRemove}
         />
       ))}
     </div>

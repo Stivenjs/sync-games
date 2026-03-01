@@ -98,7 +98,7 @@ fn parse_libraryfolders_vdf(content: &str) -> Option<Vec<PathBuf>> {
                     let s: String = chars[start..i].iter().collect();
                     if found_path_key {
                         // En VDF las barras van escapadas: "D:\\Program Files"
-                            let p = PathBuf::from(s.replace("\\\\", "\\"));
+                        let p = PathBuf::from(s.replace("\\\\", "\\"));
                         if p.is_dir() {
                             paths.push(p);
                         }
@@ -237,9 +237,7 @@ pub fn resolve_steam_app_id(
 
 /// Resuelve el Steam App ID para un juego dado sus rutas.
 /// Solo aplica si el juego no tiene ya steamAppId ni imageUrl.
-pub fn resolve_app_id_for_game(
-    game_paths: &[String],
-) -> Option<String> {
+pub fn resolve_app_id_for_game(game_paths: &[String]) -> Option<String> {
     let steam_root = steam_path_candidates()
         .into_iter()
         .find(|p| p.join("steamapps").is_dir())?;
