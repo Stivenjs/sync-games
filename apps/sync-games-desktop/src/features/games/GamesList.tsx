@@ -2,6 +2,7 @@ import { Card, CardBody, Code } from "@heroui/react";
 import { Gamepad2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
+import { needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
 
 interface GamesListProps {
@@ -41,6 +42,9 @@ export function GamesList({ games, emptyFilterMessage }: GamesListProps) {
           game={game}
           key={game.id}
           resolvedSteamAppId={resolvedSteamAppIds[game.id]}
+          isLoading={
+            needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined
+          }
         />
       ))}
     </div>

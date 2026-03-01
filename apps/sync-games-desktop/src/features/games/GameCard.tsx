@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardFooter } from "@heroui/react";
+import { Card, CardFooter, Skeleton } from "@heroui/react";
 import { Gamepad2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
@@ -8,16 +8,41 @@ export interface GameCardProps {
   game: ConfiguredGame;
   /** Steam App ID resuelto dinámicamente (por búsqueda). Opcional. */
   resolvedSteamAppId?: string | null;
+  /** Muestra skeleton mientras se resuelve Steam ID o carga la imagen. */
+  isLoading?: boolean;
 }
 
 /**
  * Tarjeta de juego con portada, usando HeroUI.
  * La imagen mantiene la proporción correcta de Steam (460×215) sin distorsión.
+ * Muestra skeletons de HeroUI mientras carga.
  */
-export function GameCard({ game, resolvedSteamAppId }: GameCardProps) {
+export function GameCard({
+  game,
+  resolvedSteamAppId,
+  isLoading: externalLoading,
+}: GameCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const imageUrl = getGameImageUrl(game, resolvedSteamAppId);
   const showImage = imageUrl && !imgError;
+  const imageLoading = showImage && !imgLoaded;
+  const isLoading = externalLoading ?? imageLoading;
+
+  if (isLoading) {
+    return (
+      <Card
+        isFooterBlurred
+        className="overflow-hidden border-none shadow-md"
+        radius="lg"
+      >
+        <Skeleton className="aspect-460/215 w-full rounded-t-large" />
+        <CardFooter className="absolute bottom-0 left-0 right-0 flex items-center justify-center overflow-hidden rounded-b-large border-0 bg-black/60 px-3 py-2 backdrop-blur-sm shadow-[0_-4px_20px_rgba(0,0,0,0.4)] z-10">
+          <Skeleton className="h-3 w-3/4 rounded-lg bg-white/30" />
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -32,6 +57,7 @@ export function GameCard({ game, resolvedSteamAppId }: GameCardProps) {
             alt={`Portada de ${game.id}`}
             className="size-full object-cover object-center"
             loading="lazy"
+            onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
           />
         </div>
