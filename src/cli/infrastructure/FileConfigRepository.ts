@@ -3,9 +3,10 @@ import { userInfo } from "os";
 import { dirname } from "path";
 import type { Config } from "@cli/domain/entities/Config";
 import type { ConfigRepository } from "@cli/domain/ports/ConfigRepository";
-
-const CONFIG_DIR_NAME = "sync-games";
-const CONFIG_FILE_NAME = "config.json";
+import {
+  CONFIG_DIR_NAME,
+  CONFIG_FILE_NAME,
+} from "@cli/infrastructure/configConstants";
 
 const DEFAULT_API_BASE_URL = process.env.SYNC_GAMES_API_URL ?? "";
 const DEFAULT_API_KEY = process.env.SYNC_GAMES_API_KEY ?? "";

@@ -2,15 +2,9 @@ import { input, select, Separator } from "@inquirer/prompts";
 import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import type { PathCandidate } from "@cli/domain/entities/PathCandidate";
+import { toGameId } from "@cli/utils";
 
 const MANUAL_OPTION = "__manual__";
-
-function toGameId(folderName: string): string {
-  return folderName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 export async function runAddInteractive(deps: CliDeps): Promise<void> {
   console.log(`\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`);

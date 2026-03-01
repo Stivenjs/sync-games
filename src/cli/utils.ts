@@ -12,6 +12,26 @@ export async function waitForKeypressOnWindowsIfNeeded(): Promise<void> {
 }
 
 /**
+ * Convierte un nombre legible a game-id: minúsculas, guiones, sin caracteres especiales.
+ */
+export function toGameId(folderName: string): string {
+  return folderName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Formatea bytes en formato legible (B, KB, MB).
+ */
+export function formatSize(bytes?: number): string {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
  * Indica si el error es una salida intencional del usuario (Ctrl+C, etc.).
  */
 export function isExitPromptError(err: unknown): boolean {

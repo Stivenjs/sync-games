@@ -1,85 +1,10 @@
 import { select, confirm, Separator } from "@inquirer/prompts";
-import { execSync } from "child_process";
-import { existsSync } from "fs";
 import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import type { Config } from "@cli/domain/entities/Config";
+import { detectDrives } from "@cli/infrastructure/driveDetector";
 
 const CANCEL_OPTION = "__cancel__";
-
-/**
- * Detecta las unidades/volúmenes montados en el sistema.
- * Windows: wmic o Get-Volume vía PowerShell.
- * Unix: parsea /proc/mounts o df.
- */
-function detectDrives(): { letter: string; path: string }[] {
-  if (process.platform === "win32") {
-    return detectWindowsDrives();
-  }
-  return detectUnixMounts();
-}
-
-function getSystemDrive(): string {
-  return (process.env.SystemDrive ?? "C:").toUpperCase();
-}
-
-function detectWindowsDrives(): { letter: string; path: string }[] {
-  const systemDrive = getSystemDrive();
-  let drives: { letter: string; path: string }[];
-
-  try {
-    const raw = execSync(
-      'powershell -NoProfile -Command "Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Root"',
-      { encoding: "utf-8", timeout: 5000 }
-    );
-    drives = raw
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length >= 2 && existsSync(l))
-      .map((root) => ({
-        letter: root.replace(/[:\\\/]+$/, ""),
-        path: root,
-      }));
-  } catch {
-    drives = [];
-    for (let code = 65; code <= 90; code++) {
-      const letter = String.fromCharCode(code);
-      const root = `${letter}:\\`;
-      if (existsSync(root)) {
-        drives.push({ letter, path: root });
-      }
-    }
-  }
-
-  return drives.filter(
-    (d) => d.letter.toUpperCase() !== systemDrive
-  );
-}
-
-function detectUnixMounts(): { letter: string; path: string }[] {
-  try {
-    const raw = execSync("df -h --output=target 2>/dev/null || df -h", {
-      encoding: "utf-8",
-      timeout: 5000,
-    });
-    const lines = raw.split(/\r?\n/).slice(1);
-    return lines
-      .map((l) => l.trim())
-      .filter(
-        (l) =>
-          l.startsWith("/") &&
-          !l.startsWith("/snap") &&
-          !l.startsWith("/boot") &&
-          !l.startsWith("/sys") &&
-          !l.startsWith("/proc") &&
-          !l.startsWith("/dev") &&
-          !l.startsWith("/run")
-      )
-      .map((mount) => ({ letter: mount, path: mount }));
-  } catch {
-    return [{ letter: "/", path: "/" }];
-  }
-}
 
 export async function runScanPathsInteractive(deps: CliDeps): Promise<void> {
   const config = await deps.getConfigUseCase.execute();

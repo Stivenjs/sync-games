@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "path";
 import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import { expandPath } from "@cli/infrastructure/listSaveFiles";
+import { formatSize } from "@cli/utils";
 
 interface RemoteSave {
   gameId: string;
@@ -82,13 +83,6 @@ async function downloadFileFromUrl(
     mkdirSync(dir, { recursive: true });
   }
   writeFileSync(destPath, Buffer.from(buffer));
-}
-
-function formatSize(bytes?: number): string {
-  if (bytes == null) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export async function runDownloadInteractive(deps: CliDeps): Promise<void> {

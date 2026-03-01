@@ -5,17 +5,17 @@ import type { PathScanner } from "@cli/domain/ports/PathScanner";
 import {
   folderContainsSaveLikeFiles,
   isExcludedFolder,
+} from "@cli/infrastructure/scanFilters";
+import {
   BASE_PATH_TEMPLATES_WIN32,
   DEFAULT_STEAM_PATH_WIN32,
-} from "@cli/infrastructure/scanFilters";
+} from "@cli/infrastructure/scanPathTemplates";
 import {
   resolveAppNames,
   extractAppId,
 } from "@cli/infrastructure/steamAppNames";
-
-function resolvePathTemplate(template: string): string {
-  return template.replace(/%([^%]+)%/g, (_, name) => process.env[name] ?? "");
-}
+import { expandPath } from "@cli/infrastructure/pathUtils";
+import { CRACK_SAVE_LOCATIONS } from "@cli/infrastructure/crackSaveLocations";
 
 function listSubdirs(dirPath: string): { path: string; name: string }[] {
   if (!existsSync(dirPath)) return [];
@@ -112,24 +112,6 @@ function findSteamLibraryCandidates(libraryPath: string): PathCandidate[] {
   return candidates;
 }
 
-// ─── Cracks (EMPRESS, CODEX, Goldberg, etc.) ───────────────────────────────
-
-/**
- * Rutas conocidas donde los cracks populares guardan saves.
- * Cada entrada tiene la ruta base y un label para mostrar al usuario.
- * Dentro, cada subcarpeta suele ser un AppID de Steam.
- */
-const CRACK_SAVE_LOCATIONS = [
-  { path: "C:\\Users\\Public\\Documents\\EMPRESS", label: "EMPRESS" },
-  { path: "C:\\Users\\Public\\Documents\\Steam", label: "CODEX/Steam emu" },
-  { path: "%APPDATA%\\Goldberg SteamEmu Saves", label: "Goldberg" },
-  { path: "%APPDATA%\\CODEX", label: "CODEX" },
-  { path: "%APPDATA%\\CPY_SAVES", label: "CPY (Conspir4cy)" },
-  { path: "%APPDATA%\\Skidrow", label: "Skidrow" },
-  { path: "%LOCALAPPDATA%\\CODEX", label: "CODEX (Local)" },
-  { path: "%USERPROFILE%\\Documents\\CPY_SAVES", label: "CPY (Documents)" },
-];
-
 /**
  * Busca saves en las carpetas de cracks conocidos.
  * Apunta a la carpeta del AppID completa (no la subcarpeta más profunda),
@@ -139,7 +121,7 @@ function findCrackSaveCandidates(): PathCandidate[] {
   const candidates: PathCandidate[] = [];
 
   for (const loc of CRACK_SAVE_LOCATIONS) {
-    const basePath = resolvePathTemplate(loc.path);
+    const basePath = expandPath(loc.path);
     if (!basePath || !existsSync(basePath)) continue;
 
     const appDirs = listSubdirs(basePath);
@@ -198,7 +180,7 @@ export class FileSystemPathScanner implements PathScanner {
     };
 
     for (const template of templates) {
-      const basePath = resolvePathTemplate(template);
+      const basePath = expandPath(template);
       if (!basePath || !existsSync(basePath)) continue;
       scanBasePaths(basePath, addCandidate);
     }

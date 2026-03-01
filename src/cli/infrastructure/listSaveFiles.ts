@@ -1,45 +1,15 @@
 import { existsSync, readdirSync, statSync } from "fs";
 import { join, relative, resolve, basename } from "path";
+import { ALL_SAVE_EXTENSIONS } from "./saveExtensions";
+import { expandPath } from "./pathUtils";
 
-/**
- * Extensiones típicas de archivos de guardado (mismo criterio que el scan).
- */
-const SAVE_EXTENSIONS = [
-  ".sav",
-  ".savx",
-  ".save",
-  ".sl2",
-  ".dat",
-  ".bin",
-  ".json",
-  ".bak",
-  ".db",
-  ".sqlite",
-  ".state",
-  ".xml",
-  ".cfg",
-  ".ini",
-  ".sr",
-];
+export { expandPath } from "./pathUtils";
 
 function looksLikeSaveFile(name: string): boolean {
   const lower = name.toLowerCase();
-  return SAVE_EXTENSIONS.some(
+  return ALL_SAVE_EXTENSIONS.some(
     (ext) => lower.endsWith(ext) || (ext.length > 1 && lower.includes(ext))
   );
-}
-
-/** Sustituye %VAR% y ~ por valores de entorno. */
-export function expandPath(raw: string): string {
-  const withEnv = raw.replace(
-    /%([^%]+)%/g,
-    (_, name: string) => process.env[name] ?? ""
-  );
-  if (withEnv.startsWith("~")) {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    return home ? join(home, withEnv.slice(1)) : withEnv;
-  }
-  return withEnv;
 }
 
 function collectFilesRecursive(
