@@ -52,6 +52,8 @@ Instalación: `bun install`
 2. **Comando global:** `bun link` → en cualquier sitio: `sync-games` (menú) o `sync-games list`.
 3. **Ejecutable único:** `bun run build:cli` → `dist/sync-games.exe`; al ejecutarlo sin args se abre el menú.
 
+**Nota:** Si el ejecutable compilado (`sync-games.exe`) provoca «Segmentation fault» al subir guardados (error conocido de Bun en Windows con ejecutables empaquetados), usa `bun run cli` en su lugar.
+
 ## Estructura del CLI (Clean Architecture)
 
 ```

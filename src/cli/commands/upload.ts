@@ -44,7 +44,10 @@ async function uploadFileToS3(
     const text = await res.text();
     throw new Error(`API upload-url: ${res.status} ${text}`);
   }
-  const { uploadUrl } = (await res.json()) as { uploadUrl: string; key: string };
+  const { uploadUrl } = (await res.json()) as {
+    uploadUrl: string;
+    key: string;
+  };
   const file = Bun.file(filePath);
   const putRes = await fetch(uploadUrl, {
     method: "PUT",
@@ -89,7 +92,9 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
     throw new Error("Missing apiBaseUrl or userId in config");
   }
 
-  const game = config.games.find((g) => g.id.toLowerCase() === gameId.toLowerCase());
+  const game = config.games.find(
+    (g) => g.id.toLowerCase() === gameId.toLowerCase()
+  );
   if (!game) {
     console.error(`Juego no encontrado: ${gameId}`);
     throw new Error("Game not found");
@@ -97,11 +102,15 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
 
   const files = listAllFilesFromPaths([...game.paths]);
   if (files.length === 0) {
-    console.log(`No se encontraron archivos de guardado en las rutas de ${gameId}.`);
+    console.log(
+      `No se encontraron archivos de guardado en las rutas de ${gameId}.`
+    );
     return;
   }
 
-  console.log(`\n${figures.arrowUp} Subiendo ${files.length} archivo(s) de: ${gameId}\n`);
+  console.log(
+    `\n${figures.arrowUp} Subiendo ${files.length} archivo(s) de: ${gameId}\n`
+  );
   let ok = 0;
   let err = 0;
   for (const { absolute, relative } of files) {
@@ -117,7 +126,12 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
       console.log(` ${figures.tick}`, relative);
       ok++;
     } catch (e) {
-      console.error(` ${figures.cross}`, relative, "-", e instanceof Error ? e.message : e);
+      console.error(
+        ` ${figures.cross}`,
+        relative,
+        "-",
+        e instanceof Error ? e.message : e
+      );
       err++;
     }
   }
