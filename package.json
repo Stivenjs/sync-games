@@ -16,6 +16,7 @@
     "invoke:local": "serverless invoke local -f api",
     "lint": "eslint src --ext .ts",
     "desktop": "bun run --cwd apps/sync-games-desktop tauri dev",
+    "desktop:dev": "bun run --cwd apps/sync-games-desktop dev",
     "desktop:build": "bun run --cwd apps/sync-games-desktop tauri build"
   },
   "dependencies": {
