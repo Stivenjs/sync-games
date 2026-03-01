@@ -1,50 +1,37 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { AppLayout, type NavItem } from "@components/layout";
+import { GamesPage } from "@features/games";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const NAV_ITEMS: NavItem[] = [
+  { id: "games", label: "Juegos" },
+  // Más secciones: Añadir, Subir, Descargar, Config...
+];
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+function PageContent({ activeId }: { activeId: string }) {
+  switch (activeId) {
+    case "games":
+      return <GamesPage />;
+    default:
+      return (
+        <div className="page page--center">
+          <p className="page__muted">Sección en desarrollo</p>
+        </div>
+      );
   }
+}
+
+function App() {
+  const [activeNavId, setActiveNavId] = useState("games");
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <AppLayout
+      navItems={NAV_ITEMS}
+      activeNavId={activeNavId}
+      onNavSelect={setActiveNavId}
+    >
+      <PageContent activeId={activeNavId} />
+    </AppLayout>
   );
 }
 
