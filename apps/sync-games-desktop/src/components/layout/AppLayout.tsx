@@ -15,9 +15,9 @@ export function AppLayout({
   children,
 }: AppLayoutProps) {
   return (
-    <div className="app-layout">
+    <div className="flex min-h-screen">
       <Sidebar items={navItems} activeId={activeNavId} onSelect={onNavSelect} />
-      <main className="app-layout__main">{children}</main>
+      <main className="flex-1 overflow-auto p-6">{children}</main>
     </div>
   );
 }

@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* HeroUI theme - Tailwind v4 scanea node_modules por defecto, pero @heroui/theme necesita @source */
+@source "../node_modules/@heroui/theme/dist/**/*.{js,ts}";
+
+/* Dark mode variant para HeroUI */
+@custom-variant dark (&:is(.dark *));

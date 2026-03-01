@@ -1,3 +1,4 @@
+import { Card, CardBody, CardHeader, Code } from "@heroui/react";
 import { Gamepad2, FolderOpen } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 
@@ -8,32 +9,41 @@ interface GamesListProps {
 export function GamesList({ games }: GamesListProps) {
   if (games.length === 0) {
     return (
-      <div className="empty-state">
-        <Gamepad2 className="empty-state__icon" size={48} strokeWidth={1.5} />
-        <p className="empty-state__text">No hay juegos configurados.</p>
-        <p className="empty-state__hint">
-          Añade juegos desde la línea de comandos con:{" "}
-          <code>sync-games add &lt;game-id&gt; &lt;ruta&gt;</code>
-        </p>
-      </div>
+      <Card className="border border-dashed border-default-300">
+        <CardBody className="flex flex-col items-center gap-4 py-12 text-center">
+          <Gamepad2 size={48} className="text-default-400" strokeWidth={1.5} />
+          <div>
+            <p className="text-default-500">No hay juegos configurados.</p>
+            <p className="mt-2 text-sm text-default-400">
+              Añade juegos desde la línea de comandos con:{" "}
+              <Code>sync-games add &lt;game-id&gt; &lt;ruta&gt;</Code>
+            </p>
+          </div>
+        </CardBody>
+      </Card>
     );
   }
 
   return (
-    <ul className="games-list">
+    <div className="flex flex-col gap-3">
       {games.map((game) => (
-        <li key={game.id} className="games-list__item">
-          <div className="games-list__id">{game.id}</div>
-          <ul className="games-list__paths">
-            {game.paths.map((path) => (
-              <li key={path} className="games-list__path">
-                <FolderOpen size={14} className="games-list__path-icon" />
-                {path}
-              </li>
-            ))}
-          </ul>
-        </li>
+        <Card key={game.id}>
+          <CardHeader className="flex gap-2 pb-0">
+            <Gamepad2 size={20} className="text-primary" />
+            <span className="font-semibold">{game.id}</span>
+          </CardHeader>
+          <CardBody className="pt-2">
+            <ul className="flex flex-col gap-1 text-small text-default-500">
+              {game.paths.map((path) => (
+                <li key={path} className="flex items-center gap-2 font-mono">
+                  <FolderOpen size={14} className="shrink-0 opacity-70" />
+                  {path}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
       ))}
-    </ul>
+    </div>
   );
 }

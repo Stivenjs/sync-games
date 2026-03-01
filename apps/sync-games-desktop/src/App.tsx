@@ -15,8 +15,8 @@ function PageContent({ activeId }: { activeId: string }) {
       return <GamesPage />;
     default:
       return (
-        <div className="page page--center">
-          <p className="page__muted">Sección en desarrollo</p>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <p className="text-default-500">Sección en desarrollo</p>
         </div>
       );
   }

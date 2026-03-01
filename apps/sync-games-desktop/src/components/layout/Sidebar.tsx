@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@heroui/react";
 import { Gamepad2 } from "lucide-react";
 
 export interface NavItem {
@@ -15,24 +16,23 @@ interface SidebarProps {
 
 export function Sidebar({ items, activeId, onSelect }: SidebarProps) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar__brand">
-        <Gamepad2 className="sidebar__logo" size={24} aria-hidden="true" />
-        <span className="sidebar__title">sync-games</span>
+    <aside className="flex w-56 flex-col border-r border-default-200 bg-default-100">
+      <div className="flex items-center gap-3 border-b border-default-200 px-4 py-5">
+        <Gamepad2 size={24} className="text-primary" aria-hidden />
+        <span className="font-semibold text-foreground">sync-games</span>
       </div>
-      <nav className="sidebar__nav">
+      <nav className="flex flex-col gap-0.5 p-2">
         {items.map((item) => (
-          <button
+          <Button
             key={item.id}
-            type="button"
-            className={`sidebar__item ${
-              activeId === item.id ? "sidebar__item--active" : ""
-            }`}
-            onClick={() => onSelect(item.id)}
+            variant={activeId === item.id ? "flat" : "light"}
+            color={activeId === item.id ? "primary" : "default"}
+            className="justify-start"
+            startContent={item.icon}
+            onPress={() => onSelect(item.id)}
           >
-            {item.icon ?? null}
-            <span>{item.label}</span>
-          </button>
+            {item.label}
+          </Button>
         ))}
       </nav>
     </aside>
