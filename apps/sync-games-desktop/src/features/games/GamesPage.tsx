@@ -37,7 +37,7 @@ export function GamesPage() {
           Juegos configurados
         </h1>
         <Button
-          variant="flat"
+          variant="solid"
           startContent={<RefreshCw size={18} />}
           onPress={() => refetch?.()}
         >
