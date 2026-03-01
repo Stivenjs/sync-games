@@ -22,6 +22,11 @@ export async function searchSteamAppId(query: string): Promise<string | null> {
   return invoke<string | null>("search_steam_app_id", { query });
 }
 
+/** Obtiene el nombre del juego a partir del Steam App ID (API appdetails) */
+export async function getSteamAppName(appId: string): Promise<string | null> {
+  return invoke<string | null>("get_steam_app_name", { appId });
+}
+
 /** Añade un juego a la configuración */
 export async function addGame(gameId: string, path: string): Promise<void> {
   await invoke("add_game", { gameId, path });

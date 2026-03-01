@@ -41,6 +41,14 @@ export function extractAppIdFromId(id: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Extrae Steam App ID de un folderName como "EMPRESS — 2050650" o "Steam App 2551020".
+ */
+export function extractAppIdFromFolderName(folderName: string): string | null {
+  const match = folderName.trim().match(/\b(\d{4,10})\b/);
+  return match ? match[1] : null;
+}
+
 /** Convierte un nombre de carpeta en un id de juego (ej. "Elden Ring" → "elden-ring"). */
 export function toGameId(folderName: string): string {
   return (

@@ -11,7 +11,8 @@ import {
 import { FolderOpen, Plus } from "lucide-react";
 import { scanPathCandidates } from "@services/tauri";
 import type { PathCandidate } from "@services/tauri";
-import { toGameId } from "@utils/gameImage";
+import { useResolvedCandidateNames } from "@hooks/useResolvedCandidateNames";
+import { extractAppIdFromFolderName, toGameId } from "@utils/gameImage";
 
 interface ScanModalProps {
   isOpen: boolean;
@@ -21,16 +22,26 @@ interface ScanModalProps {
 
 function CandidateRow({
   candidate,
+  resolvedName,
   onAdd,
 }: {
   candidate: PathCandidate;
+  resolvedName: string | null | undefined;
   onAdd: () => void;
 }) {
+  const hasAppId = !!extractAppIdFromFolderName(candidate.folderName ?? "");
+  const displayName =
+    hasAppId && resolvedName ? resolvedName : candidate.folderName;
+  const isLoading = hasAppId && resolvedName === undefined;
+
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border border-default-200 bg-default-50/50 px-4 py-3 dark:bg-default-100/20">
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-foreground">
-          {candidate.folderName}
+          {displayName}
+          {isLoading && (
+            <Spinner size="sm" className="ml-2 inline-block" color="primary" />
+          )}
         </p>
         <p className="truncate text-sm text-default-500" title={candidate.path}>
           {candidate.path}
@@ -65,6 +76,8 @@ export function ScanModal({
     enabled: isOpen,
   });
 
+  const resolvedNames = useResolvedCandidateNames(candidates);
+
   const handleAdd = (candidate: PathCandidate) => {
     onSelectCandidate(candidate.path, toGameId(candidate.folderName));
     onClose();
@@ -95,6 +108,7 @@ export function ScanModal({
                 <CandidateRow
                   key={c.path}
                   candidate={c}
+                  resolvedName={resolvedNames[c.path]}
                   onAdd={() => handleAdd(c)}
                 />
               ))}
