@@ -33,7 +33,11 @@ notify = "6"
 notify-debouncer-mini = "0.4"
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 

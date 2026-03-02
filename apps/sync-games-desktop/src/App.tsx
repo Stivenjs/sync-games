@@ -6,6 +6,7 @@ import { GamesPage } from "@features/games";
 import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { SettingsPage } from "@features/settings";
 import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
+import { checkForUpdatesWithPrompt } from "@services/tauri";
 import { toastSyncResult } from "@utils/toast";
 import { notifySyncComplete, notifySyncError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
@@ -41,6 +42,18 @@ function App() {
     uploadAll,
     isUploading,
   } = useUnsyncedSaves();
+
+  // Comprobar actualizaciones al iniciar (solo en producción)
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      const t = setTimeout(() => {
+        checkForUpdatesWithPrompt(true).catch(() => {
+          // Error silencioso: endpoint no configurado o sin conexión
+        });
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubDone = listen<{

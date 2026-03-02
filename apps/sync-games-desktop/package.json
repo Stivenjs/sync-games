@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "icon": "bun run scripts/make-icon-square.ts && tauri icon src-tauri/icons/icon-square.png"
+    "icon": "bun run scripts/make-icon-square.ts && tauri icon src-tauri/icons/icon-square.png",
+    "latest-json": "bun run scripts/generate-latest-json.ts"
   },
   "dependencies": {
     "@heroui/react": "^2.8.9",
@@ -20,6 +21,8 @@
     "@tauri-apps/plugin-dialog": "~2",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "~2",
+    "@tauri-apps/plugin-updater": "~2",
     "framer-motion": "^12.34.3",
     "gsap": "^3.14.2",
     "lucide-react": "^0.575.0",

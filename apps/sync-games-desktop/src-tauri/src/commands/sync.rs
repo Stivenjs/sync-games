@@ -529,9 +529,7 @@ pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String
 
     let backup_dir = config::config_dir().map(|root| {
         let ts = chrono::Utc::now().format("%Y-%m-%d_%H-%M-%S");
-        root.join("backups")
-            .join(&game_id)
-            .join(ts.to_string())
+        root.join("backups").join(&game_id).join(ts.to_string())
     });
 
     for save in saves {

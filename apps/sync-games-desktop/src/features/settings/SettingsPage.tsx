@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Button, Card, CardBody, Switch } from "@heroui/react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { isEnabled, enable, disable } from "@tauri-apps/plugin-autostart";
-import { exportConfigToFile, importConfigFromFile } from "@services/tauri";
+import {
+  exportConfigToFile,
+  importConfigFromFile,
+  checkForUpdatesWithPrompt,
+} from "@services/tauri";
 import { toastError, toastSuccess } from "@utils/toast";
 import { notifyTest } from "@utils/notification";
 
@@ -12,6 +16,7 @@ export function SettingsPage() {
   const [testingNotification, setTestingNotification] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleExportConfig = async () => {
     setExporting(true);
@@ -59,6 +64,15 @@ export function SettingsPage() {
       );
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      await checkForUpdatesWithPrompt();
+    } finally {
+      setCheckingUpdate(false);
     }
   };
 
@@ -116,6 +130,22 @@ export function SettingsPage() {
               />
             </div>
           </div>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardBody className="gap-4">
+          <p className="font-medium">Actualizaciones</p>
+          <p className="text-sm text-default-500">
+            Comprueba si hay una nueva versión disponible e instálala.
+          </p>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={handleCheckUpdates}
+            isLoading={checkingUpdate}
+          >
+            Buscar actualizaciones
+          </Button>
         </CardBody>
       </Card>
       <Card>
