@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { Card, CardFooter, Skeleton } from "@heroui/react";
+import {
+  Button,
+  Card,
+  CardFooter,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+  Skeleton,
+} from "@heroui/react";
 import {
   CloudDownload,
   CloudUpload,
   FolderOpen,
   Gamepad2,
+  MoreVertical,
   Trash2,
 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
@@ -79,71 +89,88 @@ export function GameCard({
       className="group relative overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
       radius="lg"
     >
-      <div className="absolute right-2 top-2 z-20 flex gap-1">
-        {onOpenFolder && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenFolder(game);
-            }}
-            disabled={isDownloading || isSyncing}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-default-100 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
-            aria-label={`Abrir carpeta de guardados de ${game.id}`}
-          >
-            <FolderOpen size={18} />
-          </button>
-        )}
-        {onDownload && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload(game);
-            }}
-            disabled={isDownloading || isSyncing}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-secondary hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
-            aria-label={`Descargar ${game.id}`}
-          >
-            {isDownloading ? (
-              <span className="size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <CloudDownload size={18} />
-            )}
-          </button>
-        )}
-        {onSync && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSync(game);
-            }}
-            disabled={isSyncing || isDownloading}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-primary hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
-            aria-label={`Subir ${game.id}`}
-          >
-            {isSyncing ? (
-              <span className="size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <CloudUpload size={18} />
-            )}
-          </button>
-        )}
-        {onRemove && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(game);
-            }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-            aria-label={`Eliminar ${game.id}`}
-          >
-            <Trash2 size={18} />
-          </button>
-        )}
-      </div>
+      {(onOpenFolder || onDownload || onSync || onRemove) && (
+        <div
+          className="absolute right-2 top-2 z-20"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Dropdown placement="bottom-end">
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                className="min-w-unit-9 h-9 rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-default-100 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 data-hover:opacity-100"
+                aria-label={`Acciones de ${game.id}`}
+              >
+                <MoreVertical size={18} strokeWidth={2} />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label={`Acciones de ${game.id}`}
+              onAction={(key) => {
+                if (key === "folder") onOpenFolder?.(game);
+                else if (key === "download") onDownload?.(game);
+                else if (key === "sync") onSync?.(game);
+                else if (key === "remove") onRemove?.(game);
+              }}
+              disabledKeys={
+                isDownloading || isSyncing ? ["folder", "download", "sync"] : []
+              }
+            >
+              {onOpenFolder ? (
+                <DropdownItem
+                  key="folder"
+                  startContent={
+                    <FolderOpen size={16} className="text-default-500" />
+                  }
+                >
+                  Abrir carpeta de guardados
+                </DropdownItem>
+              ) : null}
+              {onDownload ? (
+                <DropdownItem
+                  key="download"
+                  startContent={
+                    isDownloading ? (
+                      <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <CloudDownload size={16} className="text-default-500" />
+                    )
+                  }
+                >
+                  Descargar desde la nube
+                </DropdownItem>
+              ) : null}
+              {onSync ? (
+                <DropdownItem
+                  key="sync"
+                  startContent={
+                    isSyncing ? (
+                      <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <CloudUpload size={16} className="text-default-500" />
+                    )
+                  }
+                >
+                  Subir a la nube
+                </DropdownItem>
+              ) : null}
+              {onRemove ? (
+                <DropdownItem
+                  key="remove"
+                  className="text-danger"
+                  color="danger"
+                  startContent={<Trash2 size={16} className="text-danger" />}
+                >
+                  Eliminar juego
+                </DropdownItem>
+              ) : null}
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      )}
       {showImage ? (
         <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large">
           <img
