@@ -20,6 +20,8 @@ interface GamesListProps {
   onDownload?: (game: ConfiguredGame) => void;
   /** ID del juego que está descargando (muestra spinner). */
   downloadingId?: string | null;
+  /** Callback al abrir la carpeta de guardados. */
+  onOpenFolder?: (game: ConfiguredGame) => void;
 }
 
 export function GamesList({
@@ -30,6 +32,7 @@ export function GamesList({
   syncingId,
   onDownload,
   downloadingId,
+  onOpenFolder,
 }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
   const { statsByGameId } = useGameStats(games.length > 0);
@@ -71,6 +74,7 @@ export function GamesList({
           isSyncing={syncingId === game.id || syncingId === "all"}
           onDownload={onDownload}
           isDownloading={downloadingId === game.id || downloadingId === "all"}
+          onOpenFolder={onOpenFolder}
         />
       ))}
     </div>

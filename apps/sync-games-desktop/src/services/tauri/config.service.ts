@@ -32,6 +32,24 @@ export async function addGame(gameId: string, path: string): Promise<void> {
   await invoke("add_game", { gameId, path });
 }
 
+/** Abre la carpeta de guardados del juego en el explorador */
+export async function openSaveFolder(gameId: string): Promise<void> {
+  await invoke("open_save_folder", { gameId });
+}
+
+/** Exporta la configuración a un archivo JSON. Devuelve el path. */
+export async function exportConfigToFile(path: string): Promise<string> {
+  return invoke("export_config_to_file", { path });
+}
+
+/** Importa configuración desde archivo. mode: "merge" | "replace" */
+export async function importConfigFromFile(
+  path: string,
+  mode: "merge" | "replace"
+): Promise<void> {
+  await invoke("import_config_from_file", { path, mode });
+}
+
 /** Elimina un juego (o una ruta concreta) de la configuración */
 export async function removeGame(gameId: string, path?: string): Promise<void> {
   await invoke("remove_game", { gameId, path });

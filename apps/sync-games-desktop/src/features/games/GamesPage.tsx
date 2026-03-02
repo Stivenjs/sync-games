@@ -55,6 +55,7 @@ export function GamesPage() {
     handleDownloadOne,
     handleSyncAll,
     handleDownloadAll,
+    handleOpenFolder,
     handleRefresh,
     refetchLastSync,
     filteredGames,
@@ -167,6 +168,7 @@ export function GamesPage() {
         syncingId={syncing}
         onDownload={hasSyncConfig ? handleDownloadOne : undefined}
         downloadingId={downloading}
+        onOpenFolder={handleOpenFolder}
         emptyFilterMessage={emptyFilterMessage}
       />
 

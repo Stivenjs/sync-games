@@ -38,6 +38,9 @@ pub fn run() {
             commands::sync_download_game,
             commands::sync_check_unsynced_games,
             commands::get_game_stats,
+            commands::open_save_folder,
+            commands::export_config_to_file,
+            commands::import_config_from_file,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

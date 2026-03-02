@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Card, CardFooter, Skeleton } from "@heroui/react";
-import { CloudDownload, CloudUpload, Gamepad2, Trash2 } from "lucide-react";
+import {
+  CloudDownload,
+  CloudUpload,
+  FolderOpen,
+  Gamepad2,
+  Trash2,
+} from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
@@ -24,6 +30,8 @@ export interface GameCardProps {
   onDownload?: (game: ConfiguredGame) => void;
   /** Muestra spinner en el botón de descargar. */
   isDownloading?: boolean;
+  /** Callback al abrir la carpeta de guardados. Si no se pasa, no se muestra el botón. */
+  onOpenFolder?: (game: ConfiguredGame) => void;
 }
 
 /**
@@ -41,6 +49,7 @@ export function GameCard({
   isSyncing,
   onDownload,
   isDownloading,
+  onOpenFolder,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -71,6 +80,20 @@ export function GameCard({
       radius="lg"
     >
       <div className="absolute right-2 top-2 z-20 flex gap-1">
+        {onOpenFolder && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenFolder(game);
+            }}
+            disabled={isDownloading || isSyncing}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-default-100 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
+            aria-label={`Abrir carpeta de guardados de ${game.id}`}
+          >
+            <FolderOpen size={18} />
+          </button>
+        )}
         {onDownload && (
           <button
             type="button"

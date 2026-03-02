@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  openSaveFolder,
   removeGame,
   syncCheckDownloadConflicts,
   syncDownloadGame,
@@ -8,7 +9,7 @@ import {
 } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
-import { toastDownloadResult, toastSyncResult } from "@utils/toast";
+import { toastDownloadResult, toastError, toastSyncResult } from "@utils/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
@@ -297,6 +298,14 @@ export function useGamesPage() {
     setDownloadAllConflictGames([]);
   };
 
+  const handleOpenFolder = async (game: ConfiguredGame) => {
+    try {
+      await openSaveFolder(game.id);
+    } catch (e) {
+      toastError("No se pudo abrir", e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const filteredGames = filterGames(
     config?.games ?? [],
     searchTerm,
@@ -350,6 +359,7 @@ export function useGamesPage() {
     handleDownloadOne,
     handleSyncAll,
     handleDownloadAll,
+    handleOpenFolder,
     handleRefresh,
     refetchLastSync,
     filteredGames,
