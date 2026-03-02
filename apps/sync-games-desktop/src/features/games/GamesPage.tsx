@@ -1,6 +1,8 @@
 import { Button, Spinner } from "@heroui/react";
 import { RefreshCw } from "lucide-react";
 import { AddGameModal } from "@features/games/AddGameModal";
+import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
+import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
 import { GamesFilters } from "@features/games/GamesFilters";
 import { GamesList } from "@features/games/GamesList";
 import { GamesPageHeader } from "@features/games/GamesPageHeader";
@@ -22,6 +24,8 @@ export function GamesPage() {
     cloudGames,
     totalCloudSize,
     lastSyncLoading,
+    connectionStatus,
+    connectionError,
     searchTerm,
     setSearchTerm,
     originFilter,
@@ -34,6 +38,13 @@ export function GamesPage() {
     setAddModalInitial,
     gameToRemove,
     setGameToRemove,
+    downloadConflictGame,
+    downloadConflicts,
+    handleConfirmDownloadConflict,
+    handleCloseDownloadConflict,
+    downloadAllConflictGames,
+    handleConfirmDownloadAllConflict,
+    handleCloseDownloadAllConflict,
     syncing,
     downloading,
     operationResult,
@@ -45,6 +56,7 @@ export function GamesPage() {
     handleSyncAll,
     handleDownloadAll,
     handleRefresh,
+    refetchLastSync,
     filteredGames,
     emptyFilterMessage,
   } = useGamesPage();
@@ -80,6 +92,9 @@ export function GamesPage() {
         gamesCount={config?.games?.length ?? 0}
         syncing={syncing}
         downloading={downloading}
+        connectionStatus={connectionStatus}
+        connectionError={connectionError}
+        onConnectionRetry={() => refetchLastSync?.()}
         onScanPress={() => setScanModalOpen(true)}
         onAddPress={() => {
           setAddModalInitial({ path: "", suggestedId: "" });
@@ -107,6 +122,21 @@ export function GamesPage() {
         onClose={() => setGameToRemove(null)}
         game={gameToRemove}
         onConfirm={handleConfirmRemove}
+      />
+      <DownloadConflictModal
+        isOpen={!!downloadConflictGame}
+        onClose={handleCloseDownloadConflict}
+        gameId={downloadConflictGame?.id ?? ""}
+        conflicts={downloadConflicts}
+        onConfirm={handleConfirmDownloadConflict}
+        isLoading={!!downloading && downloading === downloadConflictGame?.id}
+      />
+      <DownloadAllConflictModal
+        isOpen={downloadAllConflictGames.length > 0}
+        onClose={handleCloseDownloadAllConflict}
+        gamesWithConflicts={downloadAllConflictGames}
+        onConfirm={handleConfirmDownloadAllConflict}
+        isLoading={downloading === "all"}
       />
 
       <div className="mb-8">

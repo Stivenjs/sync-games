@@ -25,6 +25,7 @@ pub fn run() {
             commands::list_save_files,
             commands::sync_upload_game,
             commands::sync_list_remote_saves,
+            commands::sync_check_download_conflicts,
             commands::sync_download_game,
         ])
         .run(tauri::generate_context!())

@@ -55,11 +55,19 @@ function computeCloudGames(saves: { gameId: string; size?: number }[]): {
   return { cloudGames, totalSize };
 }
 
+export type ConnectionStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "error"
+  | "retrying";
+
 /**
  * Hook que obtiene la última sincronización y los juegos en la nube.
  * Usa la lista de guardados para calcular:
  * - última sync (juego + fecha)
  * - resumen por juego (archivos, tamaño) y total en la nube
+ * - estado de conexión con la API
  */
 export function useLastSyncInfo(enabled: boolean) {
   const query = useQuery({
@@ -71,13 +79,28 @@ export function useLastSyncInfo(enabled: boolean) {
       return { ...lastSync, cloudGames, totalCloudSize: totalSize };
     },
     enabled,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? 30_000 : false,
   });
+
+  const connectionStatus: ConnectionStatus = !enabled
+    ? "idle"
+    : query.isError && query.isFetching
+      ? "retrying"
+      : query.isError
+        ? "error"
+        : query.isLoading
+          ? "connecting"
+          : "connected";
+
   return {
     lastSyncAt: query.data?.lastSyncAt ?? null,
     lastSyncGameId: query.data?.lastSyncGameId ?? null,
     cloudGames: query.data?.cloudGames ?? [],
     totalCloudSize: query.data?.totalCloudSize ?? 0,
     isLoading: query.isLoading,
+    connectionStatus,
+    connectionError: query.error instanceof Error ? query.error.message : null,
     refetch: query.refetch,
   };
 }

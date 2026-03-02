@@ -1,11 +1,13 @@
 //! Sincronización de guardados: subir y descargar a/desde la API (S3).
 
 use crate::config;
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -317,6 +319,81 @@ pub async fn sync_list_remote_saves() -> Result<Vec<RemoteSaveInfoDto>, String> 
         })
         .collect();
     Ok(out)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadConflictDto {
+    pub filename: String,
+    pub local_modified: String,
+    pub cloud_modified: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadConflictsResultDto {
+    pub conflicts: Vec<DownloadConflictDto>,
+}
+
+#[tauri::command]
+pub async fn sync_check_download_conflicts(
+    game_id: String,
+) -> Result<DownloadConflictsResultDto, String> {
+    let cfg = config::load_config();
+    let game = cfg
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+
+    let dest_base = match expand_path(game.paths[0].trim()) {
+        Some(p) => PathBuf::from(p),
+        None => return Err("No se pudo expandir la ruta de destino".into()),
+    };
+
+    let all = sync_list_remote_saves().await?;
+    let saves: Vec<_> = all
+        .into_iter()
+        .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
+        .collect();
+
+    let mut conflicts = Vec::new();
+
+    for save in saves {
+        let dest_path = dest_base.join(&save.filename);
+        let Ok(meta) = fs::metadata(&dest_path) else {
+            continue; // archivo no existe localmente, no hay conflicto
+        };
+        let Ok(local_mtime) = meta.modified() else {
+            continue;
+        };
+
+        let cloud_dt: DateTime<Utc> = match DateTime::parse_from_rfc3339(&save.last_modified)
+            .or_else(|_| DateTime::parse_from_rfc2822(&save.last_modified))
+        {
+            Ok(dt) => dt.with_timezone(&Utc),
+            Err(_) => continue, // no podemos parsear, asumir sin conflicto
+        };
+
+        let Ok(duration) = local_mtime.duration_since(UNIX_EPOCH) else {
+            continue;
+        };
+        let Some(local_dt) =
+            DateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos())
+        else {
+            continue;
+        };
+
+        if local_dt > cloud_dt {
+            conflicts.push(DownloadConflictDto {
+                filename: save.filename.clone(),
+                local_modified: local_dt.to_rfc3339(),
+                cloud_modified: save.last_modified.clone(),
+            });
+        }
+    }
+
+    Ok(DownloadConflictsResultDto { conflicts })
 }
 
 #[tauri::command]

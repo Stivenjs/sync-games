@@ -133,7 +133,11 @@ export function GamesStats({
           <Card className="border border-default-200">
             <CardBody className="flex flex-row items-center gap-4 py-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/10">
-                <HardDrive size={24} className="text-secondary" />
+                {lastSyncLoading ? (
+                  <Spinner size="sm" color="primary" />
+                ) : (
+                  <HardDrive size={24} className="text-secondary" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-default-500">En la nube</p>

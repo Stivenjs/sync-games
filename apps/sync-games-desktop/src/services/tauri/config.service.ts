@@ -77,6 +77,23 @@ export async function syncListRemoteSaves(): Promise<RemoteSaveInfo[]> {
   return invoke<RemoteSaveInfo[]>("sync_list_remote_saves");
 }
 
+/** Conflicto de descarga: archivo local más reciente que en la nube */
+export interface DownloadConflict {
+  filename: string;
+  localModified: string;
+  cloudModified: string;
+}
+
+/** Comprueba si hay conflictos (archivos locales más recientes que en la nube) */
+export async function syncCheckDownloadConflicts(
+  gameId: string
+): Promise<{ conflicts: DownloadConflict[] }> {
+  return invoke<{ conflicts: DownloadConflict[] }>(
+    "sync_check_download_conflicts",
+    { gameId }
+  );
+}
+
 /** Descarga los guardados de un juego desde la nube */
 export async function syncDownloadGame(gameId: string): Promise<SyncResult> {
   const r = await invoke<{

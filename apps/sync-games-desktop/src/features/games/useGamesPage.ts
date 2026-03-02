@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   removeGame,
+  syncCheckDownloadConflicts,
   syncDownloadGame,
   syncUploadGame,
   type SyncResult,
@@ -29,6 +30,8 @@ export function useGamesPage() {
     cloudGames,
     totalCloudSize,
     isLoading: lastSyncLoading,
+    connectionStatus,
+    connectionError,
     refetch: refetchLastSync,
   } = useLastSyncInfo(hasSyncConfig);
 
@@ -46,6 +49,14 @@ export function useGamesPage() {
     suggestedId: "",
   });
   const [gameToRemove, setGameToRemove] = useState<ConfiguredGame | null>(null);
+  const [downloadConflictGame, setDownloadConflictGame] =
+    useState<ConfiguredGame | null>(null);
+  const [downloadConflicts, setDownloadConflicts] = useState<
+    { filename: string; localModified: string; cloudModified: string }[]
+  >([]);
+  const [downloadAllConflictGames, setDownloadAllConflictGames] = useState<
+    { gameId: string; conflictCount: number }[]
+  >([]);
   const [syncing, setSyncing] = useState<string | "all" | null>(null);
   const [downloading, setDownloading] = useState<string | "all" | null>(null);
   const [operationResult, setOperationResult] =
@@ -92,8 +103,7 @@ export function useGamesPage() {
     }
   };
 
-  const handleDownloadOne = async (game: ConfiguredGame) => {
-    setDownloading(game.id);
+  const executeDownload = async (game: ConfiguredGame) => {
     setOperationResult(null);
     try {
       const result = await syncDownloadGame(game.id);
@@ -115,6 +125,53 @@ export function useGamesPage() {
       setDownloading(null);
       refetchLastSync?.();
     }
+  };
+
+  const handleDownloadOne = async (game: ConfiguredGame) => {
+    setDownloading(game.id);
+    try {
+      const { conflicts } = await syncCheckDownloadConflicts(game.id);
+      if (conflicts.length > 0) {
+        setDownloadConflictGame(game);
+        setDownloadConflicts(conflicts);
+        setDownloading(null);
+        return;
+      }
+      await executeDownload(game);
+    } catch (e) {
+      const errResult = {
+        okCount: 0,
+        errCount: 1,
+        errors: [e instanceof Error ? e.message : String(e)],
+      };
+      setOperationResult({
+        type: "download",
+        gameId: game.id,
+        result: errResult,
+      });
+      toastDownloadResult(errResult, formatGameDisplayName(game.id));
+      setDownloading(null);
+    } finally {
+      refetchLastSync?.();
+    }
+  };
+
+  const handleConfirmDownloadConflict = async () => {
+    if (!downloadConflictGame) return;
+    const game = downloadConflictGame;
+    setDownloading(game.id);
+    try {
+      await executeDownload(game);
+      setDownloadConflictGame(null);
+      setDownloadConflicts([]);
+    } finally {
+      refetchLastSync?.();
+    }
+  };
+
+  const handleCloseDownloadConflict = () => {
+    setDownloadConflictGame(null);
+    setDownloadConflicts([]);
   };
 
   const handleSyncAll = async () => {
@@ -148,10 +205,8 @@ export function useGamesPage() {
     refetchLastSync?.();
   };
 
-  const handleDownloadAll = async () => {
+  const executeDownloadAll = async () => {
     if (!config?.games?.length) return;
-    setDownloading("all");
-    setOperationResult(null);
     const results: { gameId: string; result: SyncResult }[] = [];
     for (const game of config.games) {
       try {
@@ -179,6 +234,59 @@ export function useGamesPage() {
     refetchLastSync?.();
   };
 
+  const handleDownloadAll = async () => {
+    if (!config?.games?.length) return;
+    setDownloading("all");
+    setOperationResult(null);
+    try {
+      const gamesWithConflicts: { gameId: string; conflictCount: number }[] = [];
+      for (const game of config.games) {
+        try {
+          const { conflicts } = await syncCheckDownloadConflicts(game.id);
+          if (conflicts.length > 0) {
+            gamesWithConflicts.push({
+              gameId: game.id,
+              conflictCount: conflicts.length,
+            });
+          }
+        } catch {
+          // Si falla el check, continuar con el siguiente
+        }
+      }
+      if (gamesWithConflicts.length > 0) {
+        setDownloadAllConflictGames(gamesWithConflicts);
+        setDownloading(null);
+        return;
+      }
+      await executeDownloadAll();
+    } catch (e) {
+      const errResult = {
+        okCount: 0,
+        errCount: 1,
+        errors: [e instanceof Error ? e.message : String(e)],
+      };
+      setOperationResult({ type: "download", gameId: "", result: errResult });
+      toastDownloadResult(errResult);
+      setDownloading(null);
+    } finally {
+      refetchLastSync?.();
+    }
+  };
+
+  const handleConfirmDownloadAllConflict = async () => {
+    setDownloading("all");
+    try {
+      await executeDownloadAll();
+      setDownloadAllConflictGames([]);
+    } finally {
+      refetchLastSync?.();
+    }
+  };
+
+  const handleCloseDownloadAllConflict = () => {
+    setDownloadAllConflictGames([]);
+  };
+
   const filteredGames = filterGames(
     config?.games ?? [],
     searchTerm,
@@ -201,6 +309,8 @@ export function useGamesPage() {
     cloudGames,
     totalCloudSize,
     lastSyncLoading,
+    connectionStatus,
+    connectionError,
     searchTerm,
     setSearchTerm,
     originFilter,
@@ -213,6 +323,13 @@ export function useGamesPage() {
     setAddModalInitial,
     gameToRemove,
     setGameToRemove,
+    downloadConflictGame,
+    downloadConflicts,
+    handleConfirmDownloadConflict,
+    handleCloseDownloadConflict,
+    downloadAllConflictGames,
+    handleConfirmDownloadAllConflict,
+    handleCloseDownloadAllConflict,
     syncing,
     downloading,
     operationResult,
@@ -224,6 +341,7 @@ export function useGamesPage() {
     handleSyncAll,
     handleDownloadAll,
     handleRefresh,
+    refetchLastSync,
     filteredGames,
     emptyFilterMessage,
   };
