@@ -7,7 +7,9 @@ import { toGameId } from "@cli/utils";
 const MANUAL_OPTION = "__manual__";
 
 export async function runAddInteractive(deps: CliDeps): Promise<void> {
-  console.log(`\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`);
+  console.log(
+    `\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`
+  );
   const candidates = await deps.scanForPathCandidatesUseCase.execute();
 
   let selectedPath: string;
@@ -63,7 +65,10 @@ function buildCandidateChoices(candidates: PathCandidate[]) {
   }
 
   choices.push(new Separator());
-  choices.push({ name: `${figures.pointer} Escribir manualmente`, value: MANUAL_OPTION });
+  choices.push({
+    name: `${figures.pointer} Escribir manualmente`,
+    value: MANUAL_OPTION,
+  });
   return choices;
 }
 

@@ -100,7 +100,9 @@ function printResult(
       `\n${figures.tick} Ruta eliminada. "${gameId}" ya no tenía rutas y fue eliminado.\n`
     );
   } else if (result.removedGame) {
-    console.log(`\n${figures.tick} Juego "${gameId}" eliminado completamente.\n`);
+    console.log(
+      `\n${figures.tick} Juego "${gameId}" eliminado completamente.\n`
+    );
   } else if (result.removedPath) {
     console.log(`\n${figures.tick} Ruta eliminada de "${gameId}".\n`);
   }

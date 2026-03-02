@@ -27,7 +27,7 @@ async function getTitleText(): Promise<string> {
   try {
     const figlet = (await import("figlet")).default;
     const text =
-      (await figlet.text("sync-games", {
+      (await figlet.text("SaveCloud", {
         font: "Standard",
         horizontalLayout: "fitted",
       })) ?? "";

@@ -43,11 +43,11 @@ const result = await Bun.build({
     "process.env.SYNC_GAMES_API_KEY": JSON.stringify(apiKey),
   },
   compile: {
-    outfile: "dist/sync-games",
+    outfile: "dist/savecloud",
     ...(process.platform === "win32" && {
       windows: {
         ...(hasIcon && { icon: iconPath }),
-        title: "Sync Games",
+        title: "SaveCloud",
         version: pkg.version,
         description: "CLI para sincronizar guardados de juegos en la nube (S3)",
         publisher: "Stifts",
@@ -62,5 +62,5 @@ if (!result.success) {
   for (const msg of result.logs) console.error(msg);
   process.exit(1);
 }
+console.log(`\n${figures.tick} Build completado: dist/savecloud\n`);
 
-console.log(`\n${figures.tick} Build completado: dist/sync-games\n`);

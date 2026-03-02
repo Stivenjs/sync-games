@@ -1,6 +1,6 @@
 service: sync-games
 
-frameworkVersion: '4'
+frameworkVersion: "4"
 
 provider:
   name: aws
@@ -19,8 +19,8 @@ provider:
             - s3:PutObject
             - s3:ListBucket
           Resource:
-            - Fn::Sub: 'arn:aws:s3:::${SavesBucket}'
-            - Fn::Sub: 'arn:aws:s3:::${SavesBucket}/*'
+            - Fn::Sub: "arn:aws:s3:::${SavesBucket}"
+            - Fn::Sub: "arn:aws:s3:::${SavesBucket}/*"
 
 build:
   esbuild:
@@ -50,6 +50,6 @@ resources:
                 SSEAlgorithm: AES256
         CorsConfiguration:
           CorsRules:
-            - AllowedHeaders: ['Content-Type', 'x-user-id', 'x-api-key']
+            - AllowedHeaders: ["Content-Type", "x-user-id", "x-api-key"]
               AllowedMethods: [GET, PUT, HEAD]
-              AllowedOrigins: ['*']
+              AllowedOrigins: ["*"]

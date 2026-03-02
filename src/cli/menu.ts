@@ -10,16 +10,31 @@ async function showMainMenu(): Promise<MainAction> {
     message: "¿Qué quieres hacer?",
     pageSize: 12,
     choices: [
-      { name: `${figures.pointer} Añadir un juego (ruta de guardados)`, value: "add" },
+      {
+        name: `${figures.pointer} Añadir un juego (ruta de guardados)`,
+        value: "add",
+      },
       { name: `${figures.cross} Eliminar un juego o ruta`, value: "remove" },
-      { name: `${figures.hamburger} Listar juegos configurados`, value: "list" },
-      { name: `${figures.arrowRight} Analizar rutas (buscar candidatos)`, value: "scan" },
+      {
+        name: `${figures.hamburger} Listar juegos configurados`,
+        value: "list",
+      },
+      {
+        name: `${figures.arrowRight} Analizar rutas (buscar candidatos)`,
+        value: "scan",
+      },
       new Separator(),
       { name: `${figures.arrowUp} Subir guardados a la nube`, value: "upload" },
       { name: `${figures.arrowDown} Descargar guardados`, value: "download" },
       new Separator(),
-      { name: `${figures.lozenge} Rutas de escaneo personalizadas`, value: "scan-paths" },
-      { name: `${figures.bullet} Ver ruta del archivo de config`, value: "config" },
+      {
+        name: `${figures.lozenge} Rutas de escaneo personalizadas`,
+        value: "scan-paths",
+      },
+      {
+        name: `${figures.bullet} Ver ruta del archivo de config`,
+        value: "config",
+      },
       new Separator(),
       { name: "Salir", value: "exit" },
     ],

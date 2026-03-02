@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "sync-games",
+  "productName": "SaveCloud",
   "version": "0.1.7",
-  "identifier": "com.sync-games.app",
+  "identifier": "com.savecloud.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "sync-games",
+        "title": "SaveCloud",
         "width": 800,
         "height": 600
       }
@@ -39,7 +39,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2MzZEOUM0OTJEOTc1NDUKUldSRmRkbVN4TmsyTnJEQ2NOYUZVZzRyajNFbWo3eWdmSllJcCtxb0RxcE1MMXFIbFZqTzNYdEwK",
       "endpoints": [
-        "https://github.com/Stivenjs/sync-games/releases/latest/download/latest.json"
+        "https://github.com/Stivenjs/savecloud/releases/latest/download/latest.json"
       ]
     }
   }

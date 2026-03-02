@@ -15,14 +15,14 @@ const VERSION = tauriConf.version;
 const endpoints = tauriConf.plugins?.updater?.endpoints?.[0] ?? "";
 const match = endpoints.match(/github\.com\/([^/]+)\/([^/]+)\//);
 const GITHUB_USER = match?.[1] ?? "Stivenjs";
-const REPO = match?.[2] ?? "sync-games";
+const REPO = match?.[2] ?? "savecloud";
 
 const bundleDir = resolve(
   import.meta.dir,
   "../src-tauri/target/release/bundle/nsis"
 );
 
-const sigPath = resolve(bundleDir, `sync-games_${VERSION}_x64-setup.exe.sig`);
+const sigPath = resolve(bundleDir, `SaveCloud_${VERSION}_x64-setup.exe.sig`);
 
 let sigContent: string;
 try {
@@ -42,7 +42,7 @@ const latest = {
   platforms: {
     "windows-x86_64": {
       signature: sigContent,
-      url: `https://github.com/${GITHUB_USER}/${REPO}/releases/download/v${VERSION}/sync-games_${VERSION}_x64-setup.exe`,
+      url: `https://github.com/${GITHUB_USER}/${REPO}/releases/download/v${VERSION}/SaveCloud_${VERSION}_x64-setup.exe`,
     },
   },
 };

@@ -17,34 +17,37 @@ La app incluye el sistema de actualizaciones de Tauri. Para publicar actualizaci
 Si tienes `CI=1` en el entorno (Cursor, GitHub Actions, etc.), desactívalo primero. El CLI espera `CI=true` o `CI=false`, no `1`.
 
 **PowerShell:**
+
 ```powershell
 $env:CI = $null  # o $env:CI = "false"
 mkdir -Force $env:USERPROFILE\.tauri
 cd apps/sync-games-desktop
-bun run tauri signer generate -w $env:USERPROFILE\.tauri\sync-games.key
+bun run tauri signer generate -w $env:USERPROFILE\.tauri\savecloud.key
 ```
 
 **Git Bash / MINGW64:**
+
 ```bash
 unset CI
 mkdir -p ~/.tauri
 cd apps/sync-games-desktop
-bun run tauri signer generate -w $HOME/.tauri/sync-games.key
+bun run tauri signer generate -w $HOME/.tauri/savecloud.key
 ```
 
 **Alternativa con `npx` (evita problemas con bun y el `--`):**
+
 ```bash
 cd apps/sync-games-desktop
-npx tauri signer generate -w "$HOME/.tauri/sync-games.key"
+npx tauri signer generate -w "$HOME/.tauri/savecloud.key"
 ```
 
-**Importante:** Guarda la clave privada (`sync-games.key`) en un lugar seguro. Sin ella no podrás publicar actualizaciones futuras.
+**Importante:** Guarda la clave privada (`savecloud.key`) en un lugar seguro. Sin ella no podrás publicar actualizaciones futuras.
 
 ## 2. Configurar tauri.conf.json
 
 Edita `src-tauri/tauri.conf.json` y reemplaza:
 
-- **pubkey**: El contenido completo del archivo `sync-games.key.pub` (todo en una línea)
+- **pubkey**: El contenido completo del archivo `savecloud.key.pub` (todo en una línea)
 - **endpoints**: La URL de tu JSON de actualización. Opciones comunes:
 
   - **GitHub Releases**: `https://github.com/USUARIO/REPO/releases/latest/download/latest.json`
@@ -55,7 +58,7 @@ Edita `src-tauri/tauri.conf.json` y reemplaza:
 ### En local (PowerShell)
 
 ```powershell
-$env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.tauri\sync-games.key"
+$env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.tauri\savecloud.key"
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "tu_contraseña"
 bun run tauri build
 ```
@@ -66,7 +69,7 @@ La workflow ya está configurada. Solo necesitas añadir estos **secrets** al re
 
 1. Ve a **GitHub → Tu repo → Settings → Secrets and variables → Actions**
 2. Crea estos secrets:
-   - **`TAURI_SIGNING_PRIVATE_KEY`**: contenido completo del archivo `sync-games.key` (cópialo y pégalo)
+   - **`TAURI_SIGNING_PRIVATE_KEY`**: contenido completo del archivo `savecloud.key` (cópialo y pégalo)
    - **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`**: la contraseña que usaste al generar la clave
 
 Cuando hagas push de un tag (ej. `v0.1.7`), la action compilará, firmará, generará `latest.json` y publicará todo en el release automáticamente.
@@ -91,7 +94,7 @@ Crea un archivo `latest.json` y súbelo como asset en cada release. Ejemplo:
   "platforms": {
     "windows-x86_64": {
       "signature": "CONTENIDO_DEL_ARCHIVO_.sig",
-      "url": "https://github.com/USUARIO/REPO/releases/download/v0.1.8/sync-games_0.1.8_x64-setup.exe"
+      "url": "https://github.com/USUARIO/REPO/releases/download/v0.1.8/SaveCloud_0.1.8_x64-setup.exe"
     }
   }
 }
@@ -105,24 +108,25 @@ El contenido de `signature` es el archivo `.sig` que Tauri genera junto al insta
 
 ```powershell
 cd apps/sync-games-desktop
-$env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.tauri\sync-games.key"
+$env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.tauri\savecloud.key"
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "tu_contraseña"
 bun run tauri build
 ```
 
 Al terminar, tendrás en `src-tauri/target/release/bundle/nsis/`:
-- `sync-games_0.1.7_x64-setup.exe`
-- `sync-games_0.1.7_x64-setup.exe.sig`
+
+- `SaveCloud_0.1.7_x64-setup.exe`
+- `SaveCloud_0.1.7_x64-setup.exe.sig`
 
 ### Paso B: Crear el release en GitHub
 
-1. Ve a https://github.com/Stivenjs/sync-games/releases
+1. Ve a https://github.com/Stivenjs/savecloud/releases
 2. Click en **"Create a new release"**
 3. Tag: `v0.1.7` (o el número de versión que tengas en tauri.conf.json)
 4. Título: `v0.1.7`
 5. Sube como **assets**:
-   - `sync-games_0.1.7_x64-setup.exe`
-   - `sync-games_0.1.7_x64-setup.exe.sig`
+   - `SaveCloud_0.1.7_x64-setup.exe`
+   - `SaveCloud_0.1.7_x64-setup.exe.sig`
 6. Publica el release
 
 ### Paso C: Crear latest.json
@@ -137,13 +141,13 @@ Crea un archivo `latest.json` con este contenido (ajusta versión y fechas):
   "platforms": {
     "windows-x86_64": {
       "signature": "AQUÍ_VA_EL_CONTENIDO_COMPLETO_DEL_ARCHIVO_.sig",
-      "url": "https://github.com/Stivenjs/sync-games/releases/download/v0.1.7/sync-games_0.1.7_x64-setup.exe"
+      "url": "https://github.com/Stivenjs/savecloud/releases/download/v0.1.7/SaveCloud_0.1.7_x64-setup.exe"
     }
   }
 }
 ```
 
-**Importante:** En `signature` pega TODO el contenido del archivo `sync-games_0.1.7_x64-setup.exe.sig` (es una línea larga de caracteres).
+**Importante:** En `signature` pega TODO el contenido del archivo `SaveCloud_0.1.7_x64-setup.exe.sig` (es una línea larga de caracteres).
 
 **Atajo:** Hay un script que genera el `latest.json` automáticamente:
 
@@ -159,7 +163,7 @@ Crea `latest.json` en la raíz del proyecto listo para subir.
 2. Arrastra o sube el archivo `latest.json` como asset
 3. Guarda
 
-La URL `https://github.com/Stivenjs/sync-games/releases/latest/download/latest.json` apuntará al `latest.json` del último release.
+La URL `https://github.com/Stivenjs/savecloud/releases/latest/download/latest.json` apuntará al `latest.json` del último release.
 
 ### Paso E: Probar
 

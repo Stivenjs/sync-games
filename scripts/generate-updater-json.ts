@@ -4,7 +4,7 @@
  * Solo debe ejecutarse en la GitHub Action de release, después de descargar los artifacts.
  *
  * Uso:
- *   VERSION=0.1.7 GITHUB_REPOSITORY=Stivenjs/sync-games bun run scripts/generate-updater-json.ts
+ *   VERSION=0.1.7 GITHUB_REPOSITORY=Stivenjs/savecloud bun run scripts/generate-updater-json.ts
  *
  * Espera la estructura:
  *   desktop-windows/nsis/*.exe.sig
@@ -21,7 +21,7 @@ const raw =
   process.env.GITHUB_REF?.replace(/^refs\/tags\/v?/, "") ||
   "0.0.0";
 const VERSION = raw.replace(/^v/, ""); // semver sin "v"
-const REPO = process.env.GITHUB_REPOSITORY || "Stivenjs/sync-games";
+const REPO = process.env.GITHUB_REPOSITORY || "Stivenjs/savecloud";
 const BASE_URL = `https://github.com/${REPO}/releases/download/v${VERSION}`;
 
 const cwd = process.cwd();

@@ -1,4 +1,4 @@
-# Sync Games
+# SaveCloud
 
 Servidor de guardado en la nube para juegos (S3 + Lambda). Clean Architecture + Clean Code.
 
@@ -36,23 +36,23 @@ Las dependencias apuntan hacia dentro: `interfaces` → `application` → `domai
 - `bun run deploy:dev` — Despliega al stage `dev`
 - `bun run invoke:local` — Invoca la función Lambda en local
 - `bun run cli` — Ejecuta el CLI (ej.: `bun run cli -- add elden-ring "%APPDATA%/EldenRing"`)
-- `bun run build:cli` — Genera un ejecutable en `dist/sync-games` (o `sync-games.exe` en Windows). Si existe `assets/icon.ico`, se usa como icono del .exe.
+- `bun run build:cli` — Genera un ejecutable en `dist/savecloud` (o `savecloud.exe` en Windows). Si existe `assets/icon.ico`, se usa como icono del .exe.
 
 Instalación: `bun install`
 
 ## Cómo ejecutar el CLI
 
-- **Menú interactivo:** ejecuta `sync-games` (o `bun run cli`) **sin argumentos** → se abre un menú con flechas para elegir: añadir juego, listar, analizar rutas, subir/descargar guardados, ver config, salir. Usa **@inquirer/prompts** (select, input, confirm).
+- **Menú interactivo:** ejecuta `savecloud` (o `bun run cli`) **sin argumentos** → se abre un menú con flechas para elegir: añadir juego, listar, analizar rutas, subir/descargar guardados, ver config, salir. Usa **@inquirer/prompts** (select, input, confirm).
 
 - **Modo comando (scripting):**  
-  `sync-games <comando> [opciones]`  
-  Ejemplo: `sync-games add elden-ring "%APPDATA%/EldenRing"` o `sync-games upload`
+  `savecloud <comando> [opciones]`  
+  Ejemplo: `savecloud add elden-ring "%APPDATA%/EldenRing"` o `savecloud upload`
 
 1. **Desde el repo:** `bun run cli` (menú) o `bun run cli -- add ...` (comando).
-2. **Comando global:** `bun link` → en cualquier sitio: `sync-games` (menú) o `sync-games list`.
-3. **Ejecutable único:** `bun run build:cli` → `dist/sync-games.exe`; al ejecutarlo sin args se abre el menú.
+2. **Comando global:** `bun link` → en cualquier sitio: `savecloud` (menú) o `savecloud list`.
+3. **Ejecutable único:** `bun run build:cli` → `dist/savecloud.exe`; al ejecutarlo sin args se abre el menú.
 
-**Nota:** Si el ejecutable compilado (`sync-games.exe`) provoca «Segmentation fault» al subir guardados (error conocido de Bun en Windows con ejecutables empaquetados), usa `bun run cli` en su lugar.
+**Nota:** Si el ejecutable compilado (`savecloud.exe`) provoca «Segmentation fault» al subir guardados (error conocido de Bun en Windows con ejecutables empaquetados), usa `bun run cli` en su lugar.
 
 ## Estructura del CLI (Clean Architecture)
 
@@ -68,7 +68,7 @@ src/cli/
     └── FileConfigRepository.ts   # Persistencia en JSON (APPDATA / ~/.config)
 ```
 
-Config por defecto: `%APPDATA%/sync-games/config.json` (Windows) o `~/.config/sync-games/config.json` (Linux/macOS).
+Config por defecto: `%APPDATA%/savecloud/config.json` (Windows) o `~/.config/savecloud/config.json` (Linux/macOS).
 
 ## Variables de entorno
 
@@ -88,14 +88,14 @@ El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas
 
 1. **API en local** (necesitas AWS con un bucket S3 y credenciales configuradas):
    ```bash
-   export BUCKET_NAME=tu-bucket-sync-games   # o el que uses en dev
+   export BUCKET_NAME=tu-bucket-savecloud   # o el que uses en dev
    export AWS_REGION=us-east-2
    bun run dev
    ```
    La API queda en `http://localhost:3000`.
 
 2. **Configurar el CLI** con la URL de la API y un `userId`:
-   - Ejecuta `sync-games config` (o `bun run cli -- config`) para ver la ruta del archivo de config.
+   - Ejecuta `savecloud config` (o `bun run cli -- config`) para ver la ruta del archivo de config.
    - Edita ese JSON y añade:
      ```json
      {
