@@ -99,6 +99,19 @@ export interface UnsyncedGame {
   gameId: string;
 }
 
+/** Estadísticas por juego (tamaño local, últimas modificaciones) */
+export interface GameStats {
+  gameId: string;
+  localSizeBytes: number;
+  localLastModified: string | null;
+  cloudLastModified: string | null;
+}
+
+/** Obtiene estadísticas de todos los juegos configurados */
+export async function getGameStats(): Promise<GameStats[]> {
+  return invoke<GameStats[]>("get_game_stats");
+}
+
 /** Comprueba qué juegos tienen guardados nuevos sin subir */
 export async function syncCheckUnsyncedGames(): Promise<UnsyncedGame[]> {
   return invoke<UnsyncedGame[]>("sync_check_unsynced_games");

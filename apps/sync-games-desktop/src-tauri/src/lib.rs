@@ -37,6 +37,7 @@ pub fn run() {
             commands::sync_check_download_conflicts,
             commands::sync_download_game,
             commands::sync_check_unsynced_games,
+            commands::get_game_stats,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

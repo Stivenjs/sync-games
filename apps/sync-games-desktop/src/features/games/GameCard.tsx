@@ -2,10 +2,14 @@ import { useState } from "react";
 import { Card, CardFooter, Skeleton } from "@heroui/react";
 import { CloudDownload, CloudUpload, Gamepad2, Trash2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
+import type { GameStats } from "@services/tauri";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
+import { formatBytes, formatRelativeDate } from "@utils/format";
 
 export interface GameCardProps {
   game: ConfiguredGame;
+  /** Estadísticas del juego (tamaño, últimas modificaciones). Opcional. */
+  stats?: GameStats | null;
   /** Steam App ID resuelto dinámicamente (por búsqueda). Opcional. */
   resolvedSteamAppId?: string | null;
   /** Muestra skeleton mientras se resuelve Steam ID o carga la imagen. */
@@ -29,6 +33,7 @@ export interface GameCardProps {
  */
 export function GameCard({
   game,
+  stats,
   resolvedSteamAppId,
   isLoading: externalLoading,
   onRemove,
@@ -132,10 +137,21 @@ export function GameCard({
           <Gamepad2 size={48} className="text-default-400" strokeWidth={1.5} />
         </div>
       )}
-      <CardFooter className="absolute bottom-0 left-0 right-0 flex items-center justify-center overflow-hidden rounded-b-large border-0 bg-black/60 px-3 py-2 backdrop-blur-sm shadow-[0_-4px_20px_rgba(0,0,0,0.4)] z-10">
-        <p className="truncate text-center text-xs font-bold uppercase tracking-wider text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+      <CardFooter className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-b-large border-0 bg-black/60 px-3 py-2 backdrop-blur-sm shadow-[0_-4px_20px_rgba(0,0,0,0.4)] z-10">
+        <p className="truncate w-full text-center text-xs font-bold uppercase tracking-wider text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
           {formatGameDisplayName(game.id)}
         </p>
+        {stats && (
+          <p className="w-full truncate text-center text-[10px] text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            {formatBytes(stats.localSizeBytes)}
+            {stats.localLastModified != null && (
+              <> • Local: {formatRelativeDate(stats.localLastModified)}</>
+            )}
+            {stats.cloudLastModified != null && (
+              <> • Nube: {formatRelativeDate(stats.cloudLastModified)}</>
+            )}
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

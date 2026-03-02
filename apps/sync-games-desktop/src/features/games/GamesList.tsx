@@ -1,6 +1,7 @@
 import { Card, CardBody, Code } from "@heroui/react";
 import { Gamepad2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
+import { useGameStats } from "@hooks/useGameStats";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
 import { needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
@@ -31,6 +32,7 @@ export function GamesList({
   downloadingId,
 }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
+  const { statsByGameId } = useGameStats(games.length > 0);
 
   if (games.length === 0) {
     return (
@@ -59,6 +61,7 @@ export function GamesList({
         <GameCard
           game={game}
           key={game.id}
+          stats={statsByGameId.get(game.id)}
           resolvedSteamAppId={resolvedSteamAppIds[game.id]}
           isLoading={
             needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined

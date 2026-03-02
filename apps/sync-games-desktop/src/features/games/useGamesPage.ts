@@ -9,6 +9,7 @@ import {
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { toastDownloadResult, toastSyncResult } from "@utils/toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
 import { filterGames, type OriginFilter } from "@features/games/GamesFilters";
@@ -20,6 +21,7 @@ export interface OperationResult {
 }
 
 export function useGamesPage() {
+  const queryClient = useQueryClient();
   const { config, loading, error, refetch } = useConfig();
   const hasSyncConfig = !!(
     config?.apiBaseUrl?.trim() && config?.userId?.trim()
@@ -38,6 +40,7 @@ export function useGamesPage() {
   const handleRefresh = () => {
     refetch?.();
     refetchLastSync?.();
+    queryClient.invalidateQueries({ queryKey: ["game-stats"] });
   };
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,6 +103,7 @@ export function useGamesPage() {
     } finally {
       setSyncing(null);
       refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
     }
   };
 
@@ -124,6 +128,7 @@ export function useGamesPage() {
     } finally {
       setDownloading(null);
       refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
     }
   };
 
@@ -153,6 +158,7 @@ export function useGamesPage() {
       setDownloading(null);
     } finally {
       refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
     }
   };
 
@@ -166,6 +172,7 @@ export function useGamesPage() {
       setDownloadConflicts([]);
     } finally {
       refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
     }
   };
 
@@ -203,6 +210,7 @@ export function useGamesPage() {
     toastSyncResult(totalResult);
     setSyncing(null);
     refetchLastSync?.();
+    queryClient.invalidateQueries({ queryKey: ["game-stats"] });
   };
 
   const executeDownloadAll = async () => {
@@ -232,6 +240,7 @@ export function useGamesPage() {
     toastDownloadResult(totalResult);
     setDownloading(null);
     refetchLastSync?.();
+    queryClient.invalidateQueries({ queryKey: ["game-stats"] });
   };
 
   const handleDownloadAll = async () => {
@@ -270,6 +279,7 @@ export function useGamesPage() {
       setDownloading(null);
     } finally {
       refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
     }
   };
 
