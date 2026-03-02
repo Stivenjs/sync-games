@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { Gamepad2, Info, Settings } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { GamesPage } from "@features/games";
+import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { SettingsPage } from "@features/settings";
+import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
+import { toastSyncResult } from "@utils/toast";
+import { formatGameDisplayName } from "@utils/gameImage";
 import "./App.css";
 
 const NAV_ITEMS: NavItem[] = [
@@ -28,15 +33,61 @@ function PageContent({ activeId }: { activeId: string }) {
 
 function App() {
   const [activeNavId, setActiveNavId] = useState("games");
+  const {
+    unsyncedGameIds,
+    showUnsyncedModal,
+    closeModal,
+    uploadAll,
+    isUploading,
+  } = useUnsyncedSaves();
+
+  useEffect(() => {
+    const unsubDone = listen<{
+      gameId: string;
+      okCount: number;
+      errCount: number;
+    }>("auto-sync-done", (ev) => {
+      toastSyncResult(
+        {
+          okCount: ev.payload.okCount,
+          errCount: ev.payload.errCount,
+          errors: [],
+        },
+        formatGameDisplayName(ev.payload.gameId)
+      );
+    });
+    const unsubErr = listen<{ gameId: string; error: string }>(
+      "auto-sync-error",
+      (ev) => {
+        toastSyncResult(
+          { okCount: 0, errCount: 1, errors: [ev.payload.error] },
+          formatGameDisplayName(ev.payload.gameId)
+        );
+      }
+    );
+    return () => {
+      unsubDone.then((f) => f());
+      unsubErr.then((f) => f());
+    };
+  }, []);
 
   return (
-    <AppLayout
-      navItems={NAV_ITEMS}
-      activeNavId={activeNavId}
-      onNavSelect={setActiveNavId}
-    >
-      <PageContent activeId={activeNavId} />
-    </AppLayout>
+    <>
+      <UnsyncedSavesModal
+        isOpen={showUnsyncedModal}
+        onClose={closeModal}
+        gameIds={unsyncedGameIds}
+        onUploadAll={uploadAll}
+        isLoading={isUploading}
+      />
+      <AppLayout
+        navItems={NAV_ITEMS}
+        activeNavId={activeNavId}
+        onNavSelect={setActiveNavId}
+      >
+        <PageContent activeId={activeNavId} />
+      </AppLayout>
+    </>
   );
 }
 

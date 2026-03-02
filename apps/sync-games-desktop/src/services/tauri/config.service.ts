@@ -94,6 +94,16 @@ export async function syncCheckDownloadConflicts(
   );
 }
 
+/** Juegos con guardados locales no subidos a la nube */
+export interface UnsyncedGame {
+  gameId: string;
+}
+
+/** Comprueba qué juegos tienen guardados nuevos sin subir */
+export async function syncCheckUnsyncedGames(): Promise<UnsyncedGame[]> {
+  return invoke<UnsyncedGame[]>("sync_check_unsynced_games");
+}
+
 /** Descarga los guardados de un juego desde la nube */
 export async function syncDownloadGame(gameId: string): Promise<SyncResult> {
   const r = await invoke<{

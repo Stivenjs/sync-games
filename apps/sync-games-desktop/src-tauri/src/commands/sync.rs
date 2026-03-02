@@ -54,7 +54,11 @@ fn expand_path(raw: &str) -> Option<String> {
     }
 }
 
-fn collect_files_recursive(dir: &Path, base: &Path, out: &mut Vec<(PathBuf, String)>) {
+fn collect_files_with_mtime(
+    dir: &Path,
+    base: &Path,
+    out: &mut Vec<(PathBuf, String, std::time::SystemTime)>,
+) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -66,18 +70,19 @@ fn collect_files_recursive(dir: &Path, base: &Path, out: &mut Vec<(PathBuf, Stri
         };
         if meta.is_dir() {
             if !e.file_name().to_string_lossy().starts_with('.') {
-                collect_files_recursive(&full, base, out);
+                collect_files_with_mtime(&full, base, out);
             }
         } else if meta.is_file() {
             if let Ok(rel) = full.strip_prefix(base) {
                 let rel_str = rel.to_string_lossy().replace('\\', "/");
-                out.push((full, rel_str));
+                let mtime = meta.modified().unwrap_or(UNIX_EPOCH);
+                out.push((full, rel_str, mtime));
             }
         }
     }
 }
 
-fn list_all_files_from_paths(paths: &[String]) -> Vec<(String, String)> {
+fn list_all_files_with_mtime(paths: &[String]) -> Vec<(String, String, std::time::SystemTime)> {
     let mut seen = std::collections::HashSet::new();
     let mut results = Vec::new();
 
@@ -100,20 +105,28 @@ fn list_all_files_from_paths(paths: &[String]) -> Vec<(String, String)> {
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
-                results.push((abs, rel));
+                let mtime = meta.modified().unwrap_or(UNIX_EPOCH);
+                results.push((abs, rel, mtime));
             }
         } else if meta.is_dir() {
             let mut files = Vec::new();
-            collect_files_recursive(&expanded, &expanded, &mut files);
-            for (abs_path, rel) in files {
+            collect_files_with_mtime(&expanded, &expanded, &mut files);
+            for (abs_path, rel, mtime) in files {
                 let abs = abs_path.to_string_lossy().to_string();
                 if seen.insert(abs.clone()) {
-                    results.push((abs, rel));
+                    results.push((abs, rel, mtime));
                 }
             }
         }
     }
     results
+}
+
+fn list_all_files_from_paths(paths: &[String]) -> Vec<(String, String)> {
+    list_all_files_with_mtime(paths)
+        .into_iter()
+        .map(|(a, r, _)| (a, r))
+        .collect()
 }
 
 #[tauri::command]
@@ -319,6 +332,75 @@ pub async fn sync_list_remote_saves() -> Result<Vec<RemoteSaveInfoDto>, String> 
         })
         .collect();
     Ok(out)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsyncedGameDto {
+    pub game_id: String,
+}
+
+#[tauri::command]
+pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String> {
+    let cfg = config::load_config();
+    let _ = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let _ = cfg
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura userId en Configuración")?;
+
+    let remote = sync_list_remote_saves().await?;
+    let remote_map: std::collections::HashMap<(String, String), DateTime<Utc>> = remote
+        .into_iter()
+        .filter_map(|s| {
+            let dt = DateTime::parse_from_rfc3339(&s.last_modified)
+                .or_else(|_| DateTime::parse_from_rfc2822(&s.last_modified))
+                .ok()?;
+            Some((
+                (s.game_id.to_lowercase(), s.filename),
+                dt.with_timezone(&Utc),
+            ))
+        })
+        .collect();
+
+    let mut unsynced = Vec::new();
+
+    for game in &cfg.games {
+        let local_files = list_all_files_with_mtime(&game.paths);
+        let mut has_unsynced = false;
+
+        for (_abs, rel, mtime) in local_files {
+            let Ok(duration) = mtime.duration_since(UNIX_EPOCH) else {
+                continue;
+            };
+            let Some(local_dt) =
+                DateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos())
+            else {
+                continue;
+            };
+            let local_dt = local_dt.with_timezone(&Utc);
+
+            let key = (game.id.to_lowercase(), rel.clone());
+            match remote_map.get(&key) {
+                None => has_unsynced = true,
+                Some(&cloud_dt) if local_dt > cloud_dt => has_unsynced = true,
+                _ => {}
+            }
+        }
+
+        if has_unsynced {
+            unsynced.push(UnsyncedGameDto {
+                game_id: game.id.clone(),
+            });
+        }
+    }
+
+    Ok(unsynced)
 }
 
 #[derive(Serialize)]

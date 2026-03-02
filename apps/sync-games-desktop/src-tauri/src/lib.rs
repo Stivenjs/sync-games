@@ -35,6 +35,7 @@ pub fn run() {
             commands::sync_list_remote_saves,
             commands::sync_check_download_conflicts,
             commands::sync_download_game,
+            commands::sync_check_unsynced_games,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -69,6 +70,8 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            commands::watch_sync::spawn_watcher(app.handle().clone());
 
             Ok(())
         })

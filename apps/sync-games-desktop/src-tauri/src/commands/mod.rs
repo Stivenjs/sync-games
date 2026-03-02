@@ -4,6 +4,7 @@ mod config;
 mod scan;
 mod steam_search;
 mod sync;
+pub mod watch_sync;
 
 pub use config::*;
 pub use scan::*;
