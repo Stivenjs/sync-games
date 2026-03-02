@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Button, Spinner } from "@heroui/react";
-import { FolderSearch, PlusCircle, RefreshCw } from "lucide-react";
+import { Button, Card, CardBody, Spinner } from "@heroui/react";
+import { CloudUpload, FolderSearch, PlusCircle, RefreshCw } from "lucide-react";
 import { useConfig } from "@hooks/useConfig";
-import { removeGame } from "@services/tauri";
+import { removeGame, syncUploadGame, type SyncResult } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
+import { formatGameDisplayName } from "@utils/gameImage";
 import {
   GamesFilters,
   filterGames,
@@ -26,6 +27,11 @@ export function GamesPage() {
     suggestedId: "",
   });
   const [gameToRemove, setGameToRemove] = useState<ConfiguredGame | null>(null);
+  const [syncing, setSyncing] = useState<string | "all" | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    gameId: string;
+    result: SyncResult;
+  } | null>(null);
 
   const handleScanSelect = (path: string, suggestedId: string) => {
     setAddModalInitial({ path, suggestedId });
@@ -46,6 +52,59 @@ export function GamesPage() {
       throw e;
     }
   };
+
+  const handleSyncOne = async (game: ConfiguredGame) => {
+    setSyncing(game.id);
+    setSyncResult(null);
+    try {
+      const result = await syncUploadGame(game.id);
+      setSyncResult({ gameId: game.id, result });
+    } catch (e) {
+      setSyncResult({
+        gameId: game.id,
+        result: {
+          okCount: 0,
+          errCount: 1,
+          errors: [e instanceof Error ? e.message : String(e)],
+        },
+      });
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!config?.games?.length) return;
+    setSyncing("all");
+    setSyncResult(null);
+    const results: { gameId: string; result: SyncResult }[] = [];
+    for (const game of config.games) {
+      try {
+        const result = await syncUploadGame(game.id);
+        results.push({ gameId: game.id, result });
+      } catch (e) {
+        results.push({
+          gameId: game.id,
+          result: {
+            okCount: 0,
+            errCount: 1,
+            errors: [e instanceof Error ? e.message : String(e)],
+          },
+        });
+      }
+    }
+    setSyncResult({
+      gameId: "",
+      result: {
+        okCount: results.reduce((s, r) => s + r.result.okCount, 0),
+        errCount: results.reduce((s, r) => s + r.result.errCount, 0),
+        errors: results.flatMap((r) => r.result.errors),
+      },
+    });
+    setSyncing(null);
+  };
+
+  const hasSyncConfig = config?.apiBaseUrl?.trim() && config?.userId?.trim();
 
   if (loading) {
     return (
@@ -96,6 +155,23 @@ export function GamesPage() {
           >
             Añadir juego
           </Button>
+          {hasSyncConfig && (
+            <Button
+              variant="solid"
+              color="secondary"
+              startContent={
+                syncing === "all" ? (
+                  <Spinner size="sm" color="current" />
+                ) : (
+                  <CloudUpload size={18} />
+                )
+              }
+              onPress={handleSyncAll}
+              isDisabled={!config?.games?.length || !!syncing}
+            >
+              Subir todos
+            </Button>
+          )}
           <Button
             variant="solid"
             startContent={<RefreshCw size={18} />}
@@ -137,6 +213,8 @@ export function GamesPage() {
       <GamesList
         games={filterGames(config?.games ?? [], searchTerm, originFilter)}
         onRemove={handleRemoveGame}
+        onSync={hasSyncConfig ? handleSyncOne : undefined}
+        syncingId={syncing}
         emptyFilterMessage={
           (config?.games?.length ?? 0) > 0 &&
           (searchTerm !== "" || originFilter !== "all")
@@ -144,6 +222,36 @@ export function GamesPage() {
             : undefined
         }
       />
+
+      {syncResult && (
+        <Card className="mt-6 border border-default-200">
+          <CardBody>
+            <h3 className="mb-3 font-medium text-foreground">
+              {syncResult.gameId
+                ? `Sincronización: ${formatGameDisplayName(syncResult.gameId)}`
+                : "Sincronización completada"}
+            </h3>
+            <p className="text-sm">
+              {syncResult.result.okCount} archivo(s) subido(s)
+              {syncResult.result.errCount > 0 && (
+                <span className="text-danger">
+                  , {syncResult.result.errCount} error(es)
+                </span>
+              )}
+            </p>
+            {syncResult.result.errors.length > 0 && (
+              <ul className="mt-2 list-inside list-disc text-sm text-default-500">
+                {syncResult.result.errors.slice(0, 5).map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+                {syncResult.result.errors.length > 5 && (
+                  <li>… y {syncResult.result.errors.length - 5} más</li>
+                )}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

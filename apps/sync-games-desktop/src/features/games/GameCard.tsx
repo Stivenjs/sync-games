@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardFooter, Skeleton } from "@heroui/react";
-import { Gamepad2, Trash2 } from "lucide-react";
+import { CloudUpload, Gamepad2, Trash2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
 
@@ -12,6 +12,10 @@ export interface GameCardProps {
   isLoading?: boolean;
   /** Callback al eliminar el juego. Si no se pasa, no se muestra el botón. */
   onRemove?: (game: ConfiguredGame) => void;
+  /** Callback al sincronizar (subir) el juego. Si no se pasa, no se muestra el botón. */
+  onSync?: (game: ConfiguredGame) => void;
+  /** Muestra spinner en el botón de sincronizar. */
+  isSyncing?: boolean;
 }
 
 /**
@@ -24,6 +28,8 @@ export function GameCard({
   resolvedSteamAppId,
   isLoading: externalLoading,
   onRemove,
+  onSync,
+  isSyncing,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -53,19 +59,39 @@ export function GameCard({
       className="group relative overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
       radius="lg"
     >
-      {onRemove && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(game);
-          }}
-          className="absolute right-2 top-2 z-20 rounded-lg bg-black/60 p-2 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-          aria-label={`Eliminar ${game.id}`}
-        >
-          <Trash2 size={18} />
-        </button>
-      )}
+      <div className="absolute right-2 top-2 z-20 flex gap-1">
+        {onSync && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSync(game);
+            }}
+            disabled={isSyncing}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-primary hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
+            aria-label={`Subir ${game.id}`}
+          >
+            {isSyncing ? (
+              <span className="size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <CloudUpload size={18} />
+            )}
+          </button>
+        )}
+        {onRemove && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(game);
+            }}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
+            aria-label={`Eliminar ${game.id}`}
+          >
+            <Trash2 size={18} />
+          </button>
+        )}
+      </div>
       {showImage ? (
         <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large">
           <img

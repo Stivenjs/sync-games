@@ -1,21 +1,11 @@
 import { useState } from "react";
-import {
-  CloudDownload,
-  CloudUpload,
-  Gamepad2,
-  Info,
-  PlusCircle,
-  Settings,
-} from "lucide-react";
+import { Gamepad2, Info, Settings } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { GamesPage } from "@features/games";
 import "./App.css";
 
 const NAV_ITEMS: NavItem[] = [
   { id: "games", label: "Juegos", icon: <Gamepad2 size={18} /> },
-  { id: "add", label: "Añadir juego", icon: <PlusCircle size={18} /> },
-  { id: "sync", label: "Sincronizar", icon: <CloudUpload size={18} /> },
-  { id: "download", label: "Descargar", icon: <CloudDownload size={18} /> },
   { id: "settings", label: "Configuración", icon: <Settings size={18} /> },
   { id: "about", label: "Acerca de", icon: <Info size={18} /> },
 ];

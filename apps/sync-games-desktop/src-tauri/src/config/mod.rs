@@ -55,19 +55,59 @@ pub struct ConfiguredGame {
 }
 
 /// Lee el archivo de config desde disco.
-/// Devuelve config por defecto si no existe.
+/// Usa SYNC_GAMES_API_URL y SYNC_GAMES_API_KEY de .env como defaults si no están en el config
+/// (igual que la CLI).
 pub fn load_config() -> Config {
     let path = match config_path() {
         Some(p) => p,
-        None => return Config::default(),
+        None => return config_with_env_defaults(Config::default()),
     };
 
     let contents = match fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(_) => return Config::default(),
+        Err(_) => return config_with_env_defaults(Config::default()),
     };
 
-    serde_json::from_str(&contents).unwrap_or_default()
+    let cfg: Config = serde_json::from_str(&contents).unwrap_or_default();
+    config_with_env_defaults(cfg)
+}
+
+/// Aplica defaults: primero valores embebidos en compile time (release),
+/// luego variables de entorno en runtime (.env en dev).
+fn config_with_env_defaults(mut cfg: Config) -> Config {
+    if cfg
+        .api_base_url
+        .as_ref()
+        .map_or(true, |s| s.trim().is_empty())
+    {
+        let url = option_env!("SYNC_GAMES_API_URL")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .or_else(|| {
+                std::env::var("SYNC_GAMES_API_URL")
+                    .ok()
+                    .filter(|s| !s.trim().is_empty())
+            });
+        if let Some(u) = url {
+            cfg.api_base_url = Some(u);
+        }
+    }
+    if cfg.api_key.as_ref().map_or(true, |s| s.trim().is_empty()) {
+        let key = option_env!("SYNC_GAMES_API_KEY")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .or_else(|| {
+                std::env::var("SYNC_GAMES_API_KEY")
+                    .ok()
+                    .filter(|s| !s.trim().is_empty())
+            });
+        if let Some(k) = key {
+            cfg.api_key = Some(k);
+        }
+    }
+    cfg
 }
 
 /// Guarda el config en disco.

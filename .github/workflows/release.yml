@@ -112,6 +112,9 @@ jobs:
             args: "--target x86_64-apple-darwin"
             rustTargets: x86_64-apple-darwin
     runs-on: ${{ matrix.platform }}
+    env:
+      SYNC_GAMES_API_URL: ${{ secrets.SYNC_GAMES_API_URL }}
+      SYNC_GAMES_API_KEY: ${{ secrets.SYNC_GAMES_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -1,0 +1,1 @@
+export { SyncPage } from "./SyncPage";

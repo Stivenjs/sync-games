@@ -41,3 +41,38 @@ export async function removeGame(gameId: string, path?: string): Promise<void> {
 export async function scanPathCandidates(): Promise<PathCandidate[]> {
   return invoke<PathCandidate[]>("scan_path_candidates");
 }
+
+/** Resultado de subida o descarga */
+export interface SyncResult {
+  okCount: number;
+  errCount: number;
+  errors: string[];
+}
+
+/** Sube los guardados de un juego a la nube */
+export async function syncUploadGame(gameId: string): Promise<SyncResult> {
+  const r = await invoke<{
+    okCount: number;
+    errCount: number;
+    errors: string[];
+  }>("sync_upload_game", { gameId });
+  return {
+    okCount: r.okCount,
+    errCount: r.errCount,
+    errors: r.errors,
+  };
+}
+
+/** Descarga los guardados de un juego desde la nube */
+export async function syncDownloadGame(gameId: string): Promise<SyncResult> {
+  const r = await invoke<{
+    okCount: number;
+    errCount: number;
+    errors: string[];
+  }>("sync_download_game", { gameId });
+  return {
+    okCount: r.okCount,
+    errCount: r.errCount,
+    errors: r.errors,
+  };
+}

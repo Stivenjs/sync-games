@@ -11,9 +11,13 @@ interface GamesListProps {
   emptyFilterMessage?: string;
   /** Callback al eliminar un juego. Si no se pasa, no se muestra el botón de eliminar. */
   onRemove?: (game: ConfiguredGame) => void;
+  /** Callback al sincronizar (subir) un juego. Si no se pasa, no se muestra el botón. */
+  onSync?: (game: ConfiguredGame) => void;
+  /** ID del juego que está sincronizando (muestra spinner). */
+  syncingId?: string | null;
 }
 
-export function GamesList({ games, emptyFilterMessage, onRemove }: GamesListProps) {
+export function GamesList({ games, emptyFilterMessage, onRemove, onSync, syncingId }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
 
   if (games.length === 0) {
@@ -48,6 +52,8 @@ export function GamesList({ games, emptyFilterMessage, onRemove }: GamesListProp
             needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined
           }
           onRemove={onRemove}
+          onSync={onSync}
+          isSyncing={syncingId === game.id}
         />
       ))}
     </div>
