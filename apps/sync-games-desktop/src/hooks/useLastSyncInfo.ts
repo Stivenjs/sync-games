@@ -8,6 +8,12 @@ export interface LastSyncInfo {
   lastSyncGameId: string | null;
 }
 
+export interface CloudGameSummary {
+  gameId: string;
+  fileCount: number;
+  totalSize: number;
+}
+
 function computeLastSync(
   saves: { gameId: string; lastModified: string }[]
 ): LastSyncInfo {
@@ -26,23 +32,51 @@ function computeLastSync(
     : { lastSyncAt: null, lastSyncGameId: null };
 }
 
+function computeCloudGames(saves: { gameId: string; size?: number }[]): {
+  cloudGames: CloudGameSummary[];
+  totalSize: number;
+} {
+  const byGame = new Map<string, { count: number; size: number }>();
+  for (const s of saves) {
+    const existing = byGame.get(s.gameId) ?? { count: 0, size: 0 };
+    byGame.set(s.gameId, {
+      count: existing.count + 1,
+      size: existing.size + (s.size ?? 0),
+    });
+  }
+  const cloudGames: CloudGameSummary[] = [...byGame.entries()].map(
+    ([gameId, { count, size }]) => ({
+      gameId,
+      fileCount: count,
+      totalSize: size,
+    })
+  );
+  const totalSize = cloudGames.reduce((sum, g) => sum + g.totalSize, 0);
+  return { cloudGames, totalSize };
+}
+
 /**
- * Hook que obtiene la última sincronización desde la API.
- * Usa la lista de guardados (cada uno tiene lastModified) para calcular
- * el juego y la fecha de la sync más reciente.
+ * Hook que obtiene la última sincronización y los juegos en la nube.
+ * Usa la lista de guardados para calcular:
+ * - última sync (juego + fecha)
+ * - resumen por juego (archivos, tamaño) y total en la nube
  */
 export function useLastSyncInfo(enabled: boolean) {
   const query = useQuery({
     queryKey: LAST_SYNC_QUERY_KEY,
     queryFn: async () => {
       const saves = await syncListRemoteSaves();
-      return computeLastSync(saves);
+      const lastSync = computeLastSync(saves);
+      const { cloudGames, totalSize } = computeCloudGames(saves);
+      return { ...lastSync, cloudGames, totalCloudSize: totalSize };
     },
     enabled,
   });
   return {
     lastSyncAt: query.data?.lastSyncAt ?? null,
     lastSyncGameId: query.data?.lastSyncGameId ?? null,
+    cloudGames: query.data?.cloudGames ?? [],
+    totalCloudSize: query.data?.totalCloudSize ?? 0,
     isLoading: query.isLoading,
     refetch: query.refetch,
   };

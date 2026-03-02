@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardFooter, Skeleton } from "@heroui/react";
-import { CloudUpload, Gamepad2, Trash2 } from "lucide-react";
+import { CloudDownload, CloudUpload, Gamepad2, Trash2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
 
@@ -16,6 +16,10 @@ export interface GameCardProps {
   onSync?: (game: ConfiguredGame) => void;
   /** Muestra spinner en el botón de sincronizar. */
   isSyncing?: boolean;
+  /** Callback al descargar el juego. Si no se pasa, no se muestra el botón. */
+  onDownload?: (game: ConfiguredGame) => void;
+  /** Muestra spinner en el botón de descargar. */
+  isDownloading?: boolean;
 }
 
 /**
@@ -30,6 +34,8 @@ export function GameCard({
   onRemove,
   onSync,
   isSyncing,
+  onDownload,
+  isDownloading,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -60,6 +66,24 @@ export function GameCard({
       radius="lg"
     >
       <div className="absolute right-2 top-2 z-20 flex gap-1">
+        {onDownload && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload(game);
+            }}
+            disabled={isDownloading || isSyncing}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-secondary hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
+            aria-label={`Descargar ${game.id}`}
+          >
+            {isDownloading ? (
+              <span className="size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <CloudDownload size={18} />
+            )}
+          </button>
+        )}
         {onSync && (
           <button
             type="button"
@@ -67,7 +91,7 @@ export function GameCard({
               e.stopPropagation();
               onSync(game);
             }}
-            disabled={isSyncing}
+            disabled={isSyncing || isDownloading}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-primary hover:opacity-100 focus:opacity-100 group-hover:opacity-100 disabled:opacity-100"
             aria-label={`Subir ${game.id}`}
           >

@@ -15,9 +15,21 @@ interface GamesListProps {
   onSync?: (game: ConfiguredGame) => void;
   /** ID del juego que está sincronizando (muestra spinner). */
   syncingId?: string | null;
+  /** Callback al descargar un juego. Si no se pasa, no se muestra el botón. */
+  onDownload?: (game: ConfiguredGame) => void;
+  /** ID del juego que está descargando (muestra spinner). */
+  downloadingId?: string | null;
 }
 
-export function GamesList({ games, emptyFilterMessage, onRemove, onSync, syncingId }: GamesListProps) {
+export function GamesList({
+  games,
+  emptyFilterMessage,
+  onRemove,
+  onSync,
+  syncingId,
+  onDownload,
+  downloadingId,
+}: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
 
   if (games.length === 0) {
@@ -53,7 +65,9 @@ export function GamesList({ games, emptyFilterMessage, onRemove, onSync, syncing
           }
           onRemove={onRemove}
           onSync={onSync}
-          isSyncing={syncingId === game.id}
+          isSyncing={syncingId === game.id || syncingId === "all"}
+          onDownload={onDownload}
+          isDownloading={downloadingId === game.id || downloadingId === "all"}
         />
       ))}
     </div>
