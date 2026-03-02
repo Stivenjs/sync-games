@@ -7,6 +7,7 @@ import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { SettingsPage } from "@features/settings";
 import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
 import { toastSyncResult } from "@utils/toast";
+import { notifySyncComplete, notifySyncError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 import "./App.css";
 
@@ -47,22 +48,26 @@ function App() {
       okCount: number;
       errCount: number;
     }>("auto-sync-done", (ev) => {
+      const gameName = formatGameDisplayName(ev.payload.gameId);
       toastSyncResult(
         {
           okCount: ev.payload.okCount,
           errCount: ev.payload.errCount,
           errors: [],
         },
-        formatGameDisplayName(ev.payload.gameId)
+        gameName
       );
+      notifySyncComplete(gameName, ev.payload.okCount, ev.payload.errCount);
     });
     const unsubErr = listen<{ gameId: string; error: string }>(
       "auto-sync-error",
       (ev) => {
+        const gameName = formatGameDisplayName(ev.payload.gameId);
         toastSyncResult(
           { okCount: 0, errCount: 1, errors: [ev.payload.error] },
-          formatGameDisplayName(ev.payload.gameId)
+          gameName
         );
+        notifySyncError(gameName, ev.payload.error);
       }
     );
     return () => {

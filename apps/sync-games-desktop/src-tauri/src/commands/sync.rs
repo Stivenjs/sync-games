@@ -527,6 +527,13 @@ pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String
     let mut err_count = 0u32;
     let mut errors = Vec::new();
 
+    let backup_dir = config::config_dir().map(|root| {
+        let ts = chrono::Utc::now().format("%Y-%m-%d_%H-%M-%S");
+        root.join("backups")
+            .join(&game_id)
+            .join(ts.to_string())
+    });
+
     for save in saves {
         let body = serde_json::json!({
             "gameId": game_id,
@@ -567,6 +574,18 @@ pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String
         let dest_path = dest_base.join(&save.filename);
         if let Some(parent) = dest_path.parent() {
             let _ = fs::create_dir_all(parent);
+        }
+        // Respaldo local antes de sobrescribir
+        if dest_path.exists() {
+            if let Some(ref backup_base) = backup_dir {
+                if let Ok(rel) = dest_path.strip_prefix(&dest_base) {
+                    let backup_path = backup_base.join(rel);
+                    if let Some(bp) = backup_path.parent() {
+                        let _ = fs::create_dir_all(bp);
+                    }
+                    let _ = fs::copy(&dest_path, &backup_path);
+                }
+            }
         }
         match fs::File::create(&dest_path).and_then(|mut f| f.write_all(&bytes)) {
             Ok(_) => ok_count += 1,
