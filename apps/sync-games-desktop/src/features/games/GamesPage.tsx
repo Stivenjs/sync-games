@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card, CardBody, Spinner } from "@heroui/react";
 import { CloudUpload, FolderSearch, PlusCircle, RefreshCw } from "lucide-react";
 import { useConfig } from "@hooks/useConfig";
+import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
 import { removeGame, syncUploadGame, type SyncResult } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
@@ -18,6 +19,15 @@ import { ScanModal } from "@features/games/ScanModal";
 
 export function GamesPage() {
   const { config, loading, error, refetch } = useConfig();
+  const hasSyncConfig = !!(
+    config?.apiBaseUrl?.trim() && config?.userId?.trim()
+  );
+  const {
+    lastSyncAt,
+    lastSyncGameId,
+    isLoading: lastSyncLoading,
+    refetch: refetchLastSync,
+  } = useLastSyncInfo(hasSyncConfig);
   const [searchTerm, setSearchTerm] = useState("");
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -70,6 +80,7 @@ export function GamesPage() {
       });
     } finally {
       setSyncing(null);
+      refetchLastSync?.();
     }
   };
 
@@ -102,9 +113,8 @@ export function GamesPage() {
       },
     });
     setSyncing(null);
+    refetchLastSync?.();
   };
-
-  const hasSyncConfig = config?.apiBaseUrl?.trim() && config?.userId?.trim();
 
   if (loading) {
     return (
@@ -175,7 +185,10 @@ export function GamesPage() {
           <Button
             variant="solid"
             startContent={<RefreshCw size={18} />}
-            onPress={() => refetch?.()}
+            onPress={() => {
+              refetch?.();
+              refetchLastSync?.();
+            }}
           >
             Actualizar
           </Button>
@@ -200,7 +213,12 @@ export function GamesPage() {
         onConfirm={handleConfirmRemove}
       />
       <div className="mb-8">
-        <GamesStats gamesCount={config?.games?.length ?? 0} lastSyncAt={null} />
+        <GamesStats
+          gamesCount={config?.games?.length ?? 0}
+          lastSyncAt={lastSyncAt}
+          lastSyncGameId={lastSyncGameId}
+          lastSyncLoading={hasSyncConfig && lastSyncLoading}
+        />
       </div>
       <div className="mb-6">
         <GamesFilters

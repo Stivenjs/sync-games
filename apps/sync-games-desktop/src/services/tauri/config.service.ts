@@ -63,6 +63,20 @@ export async function syncUploadGame(gameId: string): Promise<SyncResult> {
   };
 }
 
+/** Información de un guardado en la nube */
+export interface RemoteSaveInfo {
+  gameId: string;
+  key: string;
+  filename: string;
+  lastModified: string;
+  size?: number;
+}
+
+/** Lista todos los guardados del usuario en la nube (para última sincronización, etc.) */
+export async function syncListRemoteSaves(): Promise<RemoteSaveInfo[]> {
+  return invoke<RemoteSaveInfo[]>("sync_list_remote_saves");
+}
+
 /** Descarga los guardados de un juego desde la nube */
 export async function syncDownloadGame(gameId: string): Promise<SyncResult> {
   const r = await invoke<{
