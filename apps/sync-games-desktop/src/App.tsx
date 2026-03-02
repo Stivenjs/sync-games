@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Gamepad2, Info, Settings } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { GamesPage } from "@features/games";
+import { SettingsPage } from "@features/settings";
 import "./App.css";
 
 const NAV_ITEMS: NavItem[] = [
@@ -14,6 +15,8 @@ function PageContent({ activeId }: { activeId: string }) {
   switch (activeId) {
     case "games":
       return <GamesPage />;
+    case "settings":
+      return <SettingsPage />;
     default:
       return (
         <div className="flex min-h-[40vh] items-center justify-center">
