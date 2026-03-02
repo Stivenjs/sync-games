@@ -6,13 +6,32 @@ use std::sync::OnceLock;
 static APP_ID_REGEX: OnceLock<Regex> = OnceLock::new();
 
 /// Obtiene el nombre del juego a partir del Steam App ID (API appdetails).
+/// Reintenta hasta 3 veces ante fallos transitorios (red, rate limit).
 #[tauri::command]
 pub async fn get_steam_app_name(app_id: String) -> Option<String> {
-    let app_id = app_id.trim();
+    let app_id = app_id.trim().to_string();
     if app_id.is_empty() || !app_id.chars().all(|c| c.is_ascii_digit()) {
         return None;
     }
 
+    const MAX_RETRIES: u32 = 3;
+    const RETRY_DELAY_MS: u64 = 800;
+
+    for attempt in 0..MAX_RETRIES {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(
+                RETRY_DELAY_MS * attempt as u64,
+            ));
+        }
+
+        if let Some(name) = fetch_steam_app_name_impl(&app_id).await {
+            return Some(name);
+        }
+    }
+    None
+}
+
+async fn fetch_steam_app_name_impl(app_id: &str) -> Option<String> {
     let url = format!(
         "https://store.steampowered.com/api/appdetails?appids={}",
         app_id

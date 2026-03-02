@@ -212,7 +212,7 @@ fn expand_env_vars(s: &str) -> String {
 
 /// Dado un mapa de rutas -> appid y una ruta de juego, devuelve el appid si la ruta
 /// está dentro de algún directorio de instalación de Steam.
-pub fn resolve_steam_app_id(
+fn resolve_steam_app_id(
     path_to_appid: &HashMap<PathBuf, String>,
     game_path: &str,
 ) -> Option<String> {
