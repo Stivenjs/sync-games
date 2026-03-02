@@ -1,6 +1,7 @@
 //! Sincronización de guardados: subir y descargar a/desde la API (S3).
 
 use crate::config;
+use crate::process_check;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -145,6 +146,20 @@ pub async fn list_save_files(game_id: String) -> Result<Vec<SaveFileDto>, String
         .collect())
 }
 
+/// Comprueba si el juego está en ejecución (para mostrar advertencia en la UI).
+#[tauri::command]
+pub fn check_game_running(game_id: String) -> bool {
+    let cfg = config::load_config();
+    let Some(game) = cfg
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+    else {
+        return false;
+    };
+    process_check::is_game_running(&game_id, &game.paths)
+}
+
 async fn api_request(
     base_url: &str,
     user_id: &str,
@@ -177,6 +192,19 @@ async fn api_request(
 #[tauri::command]
 pub async fn sync_upload_game(game_id: String) -> Result<SyncResultDto, String> {
     let cfg = config::load_config();
+    let game = cfg
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+
+    if process_check::is_game_running(&game_id, &game.paths) {
+        return Err(format!(
+            "El juego está en ejecución. Cierra {} antes de sincronizar para evitar archivos bloqueados.",
+            game.id
+        ));
+    }
+
     let api_base = cfg
         .api_base_url
         .as_deref()
@@ -188,12 +216,6 @@ pub async fn sync_upload_game(game_id: String) -> Result<SyncResultDto, String> 
         .filter(|s| !s.trim().is_empty())
         .ok_or("Configura userId en Configuración")?;
     let api_key = cfg.api_key.as_deref().unwrap_or("");
-
-    let game = cfg
-        .games
-        .iter()
-        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
-        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
     let files = list_all_files_from_paths(&game.paths);
     if files.is_empty() {
@@ -481,6 +503,19 @@ pub async fn sync_check_download_conflicts(
 #[tauri::command]
 pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String> {
     let cfg = config::load_config();
+    let game = cfg
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+
+    if process_check::is_game_running(&game_id, &game.paths) {
+        return Err(format!(
+            "El juego está en ejecución. Cierra {} antes de descargar para evitar sobrescribir archivos en uso.",
+            game.id
+        ));
+    }
+
     let api_base = cfg
         .api_base_url
         .as_deref()
@@ -492,12 +527,6 @@ pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String
         .filter(|s| !s.trim().is_empty())
         .ok_or("Configura userId en Configuración")?;
     let api_key = cfg.api_key.as_deref().unwrap_or("");
-
-    let game = cfg
-        .games
-        .iter()
-        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
-        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
     let dest_base = match expand_path(game.paths[0].trim()) {
         Some(p) => PathBuf::from(p),

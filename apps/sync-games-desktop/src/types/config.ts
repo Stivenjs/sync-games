@@ -10,6 +10,8 @@ export interface ConfiguredGame {
   readonly steamAppId?: string;
   /** URL personalizada de imagen. Prioridad sobre steamAppId. Para juegos no-Steam. */
   readonly imageUrl?: string;
+  /** Nombres de ejecutable para detectar si el juego está en ejecución (ej. ["eldenring.exe"]). */
+  readonly executableNames?: readonly string[];
 }
 
 export interface Config {

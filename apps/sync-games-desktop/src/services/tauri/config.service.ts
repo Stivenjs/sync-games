@@ -27,6 +27,11 @@ export async function getSteamAppName(appId: string): Promise<string | null> {
   return invoke<string | null>("get_steam_app_name", { appId });
 }
 
+/** Comprueba si el juego está en ejecución (para mostrar advertencia) */
+export function checkGameRunning(gameId: string): Promise<boolean> {
+  return invoke<boolean>("check_game_running", { gameId });
+}
+
 /** Añade un juego a la configuración */
 export async function addGame(gameId: string, path: string): Promise<void> {
   await invoke("add_game", { gameId, path });

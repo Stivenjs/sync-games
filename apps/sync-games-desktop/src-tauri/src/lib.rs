@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod process_check;
 mod steam;
 
 use tauri::menu::{Menu, MenuItem};
@@ -41,6 +42,7 @@ pub fn run() {
             commands::sync_download_game,
             commands::sync_check_unsynced_games,
             commands::get_game_stats,
+            commands::check_game_running,
             commands::open_save_folder,
             commands::export_config_to_file,
             commands::import_config_from_file,

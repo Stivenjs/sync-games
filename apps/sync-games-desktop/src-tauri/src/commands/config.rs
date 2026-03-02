@@ -84,6 +84,7 @@ pub fn add_game(game_id: String, path: String) -> Result<(), String> {
             paths: vec![path],
             steam_app_id: None,
             image_url: None,
+            executable_names: None,
         });
     }
 

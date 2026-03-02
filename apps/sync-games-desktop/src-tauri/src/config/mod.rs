@@ -52,6 +52,9 @@ pub struct ConfiguredGame {
     /// URL personalizada de imagen. Prioridad sobre steam_app_id. Para juegos no-Steam.
     #[serde(default)]
     pub image_url: Option<String>,
+    /// Nombres de ejecutable para detectar si el juego está en ejecución (ej. ["eldenring.exe"]).
+    #[serde(default)]
+    pub executable_names: Option<Vec<String>>,
 }
 
 /// Lee el archivo de config desde disco.

@@ -3,6 +3,7 @@
 
 use crate::commands::sync;
 use crate::config;
+use crate::process_check;
 use notify::RecursiveMode;
 use notify_debouncer_mini::{new_debouncer, DebounceEventResult};
 use std::path::PathBuf;
@@ -121,6 +122,26 @@ pub fn spawn_watcher(app: tauri::AppHandle) {
                     }
 
                     for game_id in games_to_sync {
+                        let cfg = config::load_config();
+                        let game = cfg
+                            .games
+                            .iter()
+                            .find(|g| g.id.eq_ignore_ascii_case(&game_id));
+                        if let Some(game) = game {
+                            if process_check::is_game_running(&game_id, &game.paths) {
+                                let _ = app.emit("auto-sync-skipped-game-running", {
+                                    #[derive(serde::Serialize, Clone)]
+                                    struct Payload {
+                                        game_id: String,
+                                    }
+                                    Payload {
+                                        game_id: game_id.clone(),
+                                    }
+                                });
+                                continue;
+                            }
+                        }
+
                         let app = app.clone();
                         let gid = game_id.clone();
                         tauri::async_runtime::spawn(async move {

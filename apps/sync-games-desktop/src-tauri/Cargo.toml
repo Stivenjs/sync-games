@@ -34,6 +34,7 @@ notify-debouncer-mini = "0.4"
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-process = "2"
+sysinfo = "0.31"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

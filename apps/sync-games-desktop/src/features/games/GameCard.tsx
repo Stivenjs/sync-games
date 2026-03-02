@@ -10,6 +10,7 @@ import {
   Skeleton,
 } from "@heroui/react";
 import {
+  AlertTriangle,
   CloudDownload,
   CloudUpload,
   FolderOpen,
@@ -26,6 +27,8 @@ export interface GameCardProps {
   game: ConfiguredGame;
   /** Estadísticas del juego (tamaño, últimas modificaciones). Opcional. */
   stats?: GameStats | null;
+  /** Si el juego está en ejecución (mostrar advertencia, deshabilitar sync/download). */
+  isGameRunning?: boolean;
   /** Steam App ID resuelto dinámicamente (por búsqueda). Opcional. */
   resolvedSteamAppId?: string | null;
   /** Muestra skeleton mientras se resuelve Steam ID o carga la imagen. */
@@ -52,6 +55,7 @@ export interface GameCardProps {
 export function GameCard({
   game,
   stats,
+  isGameRunning,
   resolvedSteamAppId,
   isLoading: externalLoading,
   onRemove,
@@ -89,6 +93,15 @@ export function GameCard({
       className="group relative overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
       radius="lg"
     >
+      {isGameRunning && (
+        <div
+          className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-foreground backdrop-blur-sm"
+          title="El juego está en ejecución. Cierra el juego antes de sincronizar."
+        >
+          <AlertTriangle size={14} />
+          En ejecución
+        </div>
+      )}
       {(onOpenFolder || onDownload || onSync || onRemove) && (
         <div
           className="absolute right-2 top-2 z-20"
@@ -116,7 +129,11 @@ export function GameCard({
                 else if (key === "remove") onRemove?.(game);
               }}
               disabledKeys={
-                isDownloading || isSyncing ? ["folder", "download", "sync"] : []
+                isDownloading || isSyncing
+                  ? ["folder", "download", "sync"]
+                  : isGameRunning
+                    ? ["download", "sync"]
+                    : []
               }
             >
               {onOpenFolder ? (
