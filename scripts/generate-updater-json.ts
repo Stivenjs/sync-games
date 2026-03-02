@@ -33,7 +33,9 @@ const ARTIFACT_PLATFORM: Record<string, string> = {
   "desktop-macos-x64": "darwin-x86_64",
 };
 
-function findFirstSig(dir: string): { sigPath: string; installerName: string } | null {
+function findFirstSig(
+  dir: string
+): { sigPath: string; installerName: string } | null {
   if (!existsSync(dir)) return null;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
@@ -66,9 +68,16 @@ if (Object.keys(platforms).length === 0) {
   process.exit(1);
 }
 
+// Notas del release: RELEASE_NOTES.md, env RELEASE_NOTES, o vacío
+let notes = process.env.RELEASE_NOTES?.trim() ?? "";
+const notesFile = resolve(cwd, "RELEASE_NOTES.md");
+if (!notes && existsSync(notesFile)) {
+  notes = readFileSync(notesFile, "utf-8").trim();
+}
+
 const latest = {
   version: VERSION,
-  notes: "",
+  notes: notes || "",
   pub_date: new Date().toISOString(),
   platforms,
 };

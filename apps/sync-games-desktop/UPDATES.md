@@ -71,6 +71,14 @@ La workflow ya está configurada. Solo necesitas añadir estos **secrets** al re
 
 Cuando hagas push de un tag (ej. `v0.1.7`), la action compilará, firmará, generará `latest.json` y publicará todo en el release automáticamente.
 
+### Notas del update
+
+Las notas que ve el usuario en el diálogo de actualización se leen del archivo **`RELEASE_NOTES.md`** en la raíz del repo. Antes de crear el tag:
+
+1. Edita `RELEASE_NOTES.md` con las novedades de la versión (lista, párrafos, lo que quieras)
+2. Haz commit y push
+3. Crea el tag
+
 ## 4. Formato del JSON de actualización (GitHub Releases)
 
 Crea un archivo `latest.json` y súbelo como asset en cada release. Ejemplo:

@@ -1,0 +1,3 @@
+- Correcciones y mejoras
+- Actualizaciones automáticas
+- Mejora en la interfaz
