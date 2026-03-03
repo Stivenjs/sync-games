@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+#[cfg(target_os = "windows")]
 mod manifest;
 mod process_check;
 mod steam;

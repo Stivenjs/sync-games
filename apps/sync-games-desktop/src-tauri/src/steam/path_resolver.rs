@@ -211,6 +211,8 @@ fn expand_env_vars(s: &str) -> String {
 }
 
 /// Construye el mapa ruta de instalación -> Steam App ID para todas las bibliotecas.
+/// Solo se usa en el escaneo de candidatos (Windows).
+#[cfg(target_os = "windows")]
 pub fn get_steam_path_to_appid_map() -> HashMap<PathBuf, String> {
     let Some(steam_root) = steam_path_candidates()
         .into_iter()

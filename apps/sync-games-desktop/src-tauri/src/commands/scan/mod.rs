@@ -5,7 +5,9 @@
 mod filters;
 
 use crate::config;
+#[cfg(target_os = "windows")]
 use crate::manifest;
+#[cfg(target_os = "windows")]
 use crate::steam;
 use filters::{folder_contains_save_like_files, is_excluded_folder};
 use regex::Regex;
