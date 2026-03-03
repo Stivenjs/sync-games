@@ -5,9 +5,26 @@ use std::fs;
 use super::api;
 use super::models::SyncResultDto;
 use super::path_utils;
+use crate::tray_state::TrayState;
+use tauri::State;
 
 #[tauri::command]
-pub async fn sync_upload_game(game_id: String) -> Result<SyncResultDto, String> {
+pub async fn sync_upload_game(
+    game_id: String,
+    tray_state: State<'_, TrayState>,
+) -> Result<SyncResultDto, String> {
+    tray_state.0.syncing_inc();
+    tray_state.0.update_tooltip();
+
+    let result = sync_upload_game_impl(game_id).await;
+
+    tray_state.0.syncing_dec();
+    tray_state.0.clone().refresh_unsynced_async();
+
+    result
+}
+
+pub(crate) async fn sync_upload_game_impl(game_id: String) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
         .games
@@ -107,3 +124,4 @@ pub async fn sync_upload_game(game_id: String) -> Result<SyncResultDto, String> 
         errors,
     })
 }
+

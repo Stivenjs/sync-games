@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod process_check;
 mod steam;
+mod tray_state;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -50,6 +51,7 @@ pub fn run() {
             commands::open_save_folder,
             commands::export_config_to_file,
             commands::import_config_from_file,
+            commands::tray_tooltip::refresh_tray_tooltip,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -69,10 +71,10 @@ pub fn run() {
 
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-            let _tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .icon(icon)
                 .menu(&menu)
-                .tooltip("sync-games")
+                .tooltip("Listo")
                 .on_menu_event(move |app, event| {
                     if event.id.as_ref() == "show" {
                         if let Some(window) = app.get_webview_window("main") {
@@ -85,8 +87,13 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            commands::watch_sync::spawn_watcher(app.handle().clone());
-            commands::game_exit_sync::spawn_exit_watcher(app.handle().clone());
+            let tray_state = tray_state::TrayState::new(tray);
+            app.manage(tray_state.clone());
+            commands::watch_sync::spawn_watcher(app.handle().clone(), tray_state.0.clone());
+            commands::game_exit_sync::spawn_exit_watcher(
+                app.handle().clone(),
+                tray_state.0.clone(),
+            );
 
             Ok(())
         })

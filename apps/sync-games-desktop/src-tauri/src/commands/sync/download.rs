@@ -13,6 +13,8 @@ use super::models::{
     UnsyncedGameDto,
 };
 use super::path_utils;
+use crate::tray_state::TrayState;
+use tauri::State;
 
 #[tauri::command]
 pub async fn sync_check_download_conflicts(
@@ -139,7 +141,22 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
 }
 
 #[tauri::command]
-pub async fn sync_download_game(game_id: String) -> Result<SyncResultDto, String> {
+pub async fn sync_download_game(
+    game_id: String,
+    tray_state: State<'_, TrayState>,
+) -> Result<SyncResultDto, String> {
+    tray_state.0.syncing_inc();
+    tray_state.0.update_tooltip();
+
+    let result = sync_download_game_impl(game_id).await;
+
+    tray_state.0.syncing_dec();
+    tray_state.0.clone().refresh_unsynced_async();
+
+    result
+}
+
+async fn sync_download_game_impl(game_id: String) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
         .games

@@ -7,6 +7,7 @@ mod game_stats;
 mod scan;
 mod steam_search;
 pub mod sync;
+pub mod tray_tooltip;
 pub mod watch_sync;
 
 pub use config::*;

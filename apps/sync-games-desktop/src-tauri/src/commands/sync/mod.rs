@@ -20,7 +20,6 @@ pub(crate) mod upload;
 use models::SaveFileDto;
 
 pub use api::sync_list_remote_saves;
-pub use upload::sync_upload_game;
 
 /// Lista archivos de guardado de un juego configurado.
 #[tauri::command]

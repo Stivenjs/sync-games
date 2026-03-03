@@ -62,7 +62,10 @@ fn path_to_game_id(path: &std::path::Path, watch_roots: &[(PathBuf, String)]) ->
     best.map(|(_, id)| id)
 }
 
-pub fn spawn_watcher(app: tauri::AppHandle) {
+pub fn spawn_watcher(
+    app: tauri::AppHandle,
+    tray_state: std::sync::Arc<crate::tray_state::TrayStateInner>,
+) {
     std::thread::spawn(move || {
         let cfg = config::load_config();
         if cfg
@@ -144,8 +147,14 @@ pub fn spawn_watcher(app: tauri::AppHandle) {
 
                         let app = app.clone();
                         let gid = game_id.clone();
+                        let tray = tray_state.clone();
+                        tray.syncing_inc();
+                        tray.update_tooltip();
                         tauri::async_runtime::spawn(async move {
-                            match sync::sync_upload_game(gid.clone()).await {
+                            let res = sync::upload::sync_upload_game_impl(gid.clone()).await;
+                            tray.syncing_dec();
+                            tray.clone().refresh_unsynced_async();
+                            match res {
                                 Ok(r) => {
                                     let _ = app.emit("auto-sync-done", {
                                         #[derive(serde::Serialize, Clone)]
