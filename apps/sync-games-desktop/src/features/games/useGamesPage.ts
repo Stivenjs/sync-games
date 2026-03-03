@@ -363,11 +363,14 @@ export function useGamesPage() {
     searchTerm,
     originFilter
   );
+  const hasConfiguredGames = (config?.games?.length ?? 0) > 0;
+  const hasCloudGames = cloudGames.length > 0;
   const emptyFilterMessage =
-    (config?.games?.length ?? 0) > 0 &&
-    (searchTerm !== "" || originFilter !== "all")
+    hasConfiguredGames && (searchTerm !== "" || originFilter !== "all")
       ? "No se encontraron juegos con los filtros aplicados."
-      : undefined;
+      : !hasConfiguredGames && hasCloudGames
+        ? "No hay juegos configurados, pero tienes guardados en la nube. Añade de nuevo cada juego con el mismo identificador y la ruta local para poder descargar sus backups."
+        : undefined;
 
   return {
     config,
