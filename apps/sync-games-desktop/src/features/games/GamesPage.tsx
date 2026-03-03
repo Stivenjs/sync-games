@@ -36,6 +36,7 @@ export function GamesPage() {
     setAddModalOpen,
     scanModalOpen,
     setScanModalOpen,
+    setConfigureFromCloudGameId,
     addModalInitial,
     setAddModalInitial,
     gameToRemove,
@@ -51,6 +52,7 @@ export function GamesPage() {
     downloading,
     operationResult,
     handleScanSelect,
+    handleConfigureFromCloud,
     handleRemoveGame,
     handleConfirmRemove,
     handleSyncOne,
@@ -124,7 +126,10 @@ export function GamesPage() {
       />
       <ScanModal
         isOpen={scanModalOpen}
-        onClose={() => setScanModalOpen(false)}
+        onClose={() => {
+          setConfigureFromCloudGameId(null);
+          setScanModalOpen(false);
+        }}
         onSelectCandidate={handleScanSelect}
       />
       <RemoveGameModal
@@ -175,6 +180,7 @@ export function GamesPage() {
           hasSyncConfig={hasSyncConfig}
           cloudGames={cloudGames}
           totalCloudSize={totalCloudSize}
+          onConfigureFromCloud={handleConfigureFromCloud}
         />
       </div>
 

@@ -54,6 +54,10 @@ export function useGamesPage() {
     path: "",
     suggestedId: "",
   });
+  /** Si está definido, al elegir un candidato en ScanModal se usa este id en lugar del sugerido por la carpeta (flujo "Configurar juego" desde la nube). */
+  const [configureFromCloudGameId, setConfigureFromCloudGameId] = useState<
+    string | null
+  >(null);
   const [gameToRemove, setGameToRemove] = useState<ConfiguredGame | null>(null);
   const [downloadConflictGame, setDownloadConflictGame] =
     useState<ConfiguredGame | null>(null);
@@ -77,8 +81,15 @@ export function useGamesPage() {
     useState<ConfiguredGame | null>(null);
 
   const handleScanSelect = (path: string, suggestedId: string) => {
-    setAddModalInitial({ path, suggestedId });
+    const idToUse = configureFromCloudGameId ?? suggestedId;
+    if (configureFromCloudGameId) setConfigureFromCloudGameId(null);
+    setAddModalInitial({ path, suggestedId: idToUse });
     setAddModalOpen(true);
+  };
+
+  const handleConfigureFromCloud = (gameId: string) => {
+    setConfigureFromCloudGameId(gameId);
+    setScanModalOpen(true);
   };
 
   const handleRemoveGame = (game: ConfiguredGame) => {
@@ -393,6 +404,7 @@ export function useGamesPage() {
     setAddModalOpen,
     scanModalOpen,
     setScanModalOpen,
+    setConfigureFromCloudGameId,
     addModalInitial,
     setAddModalInitial,
     gameToRemove,
@@ -408,6 +420,7 @@ export function useGamesPage() {
     downloading,
     operationResult,
     handleScanSelect,
+    handleConfigureFromCloud,
     handleRemoveGame,
     handleConfirmRemove,
     handleSyncOne,

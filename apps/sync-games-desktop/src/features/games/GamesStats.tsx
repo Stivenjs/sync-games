@@ -2,6 +2,7 @@ import {
   Button,
   Card,
   CardBody,
+  Code,
   Modal,
   ModalBody,
   ModalContent,
@@ -31,6 +32,8 @@ interface GamesStatsProps {
   cloudGames?: CloudGameSummary[];
   /** Tamaño total en la nube en bytes. */
   totalCloudSize?: number;
+  /** Permite configurar un juego local a partir de un juego que solo existe en la nube. */
+  onConfigureFromCloud?: (gameId: string) => void;
 }
 
 function formatLastSync(date: Date): string {
@@ -60,6 +63,7 @@ export function GamesStats({
   hasSyncConfig = false,
   cloudGames = [],
   totalCloudSize = 0,
+  onConfigureFromCloud,
 }: GamesStatsProps) {
   const showCloudSection = hasSyncConfig;
   const hasCloudGames = cloudGames.length > 0;
@@ -71,15 +75,32 @@ export function GamesStats({
       {cloudGames.map((g) => (
         <li
           key={g.gameId}
-          className="flex items-center justify-between rounded-lg bg-default-100 px-3 py-2"
+          className="flex flex-col gap-1 rounded-lg bg-default-100 px-3 py-2"
         >
-          <span className="truncate text-sm font-medium text-foreground">
-            {formatGameDisplayName(g.gameId)}
-          </span>
-          <span className="ml-2 shrink-0 text-xs text-default-500">
-            {g.fileCount} archivo{g.fileCount !== 1 ? "s" : ""} ·{" "}
-            {formatSize(g.totalSize)}
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {formatGameDisplayName(g.gameId)}
+            </span>
+            <span className="shrink-0 text-xs text-default-500">
+              {g.fileCount} archivo{g.fileCount !== 1 ? "s" : ""} ·{" "}
+              {formatSize(g.totalSize)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <Code size="sm" className="max-w-[200px] truncate">
+              {g.gameId}
+            </Code>
+            {onConfigureFromCloud && (
+              <Button
+                size="sm"
+                variant="light"
+                className="h-7 text-xs"
+                onPress={() => onConfigureFromCloud(g.gameId)}
+              >
+                Configurar juego
+              </Button>
+            )}
+          </div>
         </li>
       ))}
     </ul>
@@ -165,7 +186,7 @@ export function GamesStats({
                     <Modal
                       isOpen={isOpen}
                       onOpenChange={onOpenChange}
-                      size="2xl"
+                      size="3xl"
                       scrollBehavior="inside"
                     >
                       <ModalContent>
@@ -175,7 +196,7 @@ export function GamesStats({
                           </p>
                         </ModalHeader>
                         <ModalBody>
-                          <div className="max-h-[60vh] overflow-y-auto">
+                          <div className="max-h-[70vh] overflow-y-auto">
                             {cloudDetailContent}
                           </div>
                         </ModalBody>
@@ -201,7 +222,7 @@ export function GamesStats({
                         <Info size={18} />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0">
+                    <PopoverContent className="w-104 p-0">
                       <div className="border-b border-default-200 px-4 py-3">
                         <p className="text-sm font-medium text-foreground">
                           Guardados en la nube
