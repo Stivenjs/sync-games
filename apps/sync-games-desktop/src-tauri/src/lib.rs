@@ -57,6 +57,8 @@ pub fn run() {
             commands::open_save_folder,
             commands::export_config_to_file,
             commands::import_config_from_file,
+            commands::backup_config_to_cloud,
+            commands::restore_config_from_cloud,
             commands::tray_tooltip::refresh_tray_tooltip,
         ])
         .on_window_event(|window, event| {

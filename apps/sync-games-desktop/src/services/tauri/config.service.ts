@@ -86,6 +86,16 @@ export async function exportConfigToFile(path: string): Promise<string> {
   return invoke("export_config_to_file", { path });
 }
 
+/** Sube config.json a la nube como "__config__/config.json" */
+export async function backupConfigToCloud(): Promise<void> {
+  await invoke("backup_config_to_cloud");
+}
+
+/** Restaura config.json desde la nube (última versión) */
+export async function restoreConfigFromCloud(): Promise<void> {
+  await invoke("restore_config_from_cloud");
+}
+
 /** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Devuelve la ruta del archivo. */
 export async function createConfigFile(
   apiBaseUrl: string,

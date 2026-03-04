@@ -1,6 +1,8 @@
 //! Exportar e importar configuración (lista de juegos) a/desde JSON.
 
+use crate::commands::sync::api::{api_request, sync_list_remote_saves};
 use crate::config;
+use chrono::Utc;
 use regex::Regex;
 use std::fs;
 use std::path::PathBuf;
@@ -88,6 +90,165 @@ pub fn export_config_to_file(path: String) -> Result<String, String> {
     let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())?;
     Ok(path)
+}
+
+/// Sube el archivo de configuración local a la nube como "__config__/config.json".
+#[tauri::command]
+pub async fn backup_config_to_cloud() -> Result<(), String> {
+    let cfg = config::load_config();
+    let api_base = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let user_id = cfg
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura userId en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
+
+    let path = config::config_path().ok_or("No se encontró ruta de config")?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+
+    // 1. Obtener URL de subida
+    let body = serde_json::json!({
+        "gameId": "__config__",
+        "filename": "config.json"
+    });
+    let res = api_request(
+        api_base,
+        user_id,
+        api_key,
+        "POST",
+        "/upload-url",
+        Some(body.to_string().as_bytes()),
+    )
+    .await
+    .map_err(|e| format!("upload-url: {}", e))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("API: {} {}", status, text));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let upload_url = json
+        .get("uploadUrl")
+        .and_then(|v| v.as_str())
+        .ok_or("API no devolvió uploadUrl")?;
+
+    // 2. Subir config.json a S3
+    let client = reqwest::Client::builder()
+        .user_agent("sync-games-desktop/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let put_res = client
+        .put(upload_url)
+        .body(bytes)
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !put_res.status().is_success() {
+        return Err(format!("S3 PUT: {}", put_res.status()));
+    }
+
+    Ok(())
+}
+
+/// Descarga la copia más reciente de "__config__/config.json" y la guarda localmente.
+#[tauri::command]
+pub async fn restore_config_from_cloud() -> Result<(), String> {
+    let cfg = config::load_config();
+    let api_base = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let user_id = cfg
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura userId en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
+
+    let saves = sync_list_remote_saves().await?;
+    let mut config_saves: Vec<_> = saves
+        .into_iter()
+        .filter(|s| s.game_id == "__config__" && s.filename.ends_with("config.json"))
+        .collect();
+
+    if config_saves.is_empty() {
+        return Err("No se encontró configuración en la nube".into());
+    }
+
+    // Ordenar por last_modified y quedarnos con el más reciente
+    config_saves.sort_by(|a, b| a.last_modified.cmp(&b.last_modified));
+
+    let latest = config_saves.pop().unwrap();
+
+    // Pedir URL de descarga
+    let body = serde_json::json!({
+        "gameId": "__config__",
+        "key": latest.key
+    });
+    let res = api_request(
+        api_base,
+        user_id,
+        api_key,
+        "POST",
+        "/download-url",
+        Some(body.to_string().as_bytes()),
+    )
+    .await
+    .map_err(|e| format!("download-url: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("API: {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let download_url = json
+        .get("downloadUrl")
+        .and_then(|v| v.as_str())
+        .ok_or("API no devolvió downloadUrl")?;
+
+    let client = reqwest::Client::builder()
+        .user_agent("sync-games-desktop/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let bytes = client
+        .get(download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Validar que es un JSON de config válido antes de sobrescribir
+    let imported: config::Config =
+        serde_json::from_slice(&bytes).map_err(|e| format!("JSON inválido: {}", e))?;
+
+    // Guardar backup local antes de sobrescribir
+    if let Some(path) = config::config_path() {
+        if path.exists() {
+            if let Some(parent) = path.parent() {
+                let backup_dir = parent.join("config-backups");
+                let _ = fs::create_dir_all(&backup_dir);
+                let ts = Utc::now().format("%Y-%m-%d_%H-%M-%S");
+                let backup_path = backup_dir.join(format!("config-{}.json", ts));
+                let _ = fs::write(&backup_path, fs::read(&path).unwrap_or_default());
+            }
+        }
+    }
+
+    config::save_config(&imported)
 }
 
 /// Importa configuración desde archivo. mode: "merge" fusiona juegos, "replace" reemplaza todo.
