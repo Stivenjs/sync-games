@@ -31,14 +31,49 @@ export async function getSteamAppName(appId: string): Promise<string | null> {
   return invoke<string | null>("get_steam_app_name", { appId });
 }
 
-/** Comprueba si el juego está en ejecución (para mostrar advertencia) */
+/** Comprueba si un único juego está en ejecución (para mostrar advertencia) */
 export function checkGameRunning(gameId: string): Promise<boolean> {
   return invoke<boolean>("check_game_running", { gameId });
 }
 
+/** Comprueba el estado de ejecución de varios juegos en una sola llamada */
+export function checkGamesRunning(
+  gameIds: readonly string[]
+): Promise<Record<string, boolean>> {
+  if (!gameIds.length) return Promise.resolve({});
+  return invoke<Record<string, boolean>>("check_games_running", {
+    gameIds,
+  });
+}
+
 /** Añade un juego a la configuración */
-export async function addGame(gameId: string, path: string): Promise<void> {
-  await invoke("add_game", { gameId, path });
+export async function addGame(
+  gameId: string,
+  path: string,
+  editionLabel?: string,
+  sourceUrl?: string,
+  steamAppId?: string
+): Promise<void> {
+  await invoke("add_game", {
+    gameId,
+    path,
+    editionLabel: editionLabel?.trim() || null,
+    sourceUrl: sourceUrl?.trim() || null,
+    steamAppId: steamAppId?.trim() || null,
+  });
+}
+
+export interface ManifestSearchResult {
+  steamAppId: string;
+  name: string;
+}
+
+/** Busca juegos en Steam por nombre (sugerencias rápidas) */
+export async function searchSteamGames(
+  query: string
+): Promise<ManifestSearchResult[]> {
+  if (!query.trim()) return [];
+  return invoke<ManifestSearchResult[]>("search_steam_games", { query });
 }
 
 /** Abre la carpeta de guardados del juego en el explorador */

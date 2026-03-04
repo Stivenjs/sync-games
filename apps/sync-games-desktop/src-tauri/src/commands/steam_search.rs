@@ -1,9 +1,10 @@
 //! Búsqueda dinámica de Steam App ID por nombre y resolución de App ID a nombre.
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use std::sync::OnceLock;
 
 static APP_ID_REGEX: OnceLock<Regex> = OnceLock::new();
+static SUGGEST_REGEX: OnceLock<Regex> = OnceLock::new();
 
 /// Obtiene el nombre del juego a partir del Steam App ID (API appdetails).
 /// Reintenta hasta 3 veces ante fallos transitorios (red, rate limit).
@@ -79,4 +80,81 @@ pub async fn search_steam_app_id(query: String) -> Option<String> {
         .next()
         .and_then(|c| c.get(1))
         .map(|m| m.as_str().to_string())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SteamSearchResult {
+    pub steam_app_id: String,
+    pub name: String,
+}
+
+/// Busca varios juegos en Steam por nombre usando el endpoint de sugerencias.
+#[tauri::command]
+pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
+    let query = query.trim();
+    if query.len() < 3 {
+        return Vec::new();
+    }
+
+    let term = query.replace('-', " ");
+    let url = format!(
+        "https://store.steampowered.com/search/suggest?term={}&f=games&cc=US&l=english",
+        urlencoding::encode(&term)
+    );
+
+    let client = match reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => {
+            return Vec::new();
+        }
+    };
+
+    let body = match client.get(&url).send().await {
+        Ok(resp) => match resp.text().await {
+            Ok(text) => text,
+            Err(_) => return Vec::new(),
+        },
+        Err(_) => {
+            return Vec::new();
+        }
+    };
+
+    let re = SUGGEST_REGEX.get_or_init(|| {
+        // Captura cada bloque <a ... data-ds-appid="ID"...> ... </a>
+        // y dejamos el nombre para un segundo regex dentro del bloque.
+        RegexBuilder::new(r#"<a[^>]+data-ds-appid="(\d{4,10})"[^>]*>(.*?)</a>"#)
+            .dot_matches_new_line(true)
+            .build()
+            .expect("regex válida para sugerencias de Steam")
+    });
+
+    let mut results = Vec::new();
+    // El HTML de Steam puede tener clases adicionales en el span/div de nombre,
+    // así que buscamos cualquier tag con class que contenga "match_name".
+    let name_re = Regex::new(r#"class="[^"]*match_name[^"]*"[^>]*>([^<]+)<"#)
+        .expect("regex nombre Steam");
+    for cap in re.captures_iter(&body) {
+        let app_id = match cap.get(1) {
+            Some(m) => m.as_str().to_string(),
+            None => continue,
+        };
+        let inner = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        let name = match name_re.captures(inner) {
+            Some(c) => c
+                .get(1)
+                .map(|m| m.as_str().trim().to_string())
+                .unwrap_or_default(),
+            None => String::new(),
+        };
+        if name.is_empty() {
+            continue;
+        }
+        results.push(SteamSearchResult { steam_app_id: app_id, name });
+    }
+
+    results
 }

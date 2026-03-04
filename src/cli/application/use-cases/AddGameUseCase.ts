@@ -5,6 +5,10 @@ import type { ConfigRepository } from "@cli/domain/ports/ConfigRepository";
 export interface AddGameInput {
   gameId: string;
   path: string;
+  /** Etiqueta de origen/edición (opcional, solo informativa). */
+  editionLabel?: string;
+  /** URL de descarga o página de la edición (opcional). */
+  sourceUrl?: string;
 }
 
 /**
@@ -18,6 +22,14 @@ export class AddGameUseCase {
     const config = await this.configRepository.load();
     const normalizedId = input.gameId.trim().toLowerCase();
     const normalizedPath = input.path.trim();
+    const normalizedEdition =
+      input.editionLabel?.trim() && input.editionLabel.trim().length > 0
+        ? input.editionLabel.trim()
+        : undefined;
+    const normalizedSourceUrl =
+      input.sourceUrl?.trim() && input.sourceUrl.trim().length > 0
+        ? input.sourceUrl.trim()
+        : undefined;
 
     if (!normalizedId || !normalizedPath) {
       throw new Error("gameId y path son obligatorios");
@@ -35,14 +47,22 @@ export class AddGameUseCase {
       if (!paths.includes(normalizedPath)) {
         paths.push(normalizedPath);
       }
-      newGames = config.games.map((g, i) =>
-        i === existingIndex ? { id: g.id, paths } : g
-      );
+      const updated: ConfiguredGame = {
+        ...existing,
+        paths,
+        ...(normalizedEdition ? { editionLabel: normalizedEdition } : {}),
+        ...(normalizedSourceUrl ? { sourceUrl: normalizedSourceUrl } : {}),
+      };
+      newGames = config.games.map((g, i) => (i === existingIndex ? updated : g));
     } else {
-      newGames = [
-        ...config.games,
-        { id: normalizedId, paths: [normalizedPath] },
-      ];
+      let created: ConfiguredGame = { id: normalizedId, paths: [normalizedPath] };
+      if (normalizedEdition) {
+        created = { ...created, editionLabel: normalizedEdition };
+      }
+      if (normalizedSourceUrl) {
+        created = { ...created, sourceUrl: normalizedSourceUrl };
+      }
+      newGames = [...config.games, created];
     }
 
     const newConfig: Config = {

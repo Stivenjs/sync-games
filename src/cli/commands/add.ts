@@ -43,7 +43,21 @@ export async function runAddInteractive(deps: CliDeps): Promise<void> {
   const gameId = suggestedId.trim();
   const path = selectedPath.trim();
 
-  await deps.addGameUseCase.execute({ gameId, path });
+  const editionLabel = await input({
+    message: "Origen/edición del juego (opcional, ej. Steam, Empress, RUNE)",
+    default: "",
+  });
+  const sourceUrl = await input({
+    message: "URL de descarga o página de la edición (opcional)",
+    default: "",
+  });
+
+  await deps.addGameUseCase.execute({
+    gameId,
+    path,
+    editionLabel: editionLabel.trim() || undefined,
+    sourceUrl: sourceUrl.trim() || undefined,
+  });
   console.log(`\n${figures.tick} Añadido:`, gameId, figures.arrowRight, path);
 }
 
@@ -92,9 +106,18 @@ export async function runAddFromArgs(
   const gameId = args[1];
   const path = args[2];
   if (!gameId || !path) {
-    console.error("Uso: sync-games add <game-id> <ruta>");
+    console.error(
+      "Uso: sync-games add <game-id> <ruta> [origen/edición] [url-descarga]"
+    );
     throw new Error("Arguments are missing");
   }
-  await deps.addGameUseCase.execute({ gameId, path });
+  const editionLabel = args[3];
+  const sourceUrl = args[4];
+  await deps.addGameUseCase.execute({
+    gameId,
+    path,
+    editionLabel,
+    sourceUrl,
+  });
   console.log("Añadido:", gameId, "→", path);
 }

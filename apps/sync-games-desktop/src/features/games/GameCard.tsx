@@ -238,6 +238,22 @@ export function GameCard({
             )}
           </p>
         )}
+        {(game.editionLabel || game.sourceUrl) && (
+          <p className="w-full truncate text-center text-[10px] text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            {game.editionLabel && <>Origen: {game.editionLabel}</>}
+            {game.editionLabel && game.sourceUrl && " • "}
+            {game.sourceUrl && (
+              <a
+                href={game.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                Ver enlace
+              </a>
+            )}
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

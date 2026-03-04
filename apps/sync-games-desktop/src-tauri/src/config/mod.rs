@@ -55,6 +55,12 @@ pub struct ConfiguredGame {
     /// Nombres de ejecutable para detectar si el juego está en ejecución (ej. ["eldenring.exe"]).
     #[serde(default)]
     pub executable_names: Option<Vec<String>>,
+    /// Etiqueta de origen/edición (ej. Steam, Empress, RUNE). Solo informativa.
+    #[serde(default)]
+    pub edition_label: Option<String>,
+    /// URL de descarga o página de la edición (ej. enlace al release).
+    #[serde(default)]
+    pub source_url: Option<String>,
 }
 
 /// Lee el archivo de config desde disco.

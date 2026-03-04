@@ -21,6 +21,8 @@ pub struct GameDto {
     pub paths: Vec<String>,
     pub steam_app_id: Option<String>,
     pub image_url: Option<String>,
+    pub edition_label: Option<String>,
+    pub source_url: Option<String>,
 }
 
 #[tauri::command]
@@ -46,6 +48,8 @@ pub fn get_config() -> ConfigDto {
                     paths: g.paths,
                     steam_app_id,
                     image_url: g.image_url,
+                    edition_label: g.edition_label,
+                    source_url: g.source_url,
                 }
             })
             .collect(),
@@ -99,7 +103,13 @@ pub fn create_config_file(
 }
 
 #[tauri::command]
-pub fn add_game(game_id: String, path: String) -> Result<(), String> {
+pub fn add_game(
+    game_id: String,
+    path: String,
+    edition_label: Option<String>,
+    source_url: Option<String>,
+    steam_app_id: Option<String>,
+) -> Result<(), String> {
     let mut cfg = config::load_config();
     let game_id = game_id.trim().to_string();
     let path = path.trim().to_string();
@@ -107,6 +117,17 @@ pub fn add_game(game_id: String, path: String) -> Result<(), String> {
     if game_id.is_empty() || path.is_empty() {
         return Err("gameId and path are required".to_string());
     }
+
+    // Normalizar strings opcionales (trim y vacío -> None)
+    let edition_label = edition_label
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let source_url = source_url
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let steam_app_id = steam_app_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
     if let Some(g) = cfg
         .games
@@ -116,13 +137,24 @@ pub fn add_game(game_id: String, path: String) -> Result<(), String> {
         if !g.paths.contains(&path) {
             g.paths.push(path);
         }
+        if let Some(label) = edition_label {
+            g.edition_label = Some(label);
+        }
+        if let Some(url) = source_url {
+            g.source_url = Some(url);
+        }
+        if let Some(app_id) = steam_app_id {
+            g.steam_app_id = Some(app_id);
+        }
     } else {
         cfg.games.push(config::ConfiguredGame {
             id: game_id,
             paths: vec![path],
-            steam_app_id: None,
+            steam_app_id,
             image_url: None,
             executable_names: None,
+            edition_label,
+            source_url,
         });
     }
 

@@ -1,6 +1,7 @@
 //! Detección de juegos en ejecución para evitar sincronizar mientras hay archivos bloqueados.
 
 use crate::config;
+use std::collections::HashMap;
 use std::path::Path;
 use sysinfo::{ProcessesToUpdate, System};
 
@@ -26,6 +27,77 @@ pub fn is_game_running(game_id: &str, paths: &[String]) -> bool {
         }
     }
     false
+}
+
+/// Versión optimizada para varios juegos a la vez: refresca la lista de
+/// procesos solo una vez y comprueba todos los juegos.
+pub fn are_games_running(game_ids: &[String]) -> HashMap<String, bool> {
+    let cfg = config::load_config();
+    let mut result: HashMap<String, bool> = HashMap::new();
+
+    // Precalcular nombres de ejecutable para cada juego
+    let mut names_by_game: HashMap<String, Vec<String>> = HashMap::new();
+    for id in game_ids {
+        if let Some(game) = cfg
+            .games
+            .iter()
+            .find(|g| g.id.eq_ignore_ascii_case(id))
+        {
+            let mut names: Vec<String> = Vec::new();
+            if let Some(ref execs) = game.executable_names {
+                if !execs.is_empty() {
+                    names = execs
+                        .iter()
+                        .filter_map(|s| {
+                            let t = s.trim();
+                            if t.is_empty() {
+                                None
+                            } else {
+                                Some(ensure_exe_ext(t))
+                            }
+                        })
+                        .collect();
+                }
+            }
+            if names.is_empty() {
+                names = infer_exe_candidates_from_paths_and_id(&game.paths, id);
+            }
+            if !names.is_empty() {
+                names_by_game.insert(game.id.clone(), names);
+                result.insert(game.id.clone(), false);
+            }
+        }
+    }
+
+    if names_by_game.is_empty() {
+        // Asegurar claves al menos con false
+        for id in game_ids {
+            result.entry(id.clone()).or_insert(false);
+        }
+        return result;
+    }
+
+    let mut sys = System::new_all();
+    sys.refresh_processes(ProcessesToUpdate::All);
+
+    for process in sys.processes().values() {
+        let proc_name = process.name().to_string_lossy().to_lowercase();
+        for (game_id, names) in names_by_game.iter() {
+            if names
+                .iter()
+                .any(|check| proc_name == check.to_lowercase())
+            {
+                result.insert(game_id.clone(), true);
+            }
+        }
+    }
+
+    // Asegurar que todos los ids de entrada tienen clave en el resultado
+    for id in game_ids {
+        result.entry(id.clone()).or_insert(false);
+    }
+
+    result
 }
 
 /// Genera candidatos de nombres de ejecutable a buscar.
@@ -139,6 +211,25 @@ fn infer_exe_candidates(folder_name: &str, game_id: &str) -> Vec<String> {
     candidates.sort();
     candidates.dedup();
     candidates
+}
+
+fn infer_exe_candidates_from_paths_and_id(paths: &[String], game_id: &str) -> Vec<String> {
+    for raw in paths {
+        let expanded = expand_path(raw.trim());
+        if let Some(p) = expanded {
+            let path = Path::new(&p);
+            if let Some(last) = path.components().last() {
+                let name = last.as_os_str().to_string_lossy();
+                if !name.is_empty() && name != "." && name != ".." {
+                    let candidates = infer_exe_candidates(&name, game_id);
+                    if !candidates.is_empty() {
+                        return candidates;
+                    }
+                }
+            }
+        }
+    }
+    Vec::new()
 }
 
 fn expand_path(raw: &str) -> Option<String> {
