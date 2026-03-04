@@ -39,6 +39,7 @@ pub fn run() {
             commands::search_steam_games,
             commands::search_manifest_games,
             commands::add_game,
+            commands::update_game,
             commands::remove_game,
             commands::scan_path_candidates,
             commands::sync::list_save_files,

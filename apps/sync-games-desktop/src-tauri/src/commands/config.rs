@@ -187,6 +187,54 @@ pub fn add_game(
     config::save_config(&cfg)
 }
 
+/// Actualiza un juego existente: rutas y metadatos opcionales.
+#[tauri::command]
+pub fn update_game(
+    game_id: String,
+    paths: Vec<String>,
+    edition_label: Option<String>,
+    source_url: Option<String>,
+    steam_app_id: Option<String>,
+) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    let game_id = game_id.trim();
+    if game_id.is_empty() {
+        return Err("gameId es obligatorio".to_string());
+    }
+
+    let paths: Vec<String> = paths
+        .into_iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if paths.is_empty() {
+        return Err("Al menos una ruta es obligatoria".to_string());
+    }
+
+    let edition_label = edition_label
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let source_url = source_url
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let steam_app_id = steam_app_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let g = cfg
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+
+    g.paths = paths;
+    g.edition_label = edition_label;
+    g.source_url = source_url;
+    g.steam_app_id = steam_app_id;
+
+    config::save_config(&cfg)
+}
+
 #[tauri::command]
 pub fn remove_game(game_id: String, path: Option<String>) -> Result<(), String> {
     let mut cfg = config::load_config();

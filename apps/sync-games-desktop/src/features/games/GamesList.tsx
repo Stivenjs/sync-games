@@ -25,6 +25,8 @@ interface GamesListProps {
   onOpenFolder?: (game: ConfiguredGame) => void;
   /** Callback para restaurar desde backup. */
   onRestoreBackup?: (game: ConfiguredGame) => void;
+  /** Callback para editar el juego. */
+  onEdit?: (game: ConfiguredGame) => void;
 }
 
 export function GamesList({
@@ -37,6 +39,7 @@ export function GamesList({
   downloadingId,
   onOpenFolder,
   onRestoreBackup,
+  onEdit,
 }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
   const { statsByGameId } = useGameStats(games.length > 0);
@@ -84,6 +87,7 @@ export function GamesList({
           isDownloading={downloadingId === game.id || downloadingId === "all"}
           onOpenFolder={onOpenFolder}
           onRestoreBackup={onRestoreBackup}
+          onEdit={onEdit}
         />
       ))}
     </div>

@@ -124,6 +124,23 @@ export async function importConfigFromFile(
   await invoke("import_config_from_file", { path, mode });
 }
 
+/** Actualiza un juego existente (rutas y metadatos). */
+export async function updateGame(
+  gameId: string,
+  paths: string[],
+  editionLabel?: string,
+  sourceUrl?: string,
+  steamAppId?: string
+): Promise<void> {
+  await invoke("update_game", {
+    gameId,
+    paths,
+    editionLabel: editionLabel?.trim() || null,
+    sourceUrl: sourceUrl?.trim() || null,
+    steamAppId: steamAppId?.trim() || null,
+  });
+}
+
 /** Elimina un juego (o una ruta concreta) de la configuración */
 export async function removeGame(gameId: string, path?: string): Promise<void> {
   await invoke("remove_game", { gameId, path });

@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Button, Card, CardBody, Spinner } from "@heroui/react";
 import { Copy, RefreshCw, User } from "lucide-react";
+import type { ConfiguredGame } from "@app-types/config";
 import { AddGameModal } from "@features/games/AddGameModal";
 import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
+import { EditGameModal } from "@features/games/EditGameModal";
 import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
 import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
 import { SyncPreviewModal } from "@features/games/SyncPreviewModal";
@@ -73,6 +76,8 @@ export function GamesPage() {
     filteredGames,
     emptyFilterMessage,
   } = useGamesPage();
+
+  const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
 
   if (loading) {
     return (
@@ -206,6 +211,15 @@ export function GamesPage() {
         game={gameToRestoreBackup}
         onSuccess={handleRefresh}
       />
+      <EditGameModal
+        isOpen={!!gameToEdit}
+        game={gameToEdit}
+        onClose={() => setGameToEdit(null)}
+        onSuccess={() => {
+          handleRefresh();
+          setGameToEdit(null);
+        }}
+      />
 
       <GamesStats
         gamesCount={config?.games?.length ?? 0}
@@ -234,6 +248,7 @@ export function GamesPage() {
         downloadingId={downloading}
         onOpenFolder={handleOpenFolder}
         onRestoreBackup={handleRestoreBackup}
+        onEdit={setGameToEdit}
         emptyFilterMessage={emptyFilterMessage}
       />
 

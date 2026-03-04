@@ -17,6 +17,7 @@ import {
   Gamepad2,
   History,
   MoreVertical,
+  Pencil,
   Trash2,
 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
@@ -48,6 +49,8 @@ export interface GameCardProps {
   onOpenFolder?: (game: ConfiguredGame) => void;
   /** Callback para restaurar desde backup. */
   onRestoreBackup?: (game: ConfiguredGame) => void;
+  /** Callback para editar el juego. Si no se pasa, no se muestra el botón. */
+  onEdit?: (game: ConfiguredGame) => void;
 }
 
 /**
@@ -68,6 +71,7 @@ export function GameCard({
   isDownloading,
   onOpenFolder,
   onRestoreBackup,
+  onEdit,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -110,7 +114,8 @@ export function GameCard({
         onDownload ||
         onSync ||
         onRemove ||
-        onRestoreBackup) && (
+        onRestoreBackup ||
+        onEdit) && (
         <div
           className="absolute right-2 top-2 z-20"
           onClick={(e) => e.stopPropagation()}
@@ -131,7 +136,8 @@ export function GameCard({
             <DropdownMenu
               aria-label={`Acciones de ${game.id}`}
               onAction={(key) => {
-                if (key === "folder") onOpenFolder?.(game);
+                if (key === "edit") onEdit?.(game);
+                else if (key === "folder") onOpenFolder?.(game);
                 else if (key === "download") onDownload?.(game);
                 else if (key === "sync") onSync?.(game);
                 else if (key === "restore") onRestoreBackup?.(game);
@@ -145,6 +151,16 @@ export function GameCard({
                   : []
               }
             >
+              {onEdit ? (
+                <DropdownItem
+                  key="edit"
+                  startContent={
+                    <Pencil size={16} className="text-default-500" />
+                  }
+                >
+                  Editar juego
+                </DropdownItem>
+              ) : null}
               {onOpenFolder ? (
                 <DropdownItem
                   key="folder"
