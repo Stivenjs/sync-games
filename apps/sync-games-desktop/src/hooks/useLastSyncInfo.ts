@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { syncListRemoteSaves } from "@services/tauri";
 
 const LAST_SYNC_QUERY_KEY = ["last-sync-info"] as const;
+const CONFIG_GAME_ID = "__config__";
 
 export interface LastSyncInfo {
   lastSyncAt: Date | null;
@@ -73,7 +74,8 @@ export function useLastSyncInfo(enabled: boolean) {
   const query = useQuery({
     queryKey: LAST_SYNC_QUERY_KEY,
     queryFn: async () => {
-      const saves = await syncListRemoteSaves();
+      const allSaves = await syncListRemoteSaves();
+      const saves = allSaves.filter((s) => s.gameId !== CONFIG_GAME_ID);
       const lastSync = computeLastSync(saves);
       const { cloudGames, totalSize } = computeCloudGames(saves);
       return { ...lastSync, cloudGames, totalCloudSize: totalSize };
