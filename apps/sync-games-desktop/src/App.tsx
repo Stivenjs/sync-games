@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Gamepad2, Info, Settings } from "lucide-react";
+import { Gamepad2, Info, Settings, Users } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { GamesPage } from "@features/games";
+import { FriendsPage } from "@features/friends/FriendsPage";
 import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { SettingsPage } from "@features/settings";
 import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
@@ -14,6 +15,7 @@ import "./App.css";
 
 const NAV_ITEMS: NavItem[] = [
   { id: "games", label: "Juegos", icon: <Gamepad2 size={18} /> },
+  { id: "friends", label: "Amigos", icon: <Users size={18} /> },
   { id: "settings", label: "Configuración", icon: <Settings size={18} /> },
   { id: "about", label: "Acerca de", icon: <Info size={18} /> },
 ];
@@ -22,6 +24,8 @@ function PageContent({ activeId }: { activeId: string }) {
   switch (activeId) {
     case "games":
       return <GamesPage />;
+    case "friends":
+      return <FriendsPage />;
     case "settings":
       return <SettingsPage />;
     default:

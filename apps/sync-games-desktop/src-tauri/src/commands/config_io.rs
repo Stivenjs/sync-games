@@ -1,6 +1,9 @@
 //! Exportar e importar configuración (lista de juegos) a/desde JSON.
 
-use crate::commands::sync::api::{api_request, sync_list_remote_saves};
+use crate::commands::config::{ConfigDto, GameDto};
+use crate::commands::sync::api::{
+    api_request, sync_list_remote_saves, sync_list_remote_saves_for_user,
+};
 use crate::config;
 use chrono::Utc;
 use regex::Regex;
@@ -249,6 +252,102 @@ pub async fn restore_config_from_cloud() -> Result<(), String> {
     }
 
     config::save_config(&imported)
+}
+
+/// Obtiene la configuración de un amigo (desde la nube) sin sobrescribir la local.
+#[tauri::command]
+pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, String> {
+    let friend_id = friend_user_id.trim();
+    if friend_id.is_empty() {
+        return Err("friendUserId vacío".into());
+    }
+
+    let cfg = config::load_config();
+    let api_base = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
+
+    // Buscar el último config.json del amigo
+    let saves = sync_list_remote_saves_for_user(friend_id.to_string()).await?;
+    let mut config_saves: Vec<_> = saves
+        .into_iter()
+        .filter(|s| s.game_id == "__config__" && s.filename.ends_with("config.json"))
+        .collect();
+
+    if config_saves.is_empty() {
+        return Err("El amigo no tiene configuración respaldada en la nube".into());
+    }
+
+    config_saves.sort_by(|a, b| a.last_modified.cmp(&b.last_modified));
+    let latest = config_saves.pop().unwrap();
+
+    // Pedir URL de descarga para el config del amigo
+    let body = serde_json::json!({
+        "gameId": "__config__",
+        "key": latest.key
+    });
+    let res = api_request(
+        api_base,
+        friend_id,
+        api_key,
+        "POST",
+        "/download-url",
+        Some(body.to_string().as_bytes()),
+    )
+    .await
+    .map_err(|e| format!("download-url: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("API: {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let download_url = json
+        .get("downloadUrl")
+        .and_then(|v| v.as_str())
+        .ok_or("API no devolvió downloadUrl")?;
+
+    let client = reqwest::Client::builder()
+        .user_agent("sync-games-desktop/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let bytes = client
+        .get(download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let imported: config::Config =
+        serde_json::from_slice(&bytes).map_err(|e| format!("JSON inválido: {}", e))?;
+
+    // Mapear a ConfigDto compatible con el frontend
+    let games = imported
+        .games
+        .into_iter()
+        .map(|g| GameDto {
+            id: g.id,
+            paths: g.paths,
+            steam_app_id: g.steam_app_id,
+            image_url: g.image_url,
+            edition_label: g.edition_label,
+            source_url: g.source_url,
+        })
+        .collect();
+
+    Ok(ConfigDto {
+        api_base_url: None,
+        api_key: None,
+        user_id: imported.user_id.or_else(|| Some(friend_id.to_string())),
+        games,
+        custom_scan_paths: imported.custom_scan_paths,
+    })
 }
 
 /// Importa configuración desde archivo. mode: "merge" fusiona juegos, "replace" reemplaza todo.

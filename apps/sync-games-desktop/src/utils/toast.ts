@@ -116,12 +116,17 @@ export function toastDownloadResult(
  * @param gameName - Nombre formateado del juego (opcional, para un solo juego)
  */
 export function toastSyncResult(result: SyncResult, gameName?: string): void {
-  if (result.errCount === 0) {
+  if (result.errCount === 0 && result.okCount > 0) {
     toastSuccess(
       "Sincronización completada",
       gameName
         ? `${gameName}: ${result.okCount} archivo(s) subido(s)`
         : `${result.okCount} archivo(s) subido(s)`
+    );
+  } else if (result.errCount === 0 && result.okCount === 0) {
+    toastInfo(
+      "Sin cambios en la sincronización",
+      result.errors[0] ?? "No se encontraron archivos para sincronizar"
     );
   } else if (result.okCount > 0) {
     toastWarning(

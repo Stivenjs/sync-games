@@ -59,6 +59,9 @@ pub fn run() {
             commands::import_config_from_file,
             commands::backup_config_to_cloud,
             commands::restore_config_from_cloud,
+            commands::sync::api::sync_list_remote_saves_for_user,
+            commands::get_friend_config,
+            commands::sync::api::copy_friend_saves,
             commands::tray_tooltip::refresh_tray_tooltip,
         ])
         .on_window_event(|window, event| {

@@ -96,6 +96,13 @@ export async function restoreConfigFromCloud(): Promise<void> {
   await invoke("restore_config_from_cloud");
 }
 
+/** Obtiene la configuración de un amigo desde la nube (solo lectura) */
+export async function getFriendConfig(
+  friendUserId: string
+): Promise<Config> {
+  return invoke<Config>("get_friend_config", { friendUserId });
+}
+
 /** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Devuelve la ruta del archivo. */
 export async function createConfigFile(
   apiBaseUrl: string,
@@ -148,6 +155,23 @@ export async function syncUploadGame(gameId: string): Promise<SyncResult> {
   };
 }
 
+/** Copia los guardados de un amigo para un juego concreto a tu cuenta */
+export async function copyFriendSaves(
+  friendUserId: string,
+  gameId: string
+): Promise<SyncResult> {
+  const r = await invoke<{
+    okCount: number;
+    errCount: number;
+    errors: string[];
+  }>("copy_friend_saves", { friendUserId, gameId });
+  return {
+    okCount: r.okCount,
+    errCount: r.errCount,
+    errors: r.errors,
+  };
+}
+
 /** Información de un guardado en la nube */
 export interface RemoteSaveInfo {
   gameId: string;
@@ -160,6 +184,15 @@ export interface RemoteSaveInfo {
 /** Lista todos los guardados del usuario en la nube (para última sincronización, etc.) */
 export async function syncListRemoteSaves(): Promise<RemoteSaveInfo[]> {
   return invoke<RemoteSaveInfo[]>("sync_list_remote_saves");
+}
+
+/** Lista todos los guardados en la nube de otro usuario (amigo) */
+export async function syncListRemoteSavesForUser(
+  userId: string
+): Promise<RemoteSaveInfo[]> {
+  return invoke<RemoteSaveInfo[]>("sync_list_remote_saves_for_user", {
+    userId,
+  });
 }
 
 /** Conflicto de descarga: archivo local más reciente que en la nube */
