@@ -2,7 +2,9 @@
 //! Réplica de la lógica del CLI (FileSystemPathScanner).
 //! Mejorado con el manifiesto de Ludusavi para nombres y rutas precisas (Steam y otros).
 
+mod extensions;
 mod filters;
+mod paths;
 
 use crate::config;
 #[cfg(target_os = "windows")]
@@ -62,6 +64,17 @@ fn expand_path(raw: &str) -> Option<String> {
     }
 }
 
+// ─── Unidades de almacenamiento (Windows) ─────────────────────────────────────
+
+/// Devuelve todas las unidades lógicas (ej. `C:\`, `D:\`) que existen y son legibles.
+#[cfg(target_os = "windows")]
+fn logical_drives() -> Vec<String> {
+    (b'A'..=b'Z')
+        .map(|c| format!("{}:\\", c as char))
+        .filter(|root| Path::new(root).exists() && fs::read_dir(root).is_ok())
+        .collect()
+}
+
 // ─── Base paths y listado ────────────────────────────────────────────────────
 
 fn list_subdirs(dir_path: &Path) -> Vec<(PathBuf, String)> {
@@ -94,6 +107,8 @@ fn scan_base_paths(
     if !base.exists() || !base.is_dir() {
         return;
     }
+    // Solo un nivel: evita añadir Config, SaveGames, etc. por separado.
+    // collect_files ya busca recursivamente para detectar guardados en subcarpetas.
     for (full_path, name) in list_subdirs(base) {
         if is_excluded_folder(&name) {
             continue;
@@ -118,9 +133,6 @@ fn scan_base_paths(
 }
 
 // ─── Steam ───────────────────────────────────────────────────────────────────
-
-#[cfg(target_os = "windows")]
-const DEFAULT_STEAM_PATH_WIN32: &str = "C:\\Program Files (x86)\\Steam";
 
 #[cfg(target_os = "windows")]
 fn find_steam_userdata_candidates(
@@ -261,7 +273,7 @@ fn scan_steam(
     path_to_appid: &std::collections::HashMap<PathBuf, String>,
     manifest_index: &Option<manifest::ManifestIndex>,
 ) {
-    let steam_path = DEFAULT_STEAM_PATH_WIN32;
+    let steam_path = paths::DEFAULT_STEAM_PATH_WIN32;
     if !Path::new(steam_path).exists() {
         return;
     }
@@ -334,19 +346,11 @@ fn scan_steam(
 
 // ─── Cracks ──────────────────────────────────────────────────────────────────
 
+/// Steam App ID: solo dígitos, típicamente 4–10 caracteres.
 #[cfg(target_os = "windows")]
-const CRACK_SAVE_LOCATIONS: &[(&str, &str)] = &[
-    ("C:\\Users\\Public\\Documents\\EMPRESS", "EMPRESS"),
-    ("C:\\Users\\Public\\Documents\\Steam", "CODEX/Steam emu"),
-    ("%APPDATA%\\Goldberg SteamEmu Saves", "Goldberg"),
-    ("%APPDATA%\\CODEX", "CODEX"),
-    ("%APPDATA%\\CPY_SAVES", "CPY (Conspir4cy)"),
-    ("%APPDATA%\\Skidrow", "Skidrow"),
-    ("%APPDATA%\\FLT", "FLT"),
-    ("%APPDATA%\\RUNE", "RUNE"),
-    ("%LOCALAPPDATA%\\CODEX", "CODEX (Local)"),
-    ("%USERPROFILE%\\Documents\\CPY_SAVES", "CPY (Documents)"),
-];
+fn is_steam_app_id_folder(name: &str) -> bool {
+    name.len() >= 4 && name.len() <= 10 && name.chars().all(|c| c.is_ascii_digit())
+}
 
 #[cfg(target_os = "windows")]
 fn contains_saves_at_any_depth(dir_path: &Path, depth: usize) -> bool {
@@ -368,8 +372,12 @@ fn contains_saves_at_any_depth(dir_path: &Path, depth: usize) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn scan_cracks(candidates: &mut Vec<PathCandidateDto>, seen: &mut HashSet<String>) {
-    for (path_tpl, label) in CRACK_SAVE_LOCATIONS {
+fn scan_cracks(
+    candidates: &mut Vec<PathCandidateDto>,
+    seen: &mut HashSet<String>,
+    manifest_index: &Option<manifest::ManifestIndex>,
+) {
+    for (path_tpl, label) in paths::CRACK_SAVE_LOCATIONS {
         let Some(base_path) = expand_path(path_tpl) else {
             continue;
         };
@@ -377,24 +385,92 @@ fn scan_cracks(candidates: &mut Vec<PathCandidateDto>, seen: &mut HashSet<String
         if !base.exists() || !base.is_dir() {
             continue;
         }
-        for (app_dir, name) in list_subdirs(base) {
-            if name == "steam_settings" || name == "settings" {
+        let base_path_display = base_path.clone();
+
+        for (sub_path, sub_name) in list_subdirs(base) {
+            if sub_name == "steam_settings" || sub_name == "settings" {
                 continue;
             }
-            if !contains_saves_at_any_depth(&app_dir, 0) {
-                continue;
-            }
-            if let Some(p) = app_dir.to_str() {
-                let key = p.to_lowercase();
-                if !seen.contains(&key) {
-                    seen.insert(key.clone());
+
+            if is_steam_app_id_folder(&sub_name) {
+                // Nivel directo: base/2050650 (ej. EMPRESS, Goldberg)
+                if !contains_saves_at_any_depth(&sub_path, 0) {
+                    continue;
+                }
+                if let Some(p) = sub_path.to_str() {
+                    let key = p.to_lowercase();
+                    if seen.contains(&key) {
+                        continue;
+                    }
+                    seen.insert(key.to_string());
+                    let (folder_name, steam_app_id) = if let Some(ref index) = manifest_index {
+                        if let Some((entry, _)) =
+                            manifest::get_entry_for_steam_app(index, &sub_name, Some(p))
+                        {
+                            (entry.name, Some(sub_name.to_string()))
+                        } else {
+                            (
+                                format!("Steam App {}", sub_name),
+                                Some(sub_name.to_string()),
+                            )
+                        }
+                    } else {
+                        (
+                            format!("Steam App {}", sub_name),
+                            Some(sub_name.to_string()),
+                        )
+                    };
                     candidates.push(PathCandidateDto {
                         path: p.to_string(),
-                        folder_name: format!("{} — {}", label, name),
-                        base_path: format!("{} ({})", label, base_path),
-                        steam_app_id: None,
+                        folder_name,
+                        base_path: format!("{} ({})", label, base_path_display),
+                        steam_app_id,
                         paths: None,
                     });
+                }
+            } else {
+                // Un nivel más: base/CODEX/2050650 (ej. Steam → CODEX → app_id)
+                for (app_dir, app_name) in list_subdirs(&sub_path) {
+                    if app_name == "steam_settings" || app_name == "settings" {
+                        continue;
+                    }
+                    if !is_steam_app_id_folder(&app_name) {
+                        continue;
+                    }
+                    if !contains_saves_at_any_depth(&app_dir, 0) {
+                        continue;
+                    }
+                    if let Some(p) = app_dir.to_str() {
+                        let key = p.to_lowercase();
+                        if seen.contains(&key) {
+                            continue;
+                        }
+                        seen.insert(key.to_string());
+                        let (folder_name, steam_app_id) = if let Some(ref index) = manifest_index {
+                            if let Some((entry, _)) =
+                                manifest::get_entry_for_steam_app(index, &app_name, Some(p))
+                            {
+                                (entry.name, Some(app_name.to_string()))
+                            } else {
+                                (
+                                    format!("Steam App {}", app_name),
+                                    Some(app_name.to_string()),
+                                )
+                            }
+                        } else {
+                            (
+                                format!("Steam App {}", app_name),
+                                Some(app_name.to_string()),
+                            )
+                        };
+                        candidates.push(PathCandidateDto {
+                            path: p.to_string(),
+                            folder_name,
+                            base_path: format!("{} ({})", label, base_path_display),
+                            steam_app_id,
+                            paths: None,
+                        });
+                    }
                 }
             }
         }
@@ -410,24 +486,7 @@ fn scan_path_candidates_sync() -> Vec<PathCandidateDto> {
     let mut seen = HashSet::new();
 
     // Rutas base (templates del CLI)
-    let base_templates: Vec<(&str, &str)> = if cfg!(target_os = "windows") {
-        vec![
-            ("%USERPROFILE%\\Documents\\My Games", "Documents/My Games"),
-            ("%USERPROFILE%\\Documents", "Documents"),
-            ("%APPDATA%", "AppData"),
-            ("%LOCALAPPDATA%", "LocalAppData"),
-            ("%USERPROFILE%\\Saved Games", "Saved Games"),
-            ("%LOCALAPPDATA%\\Low", "LocalAppData/Low"),
-        ]
-    } else {
-        vec![
-            ("~/.local/share", "Local Share"),
-            ("~/.config", "Config"),
-            ("~/Documents", "Documents"),
-        ]
-    };
-
-    for (tpl, label) in base_templates {
+    for (tpl, label) in paths::BASE_SCAN_TEMPLATES {
         if let Some(expanded) = expand_path(tpl) {
             scan_base_paths(&expanded, label, &mut candidates, &mut seen);
         }
@@ -439,7 +498,16 @@ fn scan_path_candidates_sync() -> Vec<PathCandidateDto> {
         let path_to_appid = steam::get_steam_path_to_appid_map();
         let manifest_index = manifest::load_manifest_index();
         scan_steam(&mut candidates, &mut seen, &path_to_appid, &manifest_index);
-        scan_cracks(&mut candidates, &mut seen);
+        scan_cracks(&mut candidates, &mut seen, &manifest_index);
+
+        // Todas las unidades: escanear la raíz de cada disco (D:\, E:\, ...)
+        for root in logical_drives() {
+            let label = format!(
+                "Disco {}",
+                root.trim_end_matches(&['\\', ':'])
+            );
+            scan_base_paths(&root, &label, &mut candidates, &mut seen);
+        }
     }
 
     // Rutas personalizadas del config
