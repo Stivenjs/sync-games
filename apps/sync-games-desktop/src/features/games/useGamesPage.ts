@@ -104,6 +104,10 @@ export function useGamesPage() {
   >(null);
   const [gameToRestoreBackup, setGameToRestoreBackup] =
     useState<ConfiguredGame | null>(null);
+  /** Modal de confirmación para "Subir todos" / "Descargar todos". */
+  const [bulkConfirm, setBulkConfirm] = useState<
+    { type: "sync" | "download"; count: number } | null
+  >(null);
 
   const handleScanSelect = async (paths: string[], suggestedId: string) => {
     const idToUse = configureFromCloudGameId ?? suggestedId;
@@ -261,7 +265,7 @@ export function useGamesPage() {
     setDownloadConflicts([]);
   };
 
-  const handleSyncAll = async () => {
+  const executeSyncAll = async () => {
     if (!config?.games?.length) return;
     setSyncing("all");
     setOperationResult(null);
@@ -291,6 +295,28 @@ export function useGamesPage() {
     setSyncing(null);
     refetchLastSync?.();
     queryClient.invalidateQueries({ queryKey: ["game-stats"] });
+  };
+
+  const openSyncAllConfirm = () => {
+    const count = config?.games?.length ?? 0;
+    if (count > 0) setBulkConfirm({ type: "sync", count });
+  };
+
+  const openDownloadAllConfirm = () => {
+    const count = config?.games?.length ?? 0;
+    if (count > 0) setBulkConfirm({ type: "download", count });
+  };
+
+  const handleConfirmBulkAction = async () => {
+    const pending = bulkConfirm;
+    setBulkConfirm(null);
+    if (!pending) return;
+    if (pending.type === "sync") await executeSyncAll();
+    else await handleDownloadAll();
+  };
+
+  const handleCancelBulkAction = () => {
+    setBulkConfirm(null);
   };
 
   const executeDownloadAll = async () => {
@@ -465,8 +491,11 @@ export function useGamesPage() {
     gameToRestoreBackup,
     handleRestoreBackup,
     handleCloseRestoreBackup,
-    handleSyncAll,
-    handleDownloadAll,
+    bulkConfirm,
+    handleConfirmBulkAction,
+    handleCancelBulkAction,
+    openSyncAllConfirm,
+    openDownloadAllConfirm,
     handleOpenFolder,
     handleRefresh,
     refetchLastSync,

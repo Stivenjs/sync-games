@@ -13,6 +13,7 @@ import { GamesList } from "@features/games/GamesList";
 import { GamesPageHeader } from "@features/games/GamesPageHeader";
 import { GamesStats } from "@features/games/GamesStats";
 import { OperationErrorCard } from "@features/games/OperationErrorCard";
+import { BulkActionConfirmModal } from "@features/games/BulkActionConfirmModal";
 import { RemoveGameModal } from "@features/games/RemoveGameModal";
 import { ScanModal } from "@features/games/ScanModal";
 import { useGamesPage } from "@features/games/useGamesPage";
@@ -68,8 +69,11 @@ export function GamesPage() {
     gameToRestoreBackup,
     handleRestoreBackup,
     handleCloseRestoreBackup,
-    handleSyncAll,
-    handleDownloadAll,
+    bulkConfirm,
+    handleConfirmBulkAction,
+    handleCancelBulkAction,
+    openSyncAllConfirm,
+    openDownloadAllConfirm,
     handleOpenFolder,
     handleRefresh,
     refetchLastSync,
@@ -122,8 +126,8 @@ export function GamesPage() {
           setAddModalInitial({ path: "", suggestedId: "" });
           setAddModalOpen(true);
         }}
-        onDownloadAllPress={handleDownloadAll}
-        onSyncAllPress={handleSyncAll}
+        onDownloadAllPress={openDownloadAllConfirm}
+        onSyncAllPress={openSyncAllConfirm}
         onRefreshPress={handleRefresh}
       />
 
@@ -190,6 +194,13 @@ export function GamesPage() {
         conflicts={downloadConflicts}
         onConfirm={handleConfirmDownloadConflict}
         isLoading={!!downloading && downloading === downloadConflictGame?.id}
+      />
+      <BulkActionConfirmModal
+        isOpen={!!bulkConfirm}
+        type={bulkConfirm?.type ?? "sync"}
+        count={bulkConfirm?.count ?? 0}
+        onConfirm={handleConfirmBulkAction}
+        onClose={handleCancelBulkAction}
       />
       <DownloadAllConflictModal
         isOpen={downloadAllConflictGames.length > 0}
