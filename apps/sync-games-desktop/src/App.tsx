@@ -51,6 +51,26 @@ function App() {
     isUploading,
   } = useUnsyncedSaves();
 
+  // Evitar menú contextual (clic derecho) y F5/Ctrl+R para que se comporte como app de escritorio
+  useEffect(() => {
+    const preventContextMenu = (e: MouseEvent) => e.preventDefault();
+    const preventRefresh = (e: KeyboardEvent) => {
+      if (
+        e.key === "F5" ||
+        (e.ctrlKey && e.key.toLowerCase() === "r") ||
+        (e.metaKey && e.key.toLowerCase() === "r")
+      ) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("contextmenu", preventContextMenu);
+    document.addEventListener("keydown", preventRefresh);
+    return () => {
+      document.removeEventListener("contextmenu", preventContextMenu);
+      document.removeEventListener("keydown", preventRefresh);
+    };
+  }, []);
+
   // Comprobar actualizaciones al iniciar (solo en producción)
   useEffect(() => {
     if (!import.meta.env.DEV) {
