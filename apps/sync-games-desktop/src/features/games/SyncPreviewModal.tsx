@@ -5,15 +5,17 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  ScrollShadow,
   Spinner,
 } from "@heroui/react";
-import { CloudDownload, CloudUpload } from "lucide-react";
+import { CloudDownload, CloudUpload, FileText } from "lucide-react";
 import {
   previewDownload,
   previewUpload,
   type PreviewDownload,
   type PreviewUpload,
 } from "@services/tauri";
+import type { PreviewFile } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatBytes } from "@utils/format";
 import { useQuery } from "@tanstack/react-query";
@@ -51,7 +53,8 @@ export function SyncPreviewModal({
   const fileCount = uploadData?.fileCount ?? downloadData?.fileCount ?? 0;
   const totalBytes = uploadData?.totalSizeBytes ?? downloadData?.totalSizeBytes ?? 0;
   const conflictCount = downloadData?.conflictCount ?? 0;
-
+  const files: PreviewFile[] =
+    type === "upload" ? uploadData?.files ?? [] : downloadData?.files ?? [];
 
   return (
     <Modal isOpen={isOpen} onOpenChange={(o) => !o && onClose()} size="lg">
@@ -95,6 +98,42 @@ export function SyncPreviewModal({
                   </p>
                 )}
               </div>
+              {files.length > 0 && (
+                <div className="mt-3">
+                  <p className="mb-2 text-xs font-medium text-default-500">
+                    Archivos y carpetas
+                  </p>
+                  <ScrollShadow className="max-h-[240px] w-full rounded-medium border border-default-200">
+                    <ul className="list-inside space-y-1 px-3 py-2 text-sm">
+                      {files.map((file) => (
+                        <li
+                          key={file.filename}
+                          className="flex items-center justify-between gap-2 rounded px-2 py-1.5 font-mono text-xs hover:bg-default-100"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <FileText
+                              size={14}
+                              className="shrink-0 text-default-400"
+                            />
+                            <span className="truncate" title={file.filename}>
+                              {file.filename}
+                            </span>
+                            {type === "download" &&
+                              file.localNewer === true && (
+                                <span className="shrink-0 rounded bg-warning/20 px-1.5 py-0.5 text-[10px] text-warning">
+                                  local más reciente
+                                </span>
+                              )}
+                          </span>
+                          <span className="shrink-0 text-default-500">
+                            {formatBytes(file.size)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollShadow>
+                </div>
+              )}
             </>
           )}
         </ModalBody>

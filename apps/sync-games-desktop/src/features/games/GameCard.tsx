@@ -11,6 +11,7 @@ import {
 } from "@heroui/react";
 import {
   AlertTriangle,
+  Check,
   CloudDownload,
   CloudUpload,
   FolderOpen,
@@ -51,6 +52,8 @@ export interface GameCardProps {
   onRestoreBackup?: (game: ConfiguredGame) => void;
   /** Callback para editar el juego. Si no se pasa, no se muestra el botón. */
   onEdit?: (game: ConfiguredGame) => void;
+  /** Estado de sincronización con la nube (para mostrar badge). */
+  syncStatus?: "pending_upload" | "pending_download" | "in_sync" | null;
 }
 
 /**
@@ -72,6 +75,7 @@ export function GameCard({
   onOpenFolder,
   onRestoreBackup,
   onEdit,
+  syncStatus,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -101,15 +105,44 @@ export function GameCard({
       className="group relative overflow-hidden border-none shadow-md transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-xl"
       radius="lg"
     >
-      {isGameRunning && (
-        <div
-          className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-foreground backdrop-blur-sm"
-          title="El juego está en ejecución. Cierra el juego antes de sincronizar."
-        >
-          <AlertTriangle size={14} />
-          En ejecución
-        </div>
-      )}
+      <div className="absolute left-2 top-2 z-20 flex flex-col gap-1.5">
+        {isGameRunning && (
+          <div
+            className="flex items-center gap-1 rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-foreground backdrop-blur-sm"
+            title="El juego está en ejecución. Cierra el juego antes de sincronizar."
+          >
+            <AlertTriangle size={14} />
+            En ejecución
+          </div>
+        )}
+        {syncStatus === "pending_upload" && (
+          <div
+            className="flex items-center gap-1 rounded-md bg-warning/90 px-2 py-1 text-xs font-medium text-warning-foreground backdrop-blur-sm"
+            title="Hay guardados locales sin subir a la nube."
+          >
+            <CloudUpload size={12} />
+            Pendiente subir
+          </div>
+        )}
+        {syncStatus === "pending_download" && (
+          <div
+            className="flex items-center gap-1 rounded-md bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground backdrop-blur-sm"
+            title="Hay guardados en la nube más recientes."
+          >
+            <CloudDownload size={12} />
+            Pendiente descargar
+          </div>
+        )}
+        {syncStatus === "in_sync" && (
+          <div
+            className="flex items-center gap-1 rounded-md bg-success/90 px-2 py-1 text-xs font-medium text-success-foreground backdrop-blur-sm"
+            title="Sincronizado con la nube."
+          >
+            <Check size={12} />
+            Sincronizado
+          </div>
+        )}
+      </div>
       {(onOpenFolder ||
         onDownload ||
         onSync ||

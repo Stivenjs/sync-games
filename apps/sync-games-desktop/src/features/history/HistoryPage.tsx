@@ -1,7 +1,11 @@
-import { Card, CardBody, Spinner } from "@heroui/react";
+import { useState } from "react";
+import { Card, CardBody, Spinner, Tab, Tabs } from "@heroui/react";
 import { History } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listOperationHistory, type OperationLogEntry } from "@services/tauri";
+import { formatGameDisplayName } from "@utils/gameImage";
+
+type HistoryFilter = "all" | OperationLogEntry["kind"];
 
 function formatKind(kind: OperationLogEntry["kind"]): string {
   switch (kind) {
@@ -23,21 +27,39 @@ function formatTimestamp(ts: string): string {
 }
 
 export function HistoryPage() {
+  const [filter, setFilter] = useState<HistoryFilter>("all");
   const { data, isLoading, error } = useQuery({
     queryKey: ["operation-history"],
     queryFn: listOperationHistory,
   });
 
-  const entries = [...(data ?? [])].reverse();
+  const allEntries = [...(data ?? [])].reverse();
+  const entries =
+    filter === "all"
+      ? allEntries
+      : allEntries.filter((e) => e.kind === filter);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Historial de operaciones</h1>
         <span className="inline-flex h-7 items-center rounded-full bg-default-100 px-3 text-xs text-default-500">
           Subidas, descargas y copias desde amigos
         </span>
       </div>
+
+      {!isLoading && !error && allEntries.length > 0 && (
+        <Tabs
+          selectedKey={filter}
+          onSelectionChange={(k) => setFilter((k as HistoryFilter) ?? "all")}
+          variant="underlined"
+        >
+          <Tab key="all" title="Todos" />
+          <Tab key="upload" title="Subidas" />
+          <Tab key="download" title="Descargas" />
+          <Tab key="copy_friend" title="Copia amigos" />
+        </Tabs>
+      )}
 
       {isLoading && (
         <div className="flex min-h-[20vh] flex-col items-center justify-center gap-3">
@@ -82,7 +104,10 @@ export function HistoryPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-default-500">
                   <span>
-                    Juego: <span className="font-mono">{entry.gameId}</span>
+                    {formatGameDisplayName(entry.gameId)}
+                    <span className="ml-1 font-mono text-default-400">
+                      ({entry.gameId})
+                    </span>
                   </span>
                   <span>
                     Archivos: {entry.fileCount} ok / {entry.errCount} error
@@ -93,6 +118,14 @@ export function HistoryPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {!isLoading && !error && allEntries.length > 0 && entries.length === 0 && (
+        <Card>
+          <CardBody className="py-8 text-center text-default-500">
+            No hay operaciones de este tipo en el historial.
+          </CardBody>
+        </Card>
       )}
     </div>
   );

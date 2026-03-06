@@ -4,6 +4,7 @@ import {
   openSaveFolder,
   removeGame,
   syncCheckDownloadConflicts,
+  syncCheckUnsyncedGames,
   syncDownloadGame,
   syncUploadGame,
   type SyncResult,
@@ -11,7 +12,7 @@ import {
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { toastDownloadResult, toastError, toastSyncResult } from "@utils/toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
 import { filterGames, type OriginFilter } from "@features/games/GamesFilters";
@@ -41,10 +42,33 @@ export function useGamesPage() {
     refetch: refetchLastSync,
   } = useLastSyncInfo(hasSyncConfig);
 
+  const { data: unsyncedGames } = useQuery({
+    queryKey: ["unsynced-games"],
+    queryFn: syncCheckUnsyncedGames,
+    enabled: hasSyncConfig,
+    refetchInterval: 60_000,
+  });
+  const unsyncedGameIds = unsyncedGames?.map((g) => g.gameId) ?? [];
+
   const handleRefresh = () => {
     refetch?.();
     refetchLastSync?.();
     queryClient.invalidateQueries({ queryKey: ["game-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["unsynced-games"] });
+  };
+
+  const handleDismissOperationError = () => {
+    setOperationResult(null);
+    handleRefresh();
+  };
+
+  const handleRetryOperationError = (gameId: string, opType: "sync" | "download") => {
+    setOperationResult(null);
+    const game = config?.games?.find((g) => g.id === gameId);
+    if (game) {
+      setSyncPreviewGame(game);
+      setSyncPreviewType(opType === "sync" ? "upload" : "download");
+    }
   };
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -448,5 +472,8 @@ export function useGamesPage() {
     refetchLastSync,
     filteredGames,
     emptyFilterMessage,
+    unsyncedGameIds,
+    handleDismissOperationError,
+    handleRetryOperationError,
   };
 }

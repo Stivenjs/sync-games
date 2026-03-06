@@ -75,6 +75,9 @@ export function GamesPage() {
     refetchLastSync,
     filteredGames,
     emptyFilterMessage,
+    unsyncedGameIds,
+    handleDismissOperationError,
+    handleRetryOperationError,
   } = useGamesPage();
 
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
@@ -108,6 +111,7 @@ export function GamesPage() {
       <GamesPageHeader
         hasSyncConfig={hasSyncConfig}
         gamesCount={config?.games?.length ?? 0}
+        unsyncedCount={unsyncedGameIds.length}
         syncing={syncing}
         downloading={downloading}
         connectionStatus={connectionStatus}
@@ -241,6 +245,13 @@ export function GamesPage() {
 
       <GamesList
         games={filteredGames}
+        emptyFilterMessage={emptyFilterMessage}
+        unsyncedGameIds={unsyncedGameIds}
+        onEmptyScanPress={() => setScanModalOpen(true)}
+        onEmptyAddPress={() => {
+          setAddModalInitial({ path: "", suggestedId: "" });
+          setAddModalOpen(true);
+        }}
         onRemove={handleRemoveGame}
         onSync={hasSyncConfig ? handleSyncOne : undefined}
         syncingId={syncing}
@@ -249,11 +260,14 @@ export function GamesPage() {
         onOpenFolder={handleOpenFolder}
         onRestoreBackup={handleRestoreBackup}
         onEdit={setGameToEdit}
-        emptyFilterMessage={emptyFilterMessage}
       />
 
       {operationResult && operationResult.result.errors.length > 0 && (
-        <OperationErrorCard operationResult={operationResult} />
+        <OperationErrorCard
+          operationResult={operationResult}
+          onDismiss={handleDismissOperationError}
+          onRetry={handleRetryOperationError}
+        />
       )}
     </div>
   );

@@ -12,6 +12,8 @@ import { ConnectionIndicator } from "@features/games/ConnectionIndicator";
 interface GamesPageHeaderProps {
   hasSyncConfig: boolean;
   gamesCount: number;
+  /** Número de juegos con guardados sin subir (muestra chip si > 0). */
+  unsyncedCount?: number;
   syncing: string | "all" | null;
   downloading: string | "all" | null;
   connectionStatus?: ConnectionStatus;
@@ -27,6 +29,7 @@ interface GamesPageHeaderProps {
 export function GamesPageHeader({
   hasSyncConfig,
   gamesCount,
+  unsyncedCount = 0,
   syncing,
   downloading,
   connectionStatus = "idle",
@@ -43,10 +46,15 @@ export function GamesPageHeader({
   return (
     <header className="mb-6 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold text-foreground">
             Juegos configurados
           </h1>
+          {hasSyncConfig && unsyncedCount > 0 && (
+            <span className="rounded-full bg-warning/20 px-3 py-1 text-sm font-medium text-warning">
+              {unsyncedCount} con cambios sin subir
+            </span>
+          )}
           {hasSyncConfig && (
             <ConnectionIndicator
               status={connectionStatus}
