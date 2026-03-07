@@ -16,6 +16,7 @@ pub struct ConfigDto {
     pub user_id: Option<String>,
     pub games: Vec<GameDto>,
     pub custom_scan_paths: Vec<String>,
+    pub keep_backups_per_game: Option<u32>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -68,6 +69,7 @@ pub fn get_config() -> ConfigDto {
             })
             .collect(),
         custom_scan_paths: cfg.custom_scan_paths,
+        keep_backups_per_game: cfg.keep_backups_per_game,
     }
 }
 
@@ -130,6 +132,14 @@ pub fn create_config_file(
 
     config::save_config(&cfg)?;
     Ok(path_str)
+}
+
+/// Guarda en config cuántos backups locales mantener por juego (usado por la UI y por la auto-limpieza tras descargas).
+#[tauri::command]
+pub fn set_keep_backups_per_game(keep_last_n: u32) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    cfg.keep_backups_per_game = Some(keep_last_n);
+    config::save_config(&cfg)
 }
 
 #[tauri::command]

@@ -347,6 +347,7 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
         user_id: imported.user_id.or_else(|| Some(friend_id.to_string())),
         games,
         custom_scan_paths: imported.custom_scan_paths,
+        keep_backups_per_game: None,
     })
 }
 

@@ -452,6 +452,26 @@ export async function restoreBackup(
   };
 }
 
+/** Resultado de la limpieza de backups antiguos */
+export interface CleanupBackupsResult {
+  backupsDeleted: number;
+  gamesAffected: number;
+}
+
+/** Elimina backups antiguos: mantiene solo los últimos N por juego. Devuelve cuántos se borraron. */
+export async function cleanupOldBackups(
+  keepLastN: number
+): Promise<CleanupBackupsResult> {
+  return invoke<CleanupBackupsResult>("cleanup_old_backups", {
+    keepLastN,
+  });
+}
+
+/** Guarda en config cuántos backups locales mantener por juego (usado por la UI y por la auto-limpieza). */
+export async function setKeepBackupsPerGame(keepLastN: number): Promise<void> {
+  await invoke("set_keep_backups_per_game", { keepLastN });
+}
+
 /** Archivo en la previsualización */
 export interface PreviewFile {
   filename: string;

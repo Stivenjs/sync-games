@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use futures_util::stream::{self, StreamExt};
 
 use super::api;
+use super::backup;
 use super::models::{
     DownloadConflictDto, DownloadConflictsResultDto, GameConflictsResultDto, GameSyncResultDto,
     RemoteSaveInfoDto, SyncResultDto, UnsyncedGameDto,
@@ -342,6 +343,13 @@ async fn sync_download_game_impl(game_id: String) -> Result<SyncResultDto, Strin
         result.err_count,
     );
 
+    if backup_dir.is_some() && result.err_count == 0 {
+        let keep = cfg
+            .keep_backups_per_game
+            .unwrap_or(backup::DEFAULT_KEEP_BACKUPS_PER_GAME);
+        let _ = backup::cleanup_old_backups(keep);
+    }
+
     Ok(result)
 }
 
@@ -425,6 +433,12 @@ pub async fn sync_download_all_games(
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
+
+    let cfg = crate::config::load_config();
+    let keep = cfg
+        .keep_backups_per_game
+        .unwrap_or(backup::DEFAULT_KEEP_BACKUPS_PER_GAME);
+    let _ = backup::cleanup_old_backups(keep);
 
     Ok(results)
 }

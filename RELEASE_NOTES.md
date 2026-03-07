@@ -1,6 +1,6 @@
 # Notas de versión
 
-## v1.2.0 (actual)
+## v1.2.1 (actual)
 
 ### API (backend)
 
@@ -19,6 +19,7 @@
 - **Config en la nube:** subida automática del `config.json` tras cambios (debounce 2,5 s) y respaldo periódico cada 5 minutos.
 - **Conflictos de descarga en batch:** un solo chequeo de conflictos para todos los juegos antes de “Descargar todos” (`sync_check_download_conflicts_batch`).
 - **Steam App ID en batch:** una llamada para resolver varios nombres de juego a Steam App ID.
+- **Limpieza de backups locales:** antes de descargar desde la nube se crea una copia local en `sync-games/backups/[juego]/[fecha]`. Para no acumular infinitos backups: (1) tras cada descarga se eliminan los backups antiguos dejando solo los últimos N por juego; (2) en Configuración → “Respaldo local automático” se puede elegir cuántos mantener (3, 5, 10 o 20) y ejecutar “Liberar espacio ahora”. La preferencia se guarda en `config.json` (`keepBackupsPerGame`) y se usa también para la auto-limpieza.
 - **UI:** transiciones entre pestañas (framer-motion), mejor organización de páginas (Juegos, Amigos, Configuración), modales de confirmación al importar por link y al copiar guardados de un amigo, botón Actualizar con estado de carga.
 - **Estado:** menos `useState` dispersos; uso de `useReducer` en páginas principales (juegos, amigos, configuración).
 

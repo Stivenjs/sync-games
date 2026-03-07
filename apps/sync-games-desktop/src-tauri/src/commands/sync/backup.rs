@@ -1,10 +1,10 @@
-//! Backups locales: listar y restaurar.
+//! Backups locales: listar, restaurar y limpiar.
 
 use std::fs;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-use super::models::{BackupInfoDto, SyncResultDto};
+use super::models::{BackupInfoDto, CleanupBackupsResultDto, SyncResultDto};
 use super::path_utils;
 
 fn count_files_recursive(dir: &Path) -> u32 {
@@ -162,5 +162,79 @@ pub fn restore_backup(game_id: String, backup_id: String) -> Result<SyncResultDt
         ok_count,
         err_count: errors.len() as u32,
         errors,
+    })
+}
+
+/// Cuántos backups se mantienen por juego tras cada descarga (auto-limpieza).
+pub const DEFAULT_KEEP_BACKUPS_PER_GAME: u32 = 10;
+
+/// Elimina backups antiguos: mantiene solo los `keep_last_n` más recientes por juego.
+/// Devuelve cuántos backups se borraron y en cuántos juegos.
+#[tauri::command]
+pub fn cleanup_old_backups(keep_last_n: u32) -> Result<CleanupBackupsResultDto, String> {
+    let cfg = crate::config::load_config();
+    let backup_root = crate::config::config_dir()
+        .ok_or("No se pudo obtener directorio de configuración")?
+        .join("backups");
+
+    if !backup_root.exists() || !backup_root.is_dir() {
+        return Ok(CleanupBackupsResultDto {
+            backups_deleted: 0,
+            games_affected: 0,
+        });
+    }
+
+    let mut total_deleted = 0u32;
+    let mut games_affected = 0u32;
+
+    for game in &cfg.games {
+        let game_backup_dir = backup_root.join(&game.id);
+        if !game_backup_dir.exists() || !game_backup_dir.is_dir() {
+            continue;
+        }
+
+        let mut entries: Vec<_> = fs::read_dir(&game_backup_dir)
+            .map_err(|e| e.to_string())?
+            .flatten()
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+        entries.sort_by(|a, b| {
+            let na = a
+                .path()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+            let nb = b
+                .path()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+            nb.cmp(&na)
+        });
+
+        let keep = keep_last_n as usize;
+        let to_remove = if keep >= entries.len() {
+            0
+        } else {
+            entries.len() - keep
+        };
+
+        for entry in entries.into_iter().skip(keep) {
+            let path = entry.path();
+            if fs::remove_dir_all(&path).is_ok() {
+                total_deleted += 1;
+            }
+        }
+        if to_remove > 0 {
+            games_affected += 1;
+        }
+    }
+
+    Ok(CleanupBackupsResultDto {
+        backups_deleted: total_deleted,
+        games_affected,
     })
 }

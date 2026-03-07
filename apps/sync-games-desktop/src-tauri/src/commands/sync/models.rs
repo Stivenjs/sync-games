@@ -53,6 +53,14 @@ pub struct BackupInfoDto {
     pub file_count: u32,
 }
 
+/// Resultado de la limpieza de backups antiguos.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupBackupsResultDto {
+    pub backups_deleted: u32,
+    pub games_affected: u32,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFileDto {

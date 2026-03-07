@@ -74,7 +74,7 @@ Desde la raíz: `bun run desktop`. Requiere Rust y dependencias de Tauri instala
 
 - **Juegos:** listado, añadir/editar/eliminar, subir a la nube, descargar, “Subir todos” / “Descargar todos” (con operaciones batch y paralelismo). Al eliminar un juego se borra también de la nube (S3). Al editar se puede cambiar el nombre/ID del juego; se actualiza en la app, en el config y en S3 (los guardados se migran al nuevo nombre).
 - **Amigos:** importar por link compartido, ver perfil por User ID, copiar guardados de un amigo.
-- **Configuración:** API URL, User ID, API Key, autostart, notificaciones, respaldo/restauración del config en la nube (con subida automática tras cambios).
+- **Configuración:** API URL, User ID, API Key, autostart, notificaciones, respaldo/restauración del config en la nube (con subida automática tras cambios). Gestión de backups locales: elegir cuántos backups mantener por juego (3, 5, 10 o 20) y liberar espacio; la preferencia se guarda en config y se aplica también a la auto-limpieza tras cada descarga.
 - **Historial:** operaciones de sync recientes.
 
 ## Variables de entorno (backend / Lambda)

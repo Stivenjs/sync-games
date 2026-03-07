@@ -24,4 +24,6 @@ export interface Config {
   readonly userId?: string;
   readonly games: readonly ConfiguredGame[];
   readonly customScanPaths?: readonly string[];
+  /** Cuántos backups locales mantener por juego (valor por defecto del selector y auto-limpieza tras descargas). */
+  readonly keepBackupsPerGame?: number;
 }

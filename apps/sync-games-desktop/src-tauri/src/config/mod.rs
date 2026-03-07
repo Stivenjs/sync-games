@@ -39,6 +39,9 @@ pub struct Config {
     pub games: Vec<ConfiguredGame>,
     #[serde(default)]
     pub custom_scan_paths: Vec<String>,
+    /// Cuántos backups locales mantener por juego (auto-limpieza y valor por defecto en la UI). Si no está definido, se usa 10.
+    #[serde(default)]
+    pub keep_backups_per_game: Option<u32>,
     #[serde(default)]
     pub operation_history: Vec<OperationLogEntry>,
 }
