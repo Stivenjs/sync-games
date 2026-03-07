@@ -54,6 +54,10 @@ Las dependencias apuntan hacia dentro: `interfaces` → `application` → `domai
 | `bun run desktop`                | App de escritorio en modo desarrollo (Tauri + Vite) |
 | `bun run desktop:dev`            | Solo frontend (Vite)                                |
 | `bun run desktop:build`          | Build de instalador de la app de escritorio         |
+| `bun run api-key`                | Genera API key para el backend                      |
+| `bun run api-key:live`           | Genera API key para el backend (live)               |
+| `bun run desktop:latest-json`    | Genera latest.json para la app de escritorio        |
+| `bun run desktop:icon`           | Genera icono para la app de escritorio              |
 
 Instalación: `bun install` en la raíz.
 
