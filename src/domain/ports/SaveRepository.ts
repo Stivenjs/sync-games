@@ -45,4 +45,12 @@ export interface SaveRepository {
     items: DownloadUrlItem[]
   ): Promise<DownloadUrlResult[]>;
   listByUser(userId: string): Promise<GameSave[]>;
+  /** Borra todos los objetos en S3 bajo userId/gameId/ */
+  deleteGame(userId: string, gameId: string): Promise<void>;
+  /** Copia todos los objetos de userId/oldGameId/ a userId/newGameId/ y borra los antiguos */
+  renameGame(
+    userId: string,
+    oldGameId: string,
+    newGameId: string
+  ): Promise<void>;
 }

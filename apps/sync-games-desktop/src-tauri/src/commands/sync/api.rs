@@ -240,6 +240,82 @@ pub async fn sync_list_remote_saves_for_user(
     list_remote_saves_for_user(api_base, api_key, user_id).await
 }
 
+/// Borra todos los guardados del juego en la nube (S3).
+#[tauri::command]
+pub async fn sync_delete_game_from_cloud(game_id: String) -> Result<(), String> {
+    let cfg = crate::config::load_config();
+    let api_base = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let user_id = cfg
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura userId en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
+    let body = serde_json::json!({ "gameId": game_id.trim() });
+    let body_bytes = body.to_string().into_bytes();
+    let res = api_request(
+        api_base,
+        user_id,
+        api_key,
+        "POST",
+        "/delete-game",
+        Some(&body_bytes),
+    )
+    .await
+    .map_err(|e| format!("delete-game: {}", e))?;
+    if !res.status().is_success() && res.status().as_u16() != 204 {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("API delete-game: {} {}", status, text));
+    }
+    Ok(())
+}
+
+/// Renombra un juego en la nube (copia objetos de old_game_id a new_game_id y borra los antiguos).
+#[tauri::command]
+pub async fn sync_rename_game_in_cloud(
+    old_game_id: String,
+    new_game_id: String,
+) -> Result<(), String> {
+    let cfg = crate::config::load_config();
+    let api_base = cfg
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura apiBaseUrl en Configuración")?;
+    let user_id = cfg
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Configura userId en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
+    let body = serde_json::json!({
+        "oldGameId": old_game_id.trim(),
+        "newGameId": new_game_id.trim()
+    });
+    let body_bytes = body.to_string().into_bytes();
+    let res = api_request(
+        api_base,
+        user_id,
+        api_key,
+        "POST",
+        "/rename-game",
+        Some(&body_bytes),
+    )
+    .await
+    .map_err(|e| format!("rename-game: {}", e))?;
+    if !res.status().is_success() && res.status().as_u16() != 204 {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("API rename-game: {} {}", status, text));
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyFriendFilePlanDto {

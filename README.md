@@ -72,7 +72,7 @@ Config por defecto: `%APPDATA%/savecloud/config.json` (Windows) o `~/.config/sav
 
 Desde la raíz: `bun run desktop`. Requiere Rust y dependencias de Tauri instaladas.
 
-- **Juegos:** listado, añadir/editar/eliminar, subir a la nube, descargar, “Subir todos” / “Descargar todos” (con operaciones batch y paralelismo).
+- **Juegos:** listado, añadir/editar/eliminar, subir a la nube, descargar, “Subir todos” / “Descargar todos” (con operaciones batch y paralelismo). Al eliminar un juego se borra también de la nube (S3). Al editar se puede cambiar el nombre/ID del juego; se actualiza en la app, en el config y en S3 (los guardados se migran al nuevo nombre).
 - **Amigos:** importar por link compartido, ver perfil por User ID, copiar guardados de un amigo.
 - **Configuración:** API URL, User ID, API Key, autostart, notificaciones, respaldo/restauración del config en la nube (con subida automática tras cambios).
 - **Historial:** operaciones de sync recientes.
@@ -85,16 +85,18 @@ Desde la raíz: `bun run desktop`. Requiere Rust y dependencias de Tauri instala
 
 ## API
 
-| Método y ruta               | Descripción                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `GET /health`               | Health check                                                                                                 |
-| `GET /saves`                | Lista guardados del usuario (headers: `x-user-id`, `x-api-key` si aplica)                                    |
-| `POST /saves/upload-url`    | Una URL de subida. Body: `{ "gameId", "filename" }` → `{ "uploadUrl", "key" }`                               |
-| `POST /saves/upload-urls`   | **Batch:** varias URLs de subida. Body: `{ "items": [{ "gameId", "filename" }, ...] }` → `{ "urls": [...] }` |
-| `POST /saves/download-url`  | Una URL de descarga. Body: `{ "gameId", "key" }` → `{ "downloadUrl" }`                                       |
-| `POST /saves/download-urls` | **Batch:** varias URLs de descarga. Body: `{ "items": [{ "gameId", "key" }, ...] }` → `{ "urls": [...] }`    |
+| Método y ruta               | Descripción                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET /health`               | Health check                                                                                                    |
+| `GET /saves`                | Lista guardados del usuario (headers: `x-user-id`, `x-api-key` si aplica)                                       |
+| `POST /saves/upload-url`    | Una URL de subida. Body: `{ "gameId", "filename" }` → `{ "uploadUrl", "key" }`                                  |
+| `POST /saves/upload-urls`   | **Batch:** varias URLs de subida. Body: `{ "items": [{ "gameId", "filename" }, ...] }` → `{ "urls": [...] }`    |
+| `POST /saves/download-url`  | Una URL de descarga. Body: `{ "gameId", "key" }` → `{ "downloadUrl" }`                                          |
+| `POST /saves/download-urls` | **Batch:** varias URLs de descarga. Body: `{ "items": [{ "gameId", "key" }, ...] }` → `{ "urls": [...] }`       |
+| `POST /saves/delete-game`   | Borra todos los guardados del juego en S3. Body: `{ "gameId" }` → 204.                                          |
+| `POST /saves/rename-game`   | Renombra un juego en S3 (copia a nuevo prefijo y borra el antiguo). Body: `{ "oldGameId", "newGameId" }` → 204. |
 
-El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas. La app de escritorio usa los endpoints batch para reducir llamadas e invocaciones Lambda.
+El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas. La app de escritorio usa los endpoints batch para reducir llamadas e invocaciones Lambda. Eliminar y renombrar requieren que el Lambda tenga permiso `s3:DeleteObject` (incluido en el `serverless.yml`).
 
 ## Probar que los guardados se suben a S3
 

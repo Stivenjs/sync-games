@@ -57,7 +57,8 @@ export function RemoveGameModal({
             ¿Eliminar &quot;{game.id}&quot;{pathsInfo}?
           </p>
           <p className="text-sm text-default-400">
-            Esta acción no se puede deshacer.
+            Se quitará de la app y sus guardados se borrarán de la nube. Esta
+            acción no se puede deshacer.
           </p>
         </ModalBody>
         <ModalFooter>

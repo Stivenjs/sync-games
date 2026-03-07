@@ -3,6 +3,8 @@ import type { GetUploadUrlUseCase } from "@application/use-cases/GetUploadUrlUse
 import type { GetUploadUrlsUseCase } from "@application/use-cases/GetUploadUrlsUseCase";
 import type { GetDownloadUrlUseCase } from "@application/use-cases/GetDownloadUrlUseCase";
 import type { GetDownloadUrlsUseCase } from "@application/use-cases/GetDownloadUrlsUseCase";
+import type { DeleteGameFromCloudUseCase } from "@application/use-cases/DeleteGameFromCloudUseCase";
+import type { RenameGameInCloudUseCase } from "@application/use-cases/RenameGameInCloudUseCase";
 import type { ListSavesUseCase } from "@application/use-cases/ListSavesUseCase";
 
 const USER_ID_HEADER = "x-user-id";
@@ -22,6 +24,8 @@ export async function registerSavesRoutes(
     getUploadUrlsUseCase: GetUploadUrlsUseCase;
     getDownloadUrlUseCase: GetDownloadUrlUseCase;
     getDownloadUrlsUseCase: GetDownloadUrlsUseCase;
+    deleteGameFromCloudUseCase: DeleteGameFromCloudUseCase;
+    renameGameInCloudUseCase: RenameGameInCloudUseCase;
     listSavesUseCase: ListSavesUseCase;
   }
 ): Promise<void> {
@@ -129,5 +133,71 @@ export async function registerSavesRoutes(
       key: key.trim(),
     });
     return reply.send(result);
+  });
+
+  app.post<{
+    Body: { gameId: string };
+  }>("/saves/delete-game", async (request, reply) => {
+    const userId = getUserId(request);
+    const body = request.body as { gameId?: string };
+    const gameId = body?.gameId?.trim();
+    if (!gameId) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "gameId is required",
+      });
+    }
+    try {
+      await deps.deleteGameFromCloudUseCase.execute({ userId, gameId });
+    } catch (err) {
+      request.log.error({ err, userId, gameId }, "delete-game failed");
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to delete game from cloud",
+      });
+    }
+    return reply.code(204).send();
+  });
+
+  app.post<{
+    Body: { oldGameId: string; newGameId: string };
+  }>("/saves/rename-game", async (request, reply) => {
+    const userId = getUserId(request);
+    const body = request.body as { oldGameId?: string; newGameId?: string };
+    const oldGameId = body?.oldGameId?.trim();
+    const newGameId = body?.newGameId?.trim();
+    if (!oldGameId || !newGameId) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "oldGameId and newGameId are required",
+      });
+    }
+    if (oldGameId === newGameId) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "oldGameId and newGameId must be different",
+      });
+    }
+    try {
+      await deps.renameGameInCloudUseCase.execute({
+        userId,
+        oldGameId,
+        newGameId,
+      });
+    } catch (err) {
+      request.log.error(
+        { err, userId, oldGameId, newGameId },
+        "rename-game failed"
+      );
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message:
+          err instanceof Error ? err.message : "Failed to rename game in cloud",
+      });
+    }
+    return reply.code(204).send();
   });
 }

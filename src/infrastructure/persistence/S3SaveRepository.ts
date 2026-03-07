@@ -1,4 +1,6 @@
 import {
+  CopyObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -117,5 +119,80 @@ export class S3SaveRepository implements SaveRepository {
       }));
 
     return saves;
+  }
+
+  async deleteGame(userId: string, gameId: string): Promise<void> {
+    const prefix = `${userId}/${gameId}/`;
+    let continuationToken: string | undefined;
+    do {
+      const list = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+      const contents = list.Contents ?? [];
+      if (contents.length === 0) break;
+      const keys = contents
+        .filter((c): c is { Key: string } => !!c.Key)
+        .map((c) => ({ Key: c.Key! }));
+      await this.s3.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucketName,
+          Delete: { Objects: keys, Quiet: true },
+        })
+      );
+      continuationToken = list.IsTruncated
+        ? list.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+  }
+
+  async renameGame(
+    userId: string,
+    oldGameId: string,
+    newGameId: string
+  ): Promise<void> {
+    if (oldGameId === newGameId) return;
+    const prefix = `${userId}/${oldGameId}/`;
+    const keysToDelete: { Key: string }[] = [];
+    let continuationToken: string | undefined;
+    do {
+      const list = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+      const contents = list.Contents ?? [];
+      for (const obj of contents) {
+        if (!obj.Key) continue;
+        const filename = obj.Key.slice(prefix.length);
+        const newKey = `${userId}/${newGameId}/${filename}`;
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: this.bucketName,
+            CopySource: `${this.bucketName}/${encodeURIComponent(obj.Key)}`,
+            Key: newKey,
+          })
+        );
+        keysToDelete.push({ Key: obj.Key });
+      }
+      continuationToken = list.IsTruncated
+        ? list.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    for (let i = 0; i < keysToDelete.length; i += 1000) {
+      const batch = keysToDelete.slice(i, i + 1000);
+      await this.s3.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucketName,
+          Delete: { Objects: batch, Quiet: true },
+        })
+      );
+    }
   }
 }

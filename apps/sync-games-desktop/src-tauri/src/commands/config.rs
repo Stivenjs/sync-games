@@ -3,9 +3,9 @@
 use std::fs;
 use std::path::Path;
 
-use base64::Engine;
 use crate::config;
 use crate::steam;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -248,6 +248,33 @@ pub fn update_game(
     g.steam_app_id = steam_app_id;
     g.image_url = image_url;
 
+    config::save_config(&cfg)
+}
+
+/// Renombra un juego en la configuración (cambia su id).
+#[tauri::command]
+pub fn rename_game(old_game_id: String, new_game_id: String) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    let old_id = old_game_id.trim();
+    let new_id = new_game_id.trim().to_string();
+    if old_id.is_empty() || new_id.is_empty() {
+        return Err("oldGameId y newGameId son obligatorios".to_string());
+    }
+    if old_id.eq_ignore_ascii_case(&new_id) {
+        return Ok(());
+    }
+    if cfg.games.iter().any(|g| g.id.eq_ignore_ascii_case(&new_id)) {
+        return Err(format!(
+            "Ya existe un juego con el id \"{}\". Elige otro nombre.",
+            new_id
+        ));
+    }
+    let g = cfg
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(old_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", old_id))?;
+    g.id = new_id;
     config::save_config(&cfg)
 }
 

@@ -6,6 +6,8 @@ import { GetUploadUrlUseCase } from "@application/use-cases/GetUploadUrlUseCase"
 import { GetUploadUrlsUseCase } from "@application/use-cases/GetUploadUrlsUseCase";
 import { GetDownloadUrlUseCase } from "@application/use-cases/GetDownloadUrlUseCase";
 import { GetDownloadUrlsUseCase } from "@application/use-cases/GetDownloadUrlsUseCase";
+import { DeleteGameFromCloudUseCase } from "@application/use-cases/DeleteGameFromCloudUseCase";
+import { RenameGameInCloudUseCase } from "@application/use-cases/RenameGameInCloudUseCase";
 import { ListSavesUseCase } from "@application/use-cases/ListSavesUseCase";
 import { registerSavesRoutes } from "@interfaces/http/routes/saves.routes";
 import { registerShareRoutes } from "@interfaces/http/routes/share.routes";
@@ -46,6 +48,12 @@ export async function buildApp(
   const getDownloadUrlsUseCase = new GetDownloadUrlsUseCase(
     deps.saveRepository
   );
+  const deleteGameFromCloudUseCase = new DeleteGameFromCloudUseCase(
+    deps.saveRepository
+  );
+  const renameGameInCloudUseCase = new RenameGameInCloudUseCase(
+    deps.saveRepository
+  );
   const listSavesUseCase = new ListSavesUseCase(deps.saveRepository);
 
   await registerSavesRoutes(app, {
@@ -53,6 +61,8 @@ export async function buildApp(
     getUploadUrlsUseCase,
     getDownloadUrlUseCase,
     getDownloadUrlsUseCase,
+    deleteGameFromCloudUseCase,
+    renameGameInCloudUseCase,
     listSavesUseCase,
   });
 

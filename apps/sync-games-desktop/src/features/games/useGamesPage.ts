@@ -1,6 +1,7 @@
 import { useReducer } from "react";
 import {
   addGame,
+  deleteGameFromCloud,
   openSaveFolder,
   removeGame,
   scheduleConfigBackupToCloud,
@@ -288,6 +289,14 @@ export function useGamesPage() {
 
   const handleConfirmRemove = async (gameId: string) => {
     try {
+      try {
+        await deleteGameFromCloud(gameId);
+      } catch (e) {
+        toastError(
+          "No se pudieron borrar los guardados en la nube",
+          e instanceof Error ? e.message : String(e)
+        );
+      }
       await removeGame(gameId);
       scheduleConfigBackupToCloud();
       refetch?.();

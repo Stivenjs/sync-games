@@ -12,7 +12,13 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, ImagePlus, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { ConfiguredGame } from "@app-types/config";
-import { readImageAsDataUrl, updateGame, searchSteamGames } from "@services/tauri";
+import {
+  readImageAsDataUrl,
+  renameGame,
+  renameGameInCloud,
+  updateGame,
+  searchSteamGames,
+} from "@services/tauri";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
 
 interface EditGameModalProps {
@@ -28,6 +34,7 @@ export function EditGameModal({
   onClose,
   onSuccess,
 }: EditGameModalProps) {
+  const [gameIdInput, setGameIdInput] = useState("");
   const [path, setPath] = useState("");
   const [editionLabel, setEditionLabel] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -41,6 +48,7 @@ export function EditGameModal({
 
   useEffect(() => {
     if (game && isOpen) {
+      setGameIdInput(game.id);
       setPath((game.paths ?? [])[0] ?? "");
       setEditionLabel(game.editionLabel ?? "");
       setSourceUrl(game.sourceUrl ?? "");
@@ -104,6 +112,11 @@ export function EditGameModal({
 
   const handleSubmit = async () => {
     if (!game) return;
+    const newId = gameIdInput.trim();
+    if (!newId) {
+      setError("El nombre / identificador del juego es obligatorio.");
+      return;
+    }
     const p = path.trim();
     if (!p) {
       setError("La ruta es obligatoria.");
@@ -115,8 +128,13 @@ export function EditGameModal({
     setLoading(true);
     setError(null);
     try {
+      const idChanged = newId !== game.id;
+      if (idChanged) {
+        await renameGameInCloud(game.id, newId);
+        await renameGame(game.id, newId);
+      }
       await updateGame(
-        game.id,
+        idChanged ? newId : game.id,
         paths,
         editionLabel.trim() || undefined,
         sourceUrl.trim() || undefined,
@@ -140,12 +158,12 @@ export function EditGameModal({
           {game ? (
             <>
               <Input
-                label="Identificador del juego"
+                label="Nombre / identificador del juego"
                 placeholder="ej. elden-ring"
-                value={game.id}
-                isReadOnly
+                value={gameIdInput}
+                onValueChange={setGameIdInput}
                 variant="bordered"
-                description="No se puede cambiar el identificador."
+                description="Se usa en la app, en el config y en la nube. Al cambiarlo se actualiza también en S3."
               />
               <Input
                 label="Ruta de la carpeta de guardados"
@@ -193,7 +211,11 @@ export function EditGameModal({
                 <Input
                   label="URL de la imagen o imagen local"
                   placeholder="Pega una URL de imagen o selecciona un archivo"
-                  value={imageUrl.startsWith("data:") ? "(imagen local seleccionada)" : imageUrl}
+                  value={
+                    imageUrl.startsWith("data:")
+                      ? "(imagen local seleccionada)"
+                      : imageUrl
+                  }
                   onValueChange={(v) => {
                     if (v !== "(imagen local seleccionada)") setImageUrl(v);
                   }}
@@ -227,7 +249,9 @@ export function EditGameModal({
                     setSelectedSteamAppId(null);
                   }}
                   variant="bordered"
-                  startContent={<Search size={16} className="text-default-400" />}
+                  startContent={
+                    <Search size={16} className="text-default-400" />
+                  }
                 />
                 {debouncedSearch.length >= 3 && (
                   <div className="max-h-40 space-y-1 overflow-y-auto rounded-medium border border-default-200 bg-default-50 px-2 py-1 text-xs">
@@ -287,7 +311,7 @@ export function EditGameModal({
             color="primary"
             onPress={handleSubmit}
             isLoading={loading}
-            isDisabled={!game || !path.trim()}
+            isDisabled={!game || !path.trim() || !gameIdInput.trim()}
           >
             Guardar cambios
           </Button>
