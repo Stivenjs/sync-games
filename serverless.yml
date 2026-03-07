@@ -10,6 +10,13 @@ provider:
   environment:
     BUCKET_NAME: { Ref: SavesBucket }
     API_KEY: ${env:SYNC_GAMES_API_KEY, ''}
+  httpApi:
+    authorizers:
+      apiKeyAuthorizer:
+        type: request
+        functionName: apiAuthorizer
+        enableSimpleResponses: true
+        resultTtlInSeconds: 0
   iam:
     role:
       statements:
@@ -26,18 +33,26 @@ build:
   esbuild:
     bundle: true
     sourcemap: true
-    target: node20
+    target: node22
 
 functions:
+  apiAuthorizer:
+    handler: src/interfaces/lambda/authorizer.handler
+    environment:
+      API_KEY: ${env:SYNC_GAMES_API_KEY, ''}
   api:
     handler: src/interfaces/lambda/handler.handler
     events:
       - httpApi:
           path: /{proxy+}
           method: ANY
+          authorizer:
+            name: apiKeyAuthorizer
       - httpApi:
           path: /
           method: ANY
+          authorizer:
+            name: apiKeyAuthorizer
 
 resources:
   Resources:
