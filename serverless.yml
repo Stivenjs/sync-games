@@ -2,6 +2,10 @@ service: sync-games
 
 frameworkVersion: "4"
 
+# Stage = entorno separado: cada uno tiene su propio stack (API Gateway, Lambda, S3 bucket).
+# deploy --stage dev  → stack sync-games-dev, bucket y API de desarrollo.
+# deploy --stage live → stack sync-games-live, bucket y API de producción.
+
 provider:
   name: aws
   runtime: nodejs22.x
