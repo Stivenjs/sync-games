@@ -151,7 +151,8 @@ pub fn spawn_watcher(
                         tray.syncing_inc();
                         tray.update_tooltip();
                         tauri::async_runtime::spawn(async move {
-                            let res = sync::upload::sync_upload_game_impl(gid.clone()).await;
+                            let res =
+                                sync::upload::sync_upload_game_impl(gid.clone(), app.clone()).await;
                             tray.syncing_dec();
                             tray.clone().refresh_unsynced_async();
                             match res {

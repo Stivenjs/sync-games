@@ -61,6 +61,16 @@ pub struct CleanupBackupsResultDto {
     pub games_affected: u32,
 }
 
+/// Payload para eventos de progreso de subida/descarga (sync-upload-progress, sync-download-progress).
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncProgressPayload {
+    pub game_id: String,
+    pub filename: String,
+    pub loaded: u64,
+    pub total: u64,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFileDto {

@@ -2,31 +2,125 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 
 use super::api;
-use super::models::{GameSyncResultDto, SyncResultDto};
+use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
 use super::path_utils;
 use crate::tray_state::TrayState;
-use futures_util::stream::{self, StreamExt};
-use tauri::State;
+use bytes::Bytes;
+use futures_util::stream::{self, Stream, StreamExt};
+use tauri::{AppHandle, Emitter, State};
+use tokio::sync::mpsc;
+
+/// Emitir progreso cada N bytes para no saturar el frontend.
+const PROGRESS_CHUNK_BYTES: usize = 256 * 1024;
+
+/// Stream que recibe chunks de un canal (llenado por un hilo que lee el archivo).
+struct FileProgressStream {
+    rx: mpsc::Receiver<Result<Bytes, std::io::Error>>,
+}
+
+impl Stream for FileProgressStream {
+    type Item = Result<Bytes, std::io::Error>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.rx.poll_recv(cx)
+    }
+}
+
+/// Crea un stream que lee el archivo en chunks y emite progreso. El stream se consume al hacer el PUT.
+fn file_stream_with_progress(
+    absolute: &std::path::Path,
+    total: u64,
+    app: AppHandle,
+    game_id: String,
+    filename: String,
+) -> Result<FileProgressStream, String> {
+    let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(2);
+    let absolute = absolute.to_path_buf();
+    std::thread::spawn(move || {
+        let file = match fs::File::open(&absolute) {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = tx.blocking_send(Err(e));
+                return;
+            }
+        };
+        let mut reader = file;
+        let mut loaded: u64 = 0;
+        let mut last_emit: u64 = 0;
+        let mut buf = vec![0u8; PROGRESS_CHUNK_BYTES];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    loaded += n as u64;
+                    if loaded - last_emit >= PROGRESS_CHUNK_BYTES as u64
+                        || (total > 0 && loaded >= total)
+                    {
+                        last_emit = loaded;
+                        let _ = app.emit(
+                            "sync-upload-progress",
+                            SyncProgressPayload {
+                                game_id: game_id.clone(),
+                                filename: filename.clone(),
+                                loaded,
+                                total,
+                            },
+                        );
+                    }
+                    let chunk = Bytes::from(buf[..n].to_vec());
+                    if tx.blocking_send(Ok(chunk)).is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.blocking_send(Err(e));
+                    break;
+                }
+            }
+        }
+        if loaded > 0 && loaded < total {
+            let _ = app.emit(
+                "sync-upload-progress",
+                SyncProgressPayload {
+                    game_id,
+                    filename,
+                    loaded: total,
+                    total,
+                },
+            );
+        }
+    });
+    Ok(FileProgressStream { rx })
+}
 
 #[tauri::command]
 pub async fn sync_upload_game(
     game_id: String,
+    app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<SyncResultDto, String> {
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    let result = sync_upload_game_impl(game_id).await;
+    let result = sync_upload_game_impl(game_id, app.clone()).await;
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
 
+    let _ = app.emit("sync-upload-done", ());
     result
 }
 
-pub(crate) async fn sync_upload_game_impl(game_id: String) -> Result<SyncResultDto, String> {
+pub(crate) async fn sync_upload_game_impl(
+    game_id: String,
+    app: AppHandle,
+) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
         .games
@@ -84,13 +178,22 @@ pub(crate) async fn sync_upload_game_impl(game_id: String) -> Result<SyncResultD
     let mut errors = Vec::new();
 
     for ((absolute, relative), (upload_url, _)) in files.into_iter().zip(upload_urls) {
-        let bytes = fs::read(&absolute).map_err(|e| format!("{}: {}", relative, e))?;
-        let content_length = bytes.len();
+        let total = fs::metadata(&absolute)
+            .map_err(|e| format!("{}: {}", relative, e))?
+            .len();
+        let body_stream = file_stream_with_progress(
+            std::path::Path::new(absolute.as_str()),
+            total,
+            app.clone(),
+            game_id.clone(),
+            relative.clone(),
+        )?;
+        let body = reqwest::Body::wrap_stream(body_stream);
         let put_res = client
             .put(&upload_url)
-            .body(bytes)
+            .body(body)
             .header("Content-Type", "application/octet-stream")
-            .header("Content-Length", content_length.to_string())
+            .header("Content-Length", total.to_string())
             .send()
             .await
             .map_err(|e| format!("{}: {}", relative, e))?;
@@ -122,6 +225,7 @@ const UPLOAD_BATCH_CONCURRENCY: usize = 4;
 /// Sube los guardados de todos los juegos configurados (operación batch, varios juegos en paralelo).
 #[tauri::command]
 pub async fn sync_upload_all_games(
+    app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<Vec<GameSyncResultDto>, String> {
     let cfg = crate::config::load_config();
@@ -168,9 +272,12 @@ pub async fn sync_upload_all_games(
         .collect();
 
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_sync)
-        .map(|game_id| async move {
-            let r = sync_upload_game_impl(game_id.clone()).await;
-            (game_id, r)
+        .map(|game_id| {
+            let app = app.clone();
+            async move {
+                let r = sync_upload_game_impl(game_id.clone(), app).await;
+                (game_id, r)
+            }
         })
         .buffer_unordered(UPLOAD_BATCH_CONCURRENCY)
         .collect()
@@ -196,6 +303,8 @@ pub async fn sync_upload_all_games(
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
+
+    let _ = app.emit("sync-upload-done", ());
 
     Ok(results)
 }

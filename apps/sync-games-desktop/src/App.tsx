@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "framer-motion";
 import { Gamepad2, History, Info, Settings, Users } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
+import { SyncProgressBar } from "@components/layout";
 import { GamesPage } from "@features/games";
 import { FriendsPage } from "@features/friends/FriendsPage";
 import { HistoryPage } from "@features/history/HistoryPage";
@@ -165,6 +166,8 @@ function App() {
           </motion.div>
         </AnimatePresence>
       </AppLayout>
+
+      <SyncProgressBar />
     </>
   );
 }

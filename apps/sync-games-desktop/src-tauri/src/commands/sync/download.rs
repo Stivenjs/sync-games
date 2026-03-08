@@ -13,11 +13,11 @@ use super::api;
 use super::backup;
 use super::models::{
     DownloadConflictDto, DownloadConflictsResultDto, GameConflictsResultDto, GameSyncResultDto,
-    RemoteSaveInfoDto, SyncResultDto, UnsyncedGameDto,
+    RemoteSaveInfoDto, SyncProgressPayload, SyncResultDto, UnsyncedGameDto,
 };
 use super::path_utils;
 use crate::tray_state::TrayState;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Calcula los conflictos de descarga para un juego dado su ruta base y la lista de saves remotos.
 fn check_conflicts_for_game(
@@ -198,23 +198,27 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
     Ok(unsynced)
 }
 
+const DOWNLOAD_PROGRESS_EMIT_BYTES: u64 = 256 * 1024;
+
 #[tauri::command]
 pub async fn sync_download_game(
     game_id: String,
+    app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<SyncResultDto, String> {
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    let result = sync_download_game_impl(game_id.clone()).await;
+    let result = sync_download_game_impl(game_id.clone(), app.clone()).await;
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
 
+    let _ = app.emit("sync-download-done", ());
     result
 }
 
-async fn sync_download_game_impl(game_id: String) -> Result<SyncResultDto, String> {
+async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
         .games
@@ -297,15 +301,6 @@ async fn sync_download_game_impl(game_id: String) -> Result<SyncResultDto, Strin
     });
 
     for (save, (download_url, _)) in saves.into_iter().zip(download_urls) {
-        let bytes = client
-            .get(&download_url)
-            .send()
-            .await
-            .map_err(|e| format!("{}: {}", save.filename, e))?
-            .bytes()
-            .await
-            .map_err(|e| format!("{}: {}", save.filename, e))?;
-
         let dest_path = dest_base.join(&save.filename);
         if let Some(parent) = dest_path.parent() {
             let _ = fs::create_dir_all(parent);
@@ -321,12 +316,74 @@ async fn sync_download_game_impl(game_id: String) -> Result<SyncResultDto, Strin
                 }
             }
         }
-        match fs::File::create(&dest_path).and_then(|mut f| f.write_all(&bytes)) {
-            Ok(_) => ok_count += 1,
+
+        let res = client
+            .get(&download_url)
+            .send()
+            .await
+            .map_err(|e| format!("{}: {}", save.filename, e))?;
+        let total = res.content_length().or(save.size).unwrap_or(0);
+        let mut loaded: u64 = 0;
+        let mut last_emit: u64 = 0;
+
+        let mut file = match fs::File::create(&dest_path) {
+            Ok(f) => f,
             Err(e) => {
                 errors.push(format!("{}: {}", save.filename, e));
                 err_count += 1;
+                continue;
             }
+        };
+
+        let mut stream = res.bytes_stream();
+        let mut write_err: Option<String> = None;
+        while let Some(chunk_result) = stream.next().await {
+            match chunk_result {
+                Ok(chunk) => {
+                    let n = chunk.len() as u64;
+                    loaded += n;
+                    if loaded - last_emit >= DOWNLOAD_PROGRESS_EMIT_BYTES
+                        || (total > 0 && loaded >= total)
+                    {
+                        last_emit = loaded;
+                        let _ = app.emit(
+                            "sync-download-progress",
+                            SyncProgressPayload {
+                                game_id: game_id.clone(),
+                                filename: save.filename.clone(),
+                                loaded,
+                                total,
+                            },
+                        );
+                    }
+                    if file.write_all(&chunk).is_err() {
+                        write_err = Some(format!("{}: error al escribir", save.filename));
+                        break;
+                    }
+                }
+                Err(e) => {
+                    write_err = Some(format!("{}: {}", save.filename, e));
+                    break;
+                }
+            }
+        }
+        if total > 0 && loaded < total {
+            let _ = app.emit(
+                "sync-download-progress",
+                SyncProgressPayload {
+                    game_id: game_id.clone(),
+                    filename: save.filename.clone(),
+                    loaded: total,
+                    total,
+                },
+            );
+        }
+        match write_err {
+            Some(e) => {
+                errors.push(e);
+                err_count += 1;
+            }
+            None => ok_count += 1,
         }
     }
 
@@ -359,6 +416,7 @@ const DOWNLOAD_BATCH_CONCURRENCY: usize = 4;
 /// Descarga los guardados de todos los juegos configurados (operación batch, varios juegos en paralelo).
 #[tauri::command]
 pub async fn sync_download_all_games(
+    app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<Vec<GameSyncResultDto>, String> {
     let cfg = crate::config::load_config();
@@ -405,9 +463,12 @@ pub async fn sync_download_all_games(
         .collect();
 
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_download)
-        .map(|game_id| async move {
-            let r = sync_download_game_impl(game_id.clone()).await;
-            (game_id, r)
+        .map(|game_id| {
+            let app = app.clone();
+            async move {
+                let r = sync_download_game_impl(game_id.clone(), app).await;
+                (game_id, r)
+            }
         })
         .buffer_unordered(DOWNLOAD_BATCH_CONCURRENCY)
         .collect()
@@ -433,6 +494,8 @@ pub async fn sync_download_all_games(
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
+
+    let _ = app.emit("sync-download-done", ());
 
     let cfg = crate::config::load_config();
     let keep = cfg
