@@ -47,10 +47,12 @@ build:
 functions:
   apiAuthorizer:
     handler: src/interfaces/lambda/authorizer.handler
+    description: Autorizador por API key para savecloud - entorno ${sls:stage, 'dev'}
     environment:
       API_KEY: ${env:SYNC_GAMES_API_KEY, ''}
   api:
     handler: src/interfaces/lambda/handler.handler
+    description: API de guardados en la nube (savecloud) - entorno ${sls:stage, 'dev'}
     timeout: 60
     events:
       - httpApi:

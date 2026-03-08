@@ -72,7 +72,8 @@ Config por defecto: `%APPDATA%/savecloud/config.json` (Windows) o `~/.config/sav
 
 Desde la raíz: `bun run desktop`. Requiere Rust y dependencias de Tauri instaladas.
 
-- **Juegos:** listado, añadir/editar/eliminar, subir a la nube, descargar, “Subir todos” / “Descargar todos” (con operaciones batch y paralelismo). Al eliminar un juego se borra también de la nube (S3). Al editar se puede cambiar el nombre/ID del juego; se actualiza en la app, en el config y en S3 (los guardados se migran al nuevo nombre).
+- **Juegos:** listado, añadir/editar/eliminar, subir a la nube, descargar, “Subir todos” / “Descargar todos” (con operaciones batch y paralelismo). Archivos ≥ 5 MB se suben por **multipart** (pausar, cancelar, reanudar); archivos pequeños en **lotes de hasta 16 PUTs en paralelo** y hasta 500 URLs por petición a la API. El tamaño en la nube se muestra correctamente en GB/TB. Al eliminar un juego se borra también de la nube (S3). Al editar se puede cambiar el nombre/ID del juego; se actualiza en la app, en el config y en S3 (los guardados se migran al nuevo nombre).
+- **Diagnóstico:** en caso de errores de subida, se escribe un log en el directorio de configuración (`sync-debug.log`); el comando `get_sync_debug_log_path` devuelve su ruta para poder abrirlo.
 - **Amigos:** importar por link compartido, ver perfil por User ID, copiar guardados de un amigo.
 - **Configuración:** API URL, User ID, API Key, autostart, notificaciones, respaldo/restauración del config en la nube (con subida automática tras cambios). Gestión de backups locales: elegir cuántos backups mantener por juego (3, 5, 10 o 20) y liberar espacio; la preferencia se guarda en config y se aplica también a la auto-limpieza tras cada descarga.
 - **Historial:** operaciones de sync recientes.
@@ -85,18 +86,23 @@ Desde la raíz: `bun run desktop`. Requiere Rust y dependencias de Tauri instala
 
 ## API
 
-| Método y ruta               | Descripción                                                                                                     |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `GET /health`               | Health check                                                                                                    |
-| `GET /saves`                | Lista guardados del usuario (headers: `x-user-id`, `x-api-key` si aplica)                                       |
-| `POST /saves/upload-url`    | Una URL de subida. Body: `{ "gameId", "filename" }` → `{ "uploadUrl", "key" }`                                  |
-| `POST /saves/upload-urls`   | **Batch:** varias URLs de subida. Body: `{ "items": [{ "gameId", "filename" }, ...] }` → `{ "urls": [...] }`    |
-| `POST /saves/download-url`  | Una URL de descarga. Body: `{ "gameId", "key" }` → `{ "downloadUrl" }`                                          |
-| `POST /saves/download-urls` | **Batch:** varias URLs de descarga. Body: `{ "items": [{ "gameId", "key" }, ...] }` → `{ "urls": [...] }`       |
-| `POST /saves/delete-game`   | Borra todos los guardados del juego en S3. Body: `{ "gameId" }` → 204.                                          |
-| `POST /saves/rename-game`   | Renombra un juego en S3 (copia a nuevo prefijo y borra el antiguo). Body: `{ "oldGameId", "newGameId" }` → 204. |
+| Método y ruta                               | Descripción                                                                                                                                               |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                               | Health check                                                                                                                                              |
+| `GET /saves`                                | Lista guardados del usuario (headers: `x-user-id`, `x-api-key` si aplica)                                                                                 |
+| `POST /saves/upload-url`                    | Una URL de subida. Body: `{ "gameId", "filename" }` → `{ "uploadUrl", "key" }`                                                                            |
+| `POST /saves/upload-urls`                   | **Batch:** varias URLs de subida (máx. 500 ítems por petición). Body: `{ "items": [{ "gameId", "filename" }, ...] }` → `{ "urls": [...] }`                |
+| `POST /saves/download-url`                  | Una URL de descarga. Body: `{ "gameId", "key" }` (opcional `range: { start, end }`) → `{ "downloadUrl" }`                                                 |
+| `POST /saves/download-urls`                 | **Batch:** varias URLs de descarga. Body: `{ "items": [{ "gameId", "key" }, ...] }` → `{ "urls": [...] }`                                                 |
+| `POST /saves/multipart/init`                | Inicia subida multipart (archivos grandes). Body: `{ "gameId", "filename" }` → `{ "uploadId", "key" }`                                                    |
+| `POST /saves/multipart/init-with-part-urls` | Init + todas las URLs de partes en una llamada. Body: `{ "gameId", "filename", "partCount" }` → `{ "uploadId", "key", "partUrls" }` (partCount máx. 2000) |
+| `POST /saves/multipart/part-urls`           | URLs firmadas para partes. Body: `{ "key", "uploadId", "partNumbers": [1,2,...] }` → `{ "partUrls" }`                                                     |
+| `POST /saves/multipart/complete`            | Completa subida multipart. Body: `{ "key", "uploadId", "parts": [{ "partNumber", "etag" }, ...] }` → 204                                                  |
+| `POST /saves/multipart/abort`               | Aborta subida multipart. Body: `{ "key", "uploadId" }` → 204                                                                                              |
+| `POST /saves/delete-game`                   | Borra todos los guardados del juego en S3. Body: `{ "gameId" }` → 204.                                                                                    |
+| `POST /saves/rename-game`                   | Renombra un juego en S3 (copia a nuevo prefijo y borra el antiguo). Body: `{ "oldGameId", "newGameId" }` → 204.                                           |
 
-El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas. La app de escritorio usa los endpoints batch para reducir llamadas e invocaciones Lambda. Eliminar y renombrar requieren que el Lambda tenga permiso `s3:DeleteObject` (incluido en el `serverless.yml`).
+El cliente sube/descarga los archivos directamente a S3 usando las URLs firmadas. La app de escritorio usa los endpoints batch y multipart para reducir llamadas e invocaciones Lambda. `GET /saves` pagina en S3 (más de 1000 objetos); `upload-urls` está limitado a 500 ítems por petición. Eliminar y renombrar requieren que el Lambda tenga permiso `s3:DeleteObject` (incluido en el `serverless.yml`).
 
 ## Probar que los guardados se suben a S3
 
