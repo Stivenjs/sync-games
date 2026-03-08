@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "framer-motion";
-import { Progress } from "@heroui/react";
 import { formatGameDisplayName } from "@utils/gameImage";
 
 export interface SyncProgressState {
@@ -28,12 +27,15 @@ export function SyncProgressBar() {
       loaded: number;
       total: number;
     }>("sync-upload-progress", (ev) => {
-      setSyncProgress({
-        type: "upload",
-        gameId: ev.payload.gameId,
-        filename: ev.payload.filename,
-        loaded: ev.payload.loaded,
-        total: ev.payload.total,
+      setSyncProgress((prev) => {
+        if (prev && prev.type !== "upload") return prev;
+        return {
+          type: "upload",
+          gameId: ev.payload.gameId,
+          filename: ev.payload.filename,
+          loaded: ev.payload.loaded,
+          total: ev.payload.total,
+        };
       });
     });
     const unsubDownload = listen<{
@@ -42,19 +44,22 @@ export function SyncProgressBar() {
       loaded: number;
       total: number;
     }>("sync-download-progress", (ev) => {
-      setSyncProgress({
-        type: "download",
-        gameId: ev.payload.gameId,
-        filename: ev.payload.filename,
-        loaded: ev.payload.loaded,
-        total: ev.payload.total,
+      setSyncProgress((prev) => {
+        if (prev && prev.type !== "download") return prev;
+        return {
+          type: "download",
+          gameId: ev.payload.gameId,
+          filename: ev.payload.filename,
+          loaded: ev.payload.loaded,
+          total: ev.payload.total,
+        };
       });
     });
     const unsubUploadDone = listen("sync-upload-done", () => {
-      setSyncProgress(null);
+      setSyncProgress((prev) => (prev?.type === "upload" ? null : prev));
     });
     const unsubDownloadDone = listen("sync-download-done", () => {
-      setSyncProgress(null);
+      setSyncProgress((prev) => (prev?.type === "download" ? null : prev));
     });
     return () => {
       unsubUpload.then((f) => f());
@@ -116,28 +121,33 @@ export function SyncProgressBar() {
               ? "Progreso de subida"
               : "Progreso de descarga"
           }
+          role="status"
+          aria-valuenow={value}
+          aria-valuemin={0}
+          aria-valuemax={100}
         >
-          <Progress
-            size="sm"
-            color="primary"
-            radius="full"
-            value={value}
-            maxValue={100}
-            label={`${syncProgress.type === "upload" ? "Subiendo" : "Descargando"}: ${formatGameDisplayName(syncProgress.gameId)}`}
-            valueLabel={
-              syncProgress.total > 0
-                ? `${Math.round((syncProgress.loaded / syncProgress.total) * 100)}%`
-                : "—"
-            }
-            showValueLabel
-            classNames={{
-              label: "text-sm font-medium",
-              value: "text-xs text-default-500 tabular-nums",
-            }}
-          />
-          <p className="mt-1.5 truncate text-xs text-default-500">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-foreground">
+              {syncProgress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
+              {formatGameDisplayName(syncProgress.gameId)}
+            </span>
+            <span className="text-xs text-default-500 tabular-nums">
+              {syncProgress.total > 0 ? `${value}%` : "—"}
+            </span>
+          </div>
+          <p className="truncate text-xs text-default-500">
             {syncProgress.filename}
           </p>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
+            <motion.div
+              className="h-full rounded-full bg-primary"
+              initial={false}
+              animate={{
+                width: `${value}%`,
+              }}
+              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
