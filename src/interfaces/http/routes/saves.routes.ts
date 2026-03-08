@@ -6,6 +6,10 @@ import type { GetDownloadUrlsUseCase } from "@application/use-cases/GetDownloadU
 import type { DeleteGameFromCloudUseCase } from "@application/use-cases/DeleteGameFromCloudUseCase";
 import type { RenameGameInCloudUseCase } from "@application/use-cases/RenameGameInCloudUseCase";
 import type { ListSavesUseCase } from "@application/use-cases/ListSavesUseCase";
+import type { CreateMultipartUploadUseCase } from "@application/use-cases/CreateMultipartUploadUseCase";
+import type { GetUploadPartUrlsUseCase } from "@application/use-cases/GetUploadPartUrlsUseCase";
+import type { CompleteMultipartUploadUseCase } from "@application/use-cases/CompleteMultipartUploadUseCase";
+import type { AbortMultipartUploadUseCase } from "@application/use-cases/AbortMultipartUploadUseCase";
 
 const USER_ID_HEADER = "x-user-id";
 
@@ -15,6 +19,21 @@ function getUserId(request: FastifyRequest): string {
     throw new Error("Missing or invalid x-user-id header");
   }
   return userId.trim();
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (
+    err != null &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+  if (err != null && typeof err === "object" && "code" in err)
+    return String((err as { code: unknown }).code);
+  return String(err);
 }
 
 export async function registerSavesRoutes(
@@ -27,6 +46,10 @@ export async function registerSavesRoutes(
     deleteGameFromCloudUseCase: DeleteGameFromCloudUseCase;
     renameGameInCloudUseCase: RenameGameInCloudUseCase;
     listSavesUseCase: ListSavesUseCase;
+    createMultipartUploadUseCase: CreateMultipartUploadUseCase;
+    getUploadPartUrlsUseCase: GetUploadPartUrlsUseCase;
+    completeMultipartUploadUseCase: CompleteMultipartUploadUseCase;
+    abortMultipartUploadUseCase: AbortMultipartUploadUseCase;
   }
 ): Promise<void> {
   app.get("/saves", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -57,32 +80,42 @@ export async function registerSavesRoutes(
   app.post<{
     Body: { items: Array<{ gameId: string; filename: string }> };
   }>("/saves/upload-urls", async (request, reply) => {
-    const userId = getUserId(request);
-    const body = request.body as {
-      items?: Array<{ gameId?: string; filename?: string }>;
-    };
-    const raw = body?.items ?? [];
-    if (!Array.isArray(raw) || raw.length === 0) {
-      return reply.status(400).send({
-        error: "Bad Request",
-        message: "items (non-empty array of { gameId, filename }) is required",
+    try {
+      const userId = getUserId(request);
+      const body = request.body as {
+        items?: Array<{ gameId?: string; filename?: string }>;
+      };
+      const raw = body?.items ?? [];
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return reply.status(400).send({
+          error: "Bad Request",
+          message:
+            "items (non-empty array of { gameId, filename }) is required",
+        });
+      }
+      const items = raw
+        .map((x) =>
+          x?.gameId?.trim() && x?.filename?.trim()
+            ? { gameId: x.gameId.trim(), filename: x.filename.trim() }
+            : null
+        )
+        .filter((x): x is { gameId: string; filename: string } => x !== null);
+      if (items.length === 0) {
+        return reply.status(400).send({
+          error: "Bad Request",
+          message: "Every item must have gameId and filename",
+        });
+      }
+      const result = await deps.getUploadUrlsUseCase.execute({ userId, items });
+      return reply.send(result);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      request.log.error({ err, message }, "upload-urls failed");
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message,
       });
     }
-    const items = raw
-      .map((x) =>
-        x?.gameId?.trim() && x?.filename?.trim()
-          ? { gameId: x.gameId.trim(), filename: x.filename.trim() }
-          : null
-      )
-      .filter((x): x is { gameId: string; filename: string } => x !== null);
-    if (items.length === 0) {
-      return reply.status(400).send({
-        error: "Bad Request",
-        message: "Every item must have gameId and filename",
-      });
-    }
-    const result = await deps.getUploadUrlsUseCase.execute({ userId, items });
-    return reply.send(result);
   });
 
   app.post<{
@@ -117,22 +150,172 @@ export async function registerSavesRoutes(
   });
 
   app.post<{
-    Body: { gameId: string; key: string };
+    Body: {
+      gameId: string;
+      key: string;
+      range?: { start: number; end: number };
+    };
   }>("/saves/download-url", async (request, reply) => {
     const userId = getUserId(request);
-    const { gameId, key } = request.body ?? {};
+    const body = request.body as {
+      gameId?: string;
+      key?: string;
+      range?: { start?: number; end?: number };
+    };
+    const { gameId, key, range } = body ?? {};
     if (!gameId?.trim() || !key?.trim()) {
       return reply.status(400).send({
         error: "Bad Request",
         message: "gameId and key are required",
       });
     }
+    const rangeArg =
+      range != null &&
+      typeof range.start === "number" &&
+      typeof range.end === "number"
+        ? { start: range.start, end: range.end }
+        : undefined;
     const result = await deps.getDownloadUrlUseCase.execute({
       userId,
       gameId: gameId.trim(),
       key: key.trim(),
+      range: rangeArg,
     });
     return reply.send(result);
+  });
+
+  // --- Multipart upload (archivos grandes: pausar, reanudar, cancelar) ---
+
+  app.post<{
+    Body: { gameId: string; filename: string };
+  }>("/saves/multipart/init", async (request, reply) => {
+    const userId = getUserId(request);
+    const { gameId, filename } = request.body ?? {};
+    if (!gameId?.trim() || !filename?.trim()) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "gameId and filename are required",
+      });
+    }
+    const result = await deps.createMultipartUploadUseCase.execute({
+      userId,
+      gameId: gameId.trim(),
+      filename: filename.trim(),
+    });
+    return reply.send(result);
+  });
+
+  app.post<{
+    Body: { key: string; uploadId: string; partNumbers: number[] };
+  }>("/saves/multipart/part-urls", async (request, reply) => {
+    const body = request.body as {
+      key?: string;
+      uploadId?: string;
+      partNumbers?: number[];
+    };
+    const { key, uploadId, partNumbers } = body ?? {};
+    if (!key?.trim() || !uploadId?.trim()) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "key and uploadId are required",
+      });
+    }
+    const numbers = Array.isArray(partNumbers)
+      ? partNumbers.filter((n) => typeof n === "number" && n >= 1 && n <= 10000)
+      : [];
+    if (numbers.length === 0) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "partNumbers must be a non-empty array of integers 1..10000",
+      });
+    }
+    const result = await deps.getUploadPartUrlsUseCase.execute({
+      key: key.trim(),
+      uploadId: uploadId.trim(),
+      partNumbers: numbers,
+    });
+    return reply.send(result);
+  });
+
+  app.post<{
+    Body: {
+      key: string;
+      uploadId: string;
+      parts: Array<{ partNumber: number; etag: string }>;
+    };
+  }>("/saves/multipart/complete", async (request, reply) => {
+    const body = request.body as {
+      key?: string;
+      uploadId?: string;
+      parts?: Array<{ partNumber?: number; etag?: string }>;
+    };
+    const { key, uploadId, parts } = body ?? {};
+    if (!key?.trim() || !uploadId?.trim()) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "key and uploadId are required",
+      });
+    }
+    const partsArray: Array<{ partNumber: number; etag: string }> =
+      Array.isArray(parts)
+        ? parts
+            .filter(
+              (p): p is { partNumber: number; etag: string } =>
+                typeof p?.partNumber === "number" && typeof p?.etag === "string"
+            )
+            .map((p) => ({ partNumber: p.partNumber, etag: p.etag.trim() }))
+        : [];
+    if (partsArray.length === 0) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "parts must be a non-empty array of { partNumber, etag }",
+      });
+    }
+    try {
+      await deps.completeMultipartUploadUseCase.execute({
+        key: key.trim(),
+        uploadId: uploadId.trim(),
+        parts: partsArray,
+      });
+    } catch (err) {
+      request.log.error({ err, key, uploadId }, "multipart/complete failed");
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to complete multipart upload",
+      });
+    }
+    return reply.code(204).send();
+  });
+
+  app.post<{
+    Body: { key: string; uploadId: string };
+  }>("/saves/multipart/abort", async (request, reply) => {
+    const { key, uploadId } = request.body ?? {};
+    if (!key?.trim() || !uploadId?.trim()) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "key and uploadId are required",
+      });
+    }
+    try {
+      await deps.abortMultipartUploadUseCase.execute({
+        key: (key as string).trim(),
+        uploadId: (uploadId as string).trim(),
+      });
+    } catch (err) {
+      request.log.error({ err, key, uploadId }, "multipart/abort failed");
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to abort multipart upload",
+      });
+    }
+    return reply.code(204).send();
   });
 
   app.post<{

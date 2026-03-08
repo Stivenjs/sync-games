@@ -278,6 +278,37 @@ export async function syncUploadAllGames(): Promise<GameSyncResult[]> {
   }));
 }
 
+/** Solicita cancelar la subida en curso (solo tiene efecto en subidas multipart entre partes). */
+export function requestUploadCancel(): Promise<void> {
+  return invoke("request_upload_cancel");
+}
+
+/** Solicita pausar la subida en curso. El estado se guarda y se puede reanudar con syncUploadResume. */
+export function requestUploadPause(): Promise<void> {
+  return invoke("request_upload_pause");
+}
+
+export interface PausedUploadInfo {
+  gameId: string;
+  filename: string;
+}
+
+/** Devuelve la info de la subida pausada, si existe (para mostrar "Reanudar" en la UI). */
+export function getPausedUploadInfo(): Promise<PausedUploadInfo | null> {
+  return invoke<PausedUploadInfo | null>("get_paused_upload_info");
+}
+
+/** Reanuda la subida multipart guardada tras pausar. */
+export function syncUploadResume(): Promise<SyncResult> {
+  return invoke<{ okCount: number; errCount: number; errors: string[] }>(
+    "sync_upload_resume"
+  ).then((r) => ({
+    okCount: r.okCount,
+    errCount: r.errCount,
+    errors: r.errors,
+  }));
+}
+
 /** Copia los guardados de un amigo para un juego concreto a tu cuenta */
 export async function copyFriendSaves(
   friendUserId: string,

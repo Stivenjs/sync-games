@@ -6,11 +6,12 @@ use std::io::Read;
 
 use super::api;
 use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
+use super::multipart_upload;
 use super::path_utils;
 use crate::tray_state::TrayState;
 use bytes::Bytes;
 use futures_util::stream::{self, Stream, StreamExt};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc;
 
 /// Emitir progreso cada N bytes para no saturar el frontend.
@@ -99,6 +100,56 @@ fn file_stream_with_progress(
     Ok(FileProgressStream { rx })
 }
 
+/// Solicita cancelar la subida en curso (solo tiene efecto en subidas multipart entre partes).
+#[tauri::command]
+pub fn request_upload_cancel(tray_state: State<'_, TrayState>) {
+    tray_state.0.request_upload_cancel();
+}
+
+/// Solicita pausar la subida en curso. Se guarda el estado en disco y se puede reanudar con sync_upload_resume.
+#[tauri::command]
+pub fn request_upload_pause(tray_state: State<'_, TrayState>) {
+    tray_state.0.request_upload_pause();
+}
+
+/// Devuelve la info de la subida pausada, si existe (para mostrar "Reanudar" en la UI).
+#[tauri::command]
+pub fn get_paused_upload_info() -> Option<PausedUploadInfoDto> {
+    multipart_upload::load_paused_state().map(|s| PausedUploadInfoDto {
+        game_id: s.game_id,
+        filename: s.filename,
+    })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PausedUploadInfoDto {
+    pub game_id: String,
+    pub filename: String,
+}
+
+/// Reanuda la subida multipart guardada (tras pausar). Solo hay una subida pausada a la vez.
+#[tauri::command]
+pub async fn sync_upload_resume(app: AppHandle) -> Result<SyncResultDto, String> {
+    let tray_state = app.state::<TrayState>();
+    tray_state.0.reset_upload_cancel();
+    tray_state.0.reset_upload_pause();
+    tray_state.0.syncing_inc();
+    tray_state.0.update_tooltip();
+
+    let result = multipart_upload::resume_paused_upload(app.clone()).await;
+
+    tray_state.0.syncing_dec();
+    tray_state.0.clone().refresh_unsynced_async();
+    let _ = app.emit("sync-upload-done", ());
+
+    result.map(|()| SyncResultDto {
+        ok_count: 1,
+        err_count: 0,
+        errors: vec![],
+    })
+}
+
 #[tauri::command]
 pub async fn sync_upload_game(
     game_id: String,
@@ -108,7 +159,9 @@ pub async fn sync_upload_game(
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    let result = sync_upload_game_impl(game_id, app.clone()).await;
+    tray_state.0.reset_upload_cancel();
+    tray_state.0.reset_upload_pause();
+    let result = sync_upload_game_impl(game_id, app.clone(), Some(tray_state.0.clone())).await;
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
@@ -120,6 +173,7 @@ pub async fn sync_upload_game(
 pub(crate) async fn sync_upload_game_impl(
     game_id: String,
     app: AppHandle,
+    tray_inner: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
 ) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
@@ -156,53 +210,114 @@ pub(crate) async fn sync_upload_game_impl(
         });
     }
 
-    let filenames: Vec<String> = files.iter().map(|(_, r)| r.clone()).collect();
-    let upload_urls = api::get_upload_urls(api_base, user_id, api_key, &game_id, &filenames)
-        .await
-        .map_err(|e| format!("upload-urls: {}", e))?;
-    if upload_urls.len() != files.len() {
-        return Err(format!(
-            "API devolvió {} URLs para {} archivos",
-            upload_urls.len(),
-            files.len()
-        ));
-    }
+    // Archivos grandes (>= umbral) se suben por multipart (pausable/cancelable).
+    let files_with_size: Vec<((String, String), u64)> = files
+        .iter()
+        .map(|(abs, rel)| {
+            let size = fs::metadata(abs)
+                .map_err(|e| format!("{}: {}", rel, e))
+                .map(|m| m.len())?;
+            Ok(((abs.clone(), rel.clone()), size))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
-    let client = reqwest::Client::builder()
-        .user_agent("sync-games-desktop/1.0")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let (multipart_files, simple_files): (Vec<_>, Vec<_>) = files_with_size
+        .into_iter()
+        .partition(|(_, size)| *size >= multipart_upload::MULTIPART_THRESHOLD);
 
     let mut ok_count = 0u32;
     let mut err_count = 0u32;
     let mut errors = Vec::new();
 
-    for ((absolute, relative), (upload_url, _)) in files.into_iter().zip(upload_urls) {
-        let total = fs::metadata(&absolute)
-            .map_err(|e| format!("{}: {}", relative, e))?
-            .len();
-        let body_stream = file_stream_with_progress(
-            std::path::Path::new(absolute.as_str()),
+    // Subida multipart para archivos grandes.
+    for ((absolute, relative), total) in multipart_files {
+        if let Some(ref t) = tray_inner {
+            if t.upload_pause_requested() {
+                break;
+            }
+        }
+        let cancel = tray_inner.clone();
+        match multipart_upload::upload_one_file_multipart(
+            std::path::Path::new(&absolute),
+            &relative,
             total,
+            &game_id,
+            api_base,
+            user_id,
+            api_key,
             app.clone(),
-            game_id.clone(),
-            relative.clone(),
-        )?;
-        let body = reqwest::Body::wrap_stream(body_stream);
-        let put_res = client
-            .put(&upload_url)
-            .body(body)
-            .header("Content-Type", "application/octet-stream")
-            .header("Content-Length", total.to_string())
-            .send()
-            .await
-            .map_err(|e| format!("{}: {}", relative, e))?;
+            cancel,
+        )
+        .await
+        {
+            Ok(()) => ok_count += 1,
+            Err(e) => {
+                if e == multipart_upload::PAUSED_ERR_MSG {
+                    let _ = app.emit(
+                        "sync-upload-paused",
+                        serde_json::json!({
+                            "gameId": game_id,
+                            "filename": relative,
+                        }),
+                    );
+                } else {
+                    errors.push(format!("{}: {}", relative, e));
+                    err_count += 1;
+                }
+            }
+        }
+    }
 
-        if !put_res.status().is_success() {
-            errors.push(format!("{}: S3 PUT {}", relative, put_res.status()));
-            err_count += 1;
-        } else {
-            ok_count += 1;
+    // Subida PUT simple para archivos pequeños (y URLs batch).
+    if !simple_files.is_empty() {
+        let filenames: Vec<String> = simple_files.iter().map(|((_, r), _)| r.clone()).collect();
+        let upload_urls = api::get_upload_urls(api_base, user_id, api_key, &game_id, &filenames)
+            .await
+            .map_err(|e| format!("upload-urls: {}", e))?;
+        if upload_urls.len() != simple_files.len() {
+            return Err(format!(
+                "API devolvió {} URLs para {} archivos",
+                upload_urls.len(),
+                simple_files.len()
+            ));
+        }
+
+        let client = reqwest::Client::builder()
+            .user_agent("sync-games-desktop/1.0")
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        for (((absolute, relative), total), (upload_url, _)) in
+            simple_files.into_iter().zip(upload_urls)
+        {
+            if let Some(ref t) = tray_inner {
+                if t.upload_pause_requested() || t.upload_cancel_requested() {
+                    break;
+                }
+            }
+            let body_stream = file_stream_with_progress(
+                std::path::Path::new(absolute.as_str()),
+                total,
+                app.clone(),
+                game_id.clone(),
+                relative.clone(),
+            )?;
+            let body = reqwest::Body::wrap_stream(body_stream);
+            let put_res = client
+                .put(&upload_url)
+                .body(body)
+                .header("Content-Type", "application/octet-stream")
+                .header("Content-Length", total.to_string())
+                .send()
+                .await
+                .map_err(|e| format!("{}: {}", relative, e))?;
+
+            if !put_res.status().is_success() {
+                errors.push(format!("{}: S3 PUT {}", relative, put_res.status()));
+                err_count += 1;
+            } else {
+                ok_count += 1;
+            }
         }
     }
 
@@ -241,6 +356,8 @@ pub async fn sync_upload_all_games(
         .ok_or("Configura userId en Configuración")?;
 
     tray_state.0.syncing_inc();
+    tray_state.0.reset_upload_cancel();
+    tray_state.0.reset_upload_pause();
     tray_state.0.update_tooltip();
 
     let mut results_by_id: HashMap<String, GameSyncResultDto> = HashMap::new();
@@ -271,11 +388,13 @@ pub async fn sync_upload_all_games(
         .map(|g| g.id.clone())
         .collect();
 
+    let tray_inner = Some(tray_state.0.clone());
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_sync)
         .map(|game_id| {
             let app = app.clone();
+            let inner = tray_inner.clone();
             async move {
-                let r = sync_upload_game_impl(game_id.clone(), app).await;
+                let r = sync_upload_game_impl(game_id.clone(), app, inner).await;
                 (game_id, r)
             }
         })

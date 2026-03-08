@@ -138,6 +138,8 @@ pub(super) static EXCLUDED_FOLDER_NAMES: LazyLock<HashSet<&'static str>> = LazyL
         "default",
         // Carpetas de sistema Windows / desarrollo (no juegos)
         "$windows.~ws",
+        "$SysReset",
+        "Windows.old",
         "msys64",
         "publishers",
     ]

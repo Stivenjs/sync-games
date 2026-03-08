@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getPausedUploadInfo } from "@services/tauri";
 
 export interface SyncProgressState {
   type: "upload" | "download";
@@ -25,13 +26,24 @@ export interface SyncOperation {
   gameId: string | null;
 }
 
+export interface PausedUploadInfo {
+  gameId: string;
+  filename: string;
+}
+
 type SyncProgressContextValue = {
   /** Operación en curso: single (un juego) o batch (todos). null cuando no hay. */
   syncOperation: SyncOperation | null;
   /** Progreso actual (archivo actual, loaded/total). */
   progress: SyncProgressState | null;
+  /** Si hay una subida pausada (para mostrar "Reanudar"). */
+  pausedUploadInfo: PausedUploadInfo | null;
   /** Llamar al iniciar una subida/descarga: single con gameId o batch con gameId null. */
   setSyncOperation: (op: SyncOperation | null) => void;
+  /** Refresca si hay subida pausada (p. ej. al montar). */
+  refreshPausedUploadInfo: () => Promise<void>;
+  /** Limpia la info de subida pausada (tras reanudar con éxito). */
+  clearPausedUploadInfo: () => void;
 };
 
 const SyncProgressContext = createContext<SyncProgressContextValue | null>(
@@ -45,11 +57,22 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
   const [syncOperation, setSyncOperationState] =
     useState<SyncOperation | null>(null);
   const [progress, setProgress] = useState<SyncProgressState | null>(null);
+  const [pausedUploadInfo, setPausedUploadInfo] =
+    useState<PausedUploadInfo | null>(null);
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setSyncOperation = useCallback((op: SyncOperation | null) => {
     setSyncOperationState(op);
     if (!op) setProgress(null);
+  }, []);
+
+  const refreshPausedUploadInfo = useCallback(async () => {
+    const info = await getPausedUploadInfo();
+    setPausedUploadInfo(info);
+  }, []);
+
+  const clearPausedUploadInfo = useCallback(() => {
+    setPausedUploadInfo(null);
   }, []);
 
   useEffect(() => {
@@ -91,6 +114,17 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       setProgress((prev) => (prev?.type === "upload" ? null : prev));
       setSyncOperationState(null);
     });
+    const unsubUploadPaused = listen<{ gameId: string; filename: string }>(
+      "sync-upload-paused",
+      (ev) => {
+        setProgress((prev) => (prev?.type === "upload" ? null : prev));
+        setSyncOperationState(null);
+        setPausedUploadInfo({
+          gameId: ev.payload.gameId,
+          filename: ev.payload.filename,
+        });
+      }
+    );
     const unsubDownloadDone = listen("sync-download-done", () => {
       setProgress((prev) => (prev?.type === "download" ? null : prev));
       setSyncOperationState(null);
@@ -100,8 +134,13 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       unsubDownload.then((f) => f());
       unsubUploadDone.then((f) => f());
       unsubDownloadDone.then((f) => f());
+      unsubUploadPaused.then((f) => f());
     };
   }, []);
+
+  useEffect(() => {
+    refreshPausedUploadInfo();
+  }, [refreshPausedUploadInfo]);
 
   useEffect(() => {
     if (!progress || progress.total <= 0) {
@@ -133,7 +172,10 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
   const value: SyncProgressContextValue = {
     syncOperation,
     progress,
+    pausedUploadInfo,
     setSyncOperation,
+    refreshPausedUploadInfo,
+    clearPausedUploadInfo,
   };
 
   return (

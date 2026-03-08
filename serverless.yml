@@ -30,6 +30,10 @@ provider:
             - s3:PutObject
             - s3:DeleteObject
             - s3:ListBucket
+            - s3:CreateMultipartUpload
+            - s3:AbortMultipartUpload
+            - s3:CompleteMultipartUpload
+            - s3:ListMultipartUploadParts
           Resource:
             - Fn::Sub: "arn:aws:s3:::${SavesBucket}"
             - Fn::Sub: "arn:aws:s3:::${SavesBucket}/*"
@@ -47,6 +51,7 @@ functions:
       API_KEY: ${env:SYNC_GAMES_API_KEY, ''}
   api:
     handler: src/interfaces/lambda/handler.handler
+    timeout: 60
     events:
       - httpApi:
           path: /{proxy+}

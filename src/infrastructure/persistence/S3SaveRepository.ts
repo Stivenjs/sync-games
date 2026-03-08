@@ -1,17 +1,24 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
   CopyObjectCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { GameSave } from "@domain/entities/GameSave";
 import type {
+  CompletedPart,
+  CreateMultipartUploadResult,
   DownloadUrlItem,
   DownloadUrlResult,
   SaveRepository,
+  UploadPartUrl,
   UploadUrlItem,
   UploadUrlResult,
 } from "@domain/ports/SaveRepository";
@@ -46,11 +53,15 @@ export class S3SaveRepository implements SaveRepository {
   async getDownloadUrl(
     _userId: string,
     _gameId: string,
-    key: string
+    key: string,
+    range?: { start: number; end: number }
   ): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
+      ...(range != null && {
+        Range: `bytes=${range.start}-${range.end}`,
+      }),
     });
     return getSignedUrl(this.s3, command, {
       expiresIn: PRESIGN_EXPIRES_IN_SECONDS,
@@ -62,6 +73,9 @@ export class S3SaveRepository implements SaveRepository {
     items: UploadUrlItem[]
   ): Promise<UploadUrlResult[]> {
     if (items.length === 0) return [];
+    if (!this.bucketName || !this.bucketName.trim()) {
+      throw new Error("BUCKET_NAME no está configurado en el servidor");
+    }
     const options = { expiresIn: PRESIGN_EXPIRES_IN_SECONDS };
     const results = await Promise.all(
       items.map(async ({ gameId, filename }) => {
@@ -94,6 +108,70 @@ export class S3SaveRepository implements SaveRepository {
       })
     );
     return results;
+  }
+
+  async createMultipartUpload(
+    userId: string,
+    gameId: string,
+    filename: string
+  ): Promise<CreateMultipartUploadResult> {
+    const key = `${userId}/${gameId}/${filename}`;
+    const command = new CreateMultipartUploadCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    const { UploadId } = await this.s3.send(command);
+    if (!UploadId) throw new Error("S3 did not return UploadId");
+    return { uploadId: UploadId, key };
+  }
+
+  async getUploadPartUrls(
+    key: string,
+    uploadId: string,
+    partNumbers: number[]
+  ): Promise<UploadPartUrl[]> {
+    const options = { expiresIn: PRESIGN_EXPIRES_IN_SECONDS };
+    const partUrls = await Promise.all(
+      partNumbers.map(async (partNumber) => {
+        const command = new UploadPartCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+        });
+        const url = await getSignedUrl(this.s3, command, options);
+        return { partNumber, url };
+      })
+    );
+    return partUrls;
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: CompletedPart[]
+  ): Promise<void> {
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: parts
+          .slice()
+          .sort((a, b) => a.partNumber - b.partNumber)
+          .map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })),
+      },
+    });
+    await this.s3.send(command);
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    const command = new AbortMultipartUploadCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      UploadId: uploadId,
+    });
+    await this.s3.send(command);
   }
 
   async listByUser(userId: string): Promise<GameSave[]> {

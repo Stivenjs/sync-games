@@ -23,6 +23,24 @@ export interface DownloadUrlResult {
   key: string;
 }
 
+/** Resultado de iniciar una subida multipart (archivos grandes, pausable/cancelable). */
+export interface CreateMultipartUploadResult {
+  uploadId: string;
+  key: string;
+}
+
+/** Par de número de parte y URL firmada para subir esa parte. */
+export interface UploadPartUrl {
+  partNumber: number;
+  url: string;
+}
+
+/** Parte completada (ETag devuelto por S3 al subir la parte). */
+export interface CompletedPart {
+  partNumber: number;
+  etag: string;
+}
+
 /**
  * Puerto (interface) para persistencia de guardados.
  * La capa de aplicación depende de este contrato; la implementación vive en infrastructure.
@@ -33,7 +51,12 @@ export interface SaveRepository {
     gameId: string,
     filename: string
   ): Promise<string>;
-  getDownloadUrl(userId: string, gameId: string, key: string): Promise<string>;
+  getDownloadUrl(
+    userId: string,
+    gameId: string,
+    key: string,
+    range?: { start: number; end: number }
+  ): Promise<string>;
   /** Varias URLs de subida en una sola llamada (menos round-trips y una sola invocación Lambda). */
   getUploadUrls(
     userId: string,
@@ -53,4 +76,26 @@ export interface SaveRepository {
     oldGameId: string,
     newGameId: string
   ): Promise<void>;
+
+  // --- Multipart upload (archivos grandes, pausar/cancelar) ---
+  /** Inicia una subida multipart; devuelve uploadId y key para las siguientes llamadas. */
+  createMultipartUpload(
+    userId: string,
+    gameId: string,
+    filename: string
+  ): Promise<CreateMultipartUploadResult>;
+  /** URLs firmadas para subir cada parte (partNumbers 1-based). El cliente hace PUT a cada URL. */
+  getUploadPartUrls(
+    key: string,
+    uploadId: string,
+    partNumbers: number[]
+  ): Promise<UploadPartUrl[]>;
+  /** Completa la subida multipart con los ETags devueltos por S3 al subir cada parte. */
+  completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: CompletedPart[]
+  ): Promise<void>;
+  /** Cancela la subida multipart y libera recursos en S3. */
+  abortMultipartUpload(key: string, uploadId: string): Promise<void>;
 }

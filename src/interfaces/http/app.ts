@@ -9,6 +9,10 @@ import { GetDownloadUrlsUseCase } from "@application/use-cases/GetDownloadUrlsUs
 import { DeleteGameFromCloudUseCase } from "@application/use-cases/DeleteGameFromCloudUseCase";
 import { RenameGameInCloudUseCase } from "@application/use-cases/RenameGameInCloudUseCase";
 import { ListSavesUseCase } from "@application/use-cases/ListSavesUseCase";
+import { CreateMultipartUploadUseCase } from "@application/use-cases/CreateMultipartUploadUseCase";
+import { GetUploadPartUrlsUseCase } from "@application/use-cases/GetUploadPartUrlsUseCase";
+import { CompleteMultipartUploadUseCase } from "@application/use-cases/CompleteMultipartUploadUseCase";
+import { AbortMultipartUploadUseCase } from "@application/use-cases/AbortMultipartUploadUseCase";
 import { registerSavesRoutes } from "@interfaces/http/routes/saves.routes";
 import { registerShareRoutes } from "@interfaces/http/routes/share.routes";
 
@@ -55,6 +59,18 @@ export async function buildApp(
     deps.saveRepository
   );
   const listSavesUseCase = new ListSavesUseCase(deps.saveRepository);
+  const createMultipartUploadUseCase = new CreateMultipartUploadUseCase(
+    deps.saveRepository
+  );
+  const getUploadPartUrlsUseCase = new GetUploadPartUrlsUseCase(
+    deps.saveRepository
+  );
+  const completeMultipartUploadUseCase = new CompleteMultipartUploadUseCase(
+    deps.saveRepository
+  );
+  const abortMultipartUploadUseCase = new AbortMultipartUploadUseCase(
+    deps.saveRepository
+  );
 
   await registerSavesRoutes(app, {
     getUploadUrlUseCase,
@@ -64,6 +80,10 @@ export async function buildApp(
     deleteGameFromCloudUseCase,
     renameGameInCloudUseCase,
     listSavesUseCase,
+    createMultipartUploadUseCase,
+    getUploadPartUrlsUseCase,
+    completeMultipartUploadUseCase,
+    abortMultipartUploadUseCase,
   });
 
   if (deps.shareTokenStore) {
