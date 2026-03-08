@@ -454,10 +454,12 @@ async fn copy_friend_saves_with_plan_impl(
             }
         };
 
+        let content_length = bytes.len();
         let put_res = match client
             .put(upload_url)
             .body(bytes)
             .header("Content-Type", "application/octet-stream")
+            .header("Content-Length", content_length.to_string())
             .send()
             .await
         {

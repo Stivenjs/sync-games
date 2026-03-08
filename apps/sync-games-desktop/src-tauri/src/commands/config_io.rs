@@ -148,10 +148,12 @@ pub async fn backup_config_to_cloud() -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
+    let content_length = bytes.len();
     let put_res = client
         .put(upload_url)
         .body(bytes)
         .header("Content-Type", "application/json")
+        .header("Content-Length", content_length.to_string())
         .send()
         .await
         .map_err(|e| e.to_string())?;

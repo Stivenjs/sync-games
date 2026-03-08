@@ -85,10 +85,12 @@ pub(crate) async fn sync_upload_game_impl(game_id: String) -> Result<SyncResultD
 
     for ((absolute, relative), (upload_url, _)) in files.into_iter().zip(upload_urls) {
         let bytes = fs::read(&absolute).map_err(|e| format!("{}: {}", relative, e))?;
+        let content_length = bytes.len();
         let put_res = client
             .put(&upload_url)
             .body(bytes)
             .header("Content-Type", "application/octet-stream")
+            .header("Content-Length", content_length.to_string())
             .send()
             .await
             .map_err(|e| format!("{}: {}", relative, e))?;
