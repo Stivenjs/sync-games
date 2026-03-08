@@ -1,6 +1,8 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Button,
+  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -8,9 +10,10 @@ import {
   ModalHeader,
   Spinner,
 } from "@heroui/react";
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus, Search } from "lucide-react";
 import { scanPathCandidates } from "@services/tauri";
 import type { PathCandidate } from "@services/tauri";
+import { useDebouncedValue } from "@hooks/useDebouncedValue";
 import { useResolvedCandidateNames } from "@hooks/useResolvedCandidateNames";
 import { extractAppIdFromFolderName, toGameId } from "@utils/gameImage";
 
@@ -30,7 +33,8 @@ function CandidateRow({
   onAdd: () => void;
 }) {
   const hasAppId =
-    !!candidate.steamAppId || !!extractAppIdFromFolderName(candidate.folderName ?? "");
+    !!candidate.steamAppId ||
+    !!extractAppIdFromFolderName(candidate.folderName ?? "");
   const displayName =
     hasAppId && resolvedName ? resolvedName : candidate.folderName;
   const isLoading = hasAppId && resolvedName === undefined;
@@ -78,12 +82,38 @@ export function ScanModal({
   });
 
   const resolvedNames = useResolvedCandidateNames(candidates);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(
+    searchQuery.trim().toLowerCase(),
+    300
+  );
+
+  const filteredCandidates = useMemo(() => {
+    if (!candidates?.length) return [];
+    if (!debouncedSearch) return candidates;
+    return candidates.filter((c) => {
+      const resolvedName = resolvedNames[c.path];
+      const hasAppId =
+        !!c.steamAppId || !!extractAppIdFromFolderName(c.folderName ?? "");
+      const displayName =
+        hasAppId && resolvedName ? resolvedName : c.folderName ?? "";
+      const searchIn = [
+        displayName,
+        c.folderName ?? "",
+        c.path,
+        c.basePath ?? "",
+      ].join(" ");
+      return searchIn.toLowerCase().includes(debouncedSearch);
+    });
+  }, [candidates, debouncedSearch, resolvedNames]);
 
   const handleAdd = (candidate: PathCandidate) => {
     const resolvedName = resolvedNames[candidate.path];
     const baseName = resolvedName?.trim() || candidate.folderName;
     const gameId = toGameId(baseName);
-    const pathsToAdd = candidate.paths?.length ? candidate.paths : [candidate.path];
+    const pathsToAdd = candidate.paths?.length
+      ? candidate.paths
+      : [candidate.path];
     onSelectCandidate(pathsToAdd, gameId);
     onClose();
   };
@@ -108,16 +138,32 @@ export function ScanModal({
               </p>
             </div>
           ) : candidates && candidates.length > 0 ? (
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-2">
-              {candidates.map((c) => (
-                <CandidateRow
-                  key={c.path}
-                  candidate={c}
-                  resolvedName={resolvedNames[c.path]}
-                  onAdd={() => handleAdd(c)}
-                />
-              ))}
-            </div>
+            <>
+              <Input
+                aria-label="Buscar en los resultados"
+                classNames={{ inputWrapper: "bg-default-100" }}
+                placeholder="Buscar en los resultados..."
+                startContent={<Search size={18} className="text-default-400" />}
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-2">
+                {filteredCandidates.length > 0 ? (
+                  filteredCandidates.map((c) => (
+                    <CandidateRow
+                      key={c.path}
+                      candidate={c}
+                      resolvedName={resolvedNames[c.path]}
+                      onAdd={() => handleAdd(c)}
+                    />
+                  ))
+                ) : (
+                  <p className="py-6 text-center text-sm text-default-500">
+                    No hay coincidencias para &quot;{searchQuery}&quot;
+                  </p>
+                )}
+              </div>
+            </>
           ) : (
             <div className="flex flex-col items-center gap-4 py-12 text-center">
               <FolderOpen size={48} className="text-default-400" />
