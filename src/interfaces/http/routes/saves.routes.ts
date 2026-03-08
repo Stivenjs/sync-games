@@ -79,6 +79,8 @@ export async function registerSavesRoutes(
     return reply.send(result);
   });
 
+  const UPLOAD_URLS_MAX_ITEMS = 500;
+
   app.post<{
     Body: { items: Array<{ gameId: string; filename: string }> };
   }>("/saves/upload-urls", async (request, reply) => {
@@ -106,6 +108,12 @@ export async function registerSavesRoutes(
         return reply.status(400).send({
           error: "Bad Request",
           message: "Every item must have gameId and filename",
+        });
+      }
+      if (items.length > UPLOAD_URLS_MAX_ITEMS) {
+        return reply.status(400).send({
+          error: "Bad Request",
+          message: `Maximum ${UPLOAD_URLS_MAX_ITEMS} items per request. The client should split into batches.`,
         });
       }
       const result = await deps.getUploadUrlsUseCase.execute({ userId, items });

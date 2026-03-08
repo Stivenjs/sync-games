@@ -69,6 +69,7 @@ pub fn run() {
             commands::get_game_stats,
             commands::sync::check_game_running,
             commands::sync::check_games_running,
+            commands::sync::get_sync_debug_log_path,
             commands::open_save_folder,
             commands::export_config_to_file,
             commands::import_config_from_file,

@@ -13,6 +13,7 @@ use std::path::Path;
 
 use super::api;
 use super::models::SyncProgressPayload;
+use super::sync_logger;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 
@@ -185,6 +186,7 @@ async fn multipart_init(
     if !res.status().is_success() {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
+        sync_logger::log_api("multipart/init", "/multipart/init", status.as_u16(), &text);
         return Err(format!("API multipart/init: {} {}", status, text));
     }
 
@@ -225,6 +227,12 @@ async fn multipart_init_with_part_urls(
     if !res.status().is_success() {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
+        sync_logger::log_api(
+            "multipart/init-with-part-urls",
+            "/multipart/init-with-part-urls",
+            status.as_u16(),
+            &text,
+        );
         return Err(format!(
             "API multipart/init-with-part-urls: {} {}",
             status, text
@@ -275,6 +283,7 @@ async fn multipart_part_urls(
     if !res.status().is_success() {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
+        sync_logger::log_api("multipart/part-urls", "/multipart/part-urls", status.as_u16(), &text);
         return Err(format!("API multipart/part-urls: {} {}", status, text));
     }
 
@@ -356,6 +365,7 @@ async fn multipart_complete(
     if !res.status().is_success() && res.status().as_u16() != 204 {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
+        sync_logger::log_api("multipart/complete", "/multipart/complete", status.as_u16(), &text);
         return Err(format!("API multipart/complete: {} {}", status, text));
     }
     Ok(())
@@ -383,6 +393,7 @@ async fn multipart_abort(
     if !res.status().is_success() && res.status().as_u16() != 204 {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
+        sync_logger::log_api("multipart/abort", "/multipart/abort", status.as_u16(), &text);
         return Err(format!("API multipart/abort: {} {}", status, text));
     }
     Ok(())
@@ -402,6 +413,13 @@ pub(crate) async fn upload_one_file_multipart(
     app: tauri::AppHandle,
     cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
+    let ctx = sync_logger::upload_context(
+        game_id,
+        relative_filename,
+        &absolute_path.to_string_lossy(),
+    );
+    sync_logger::log_operation("upload_multipart_start", &ctx);
+
     let num_parts = if total_size == 0 {
         0u32
     } else {

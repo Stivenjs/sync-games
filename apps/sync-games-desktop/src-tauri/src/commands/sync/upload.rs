@@ -261,6 +261,11 @@ pub(crate) async fn sync_upload_game_impl(
                         }),
                     );
                 } else {
+                    super::sync_logger::log_error(
+                        "upload_multipart",
+                        &super::sync_logger::upload_context(&game_id, &relative, &absolute),
+                        &e,
+                    );
                     errors.push(format!("{}: {}", relative, e));
                     err_count += 1;
                 }
@@ -268,12 +273,28 @@ pub(crate) async fn sync_upload_game_impl(
         }
     }
 
-    // Subida PUT simple para archivos pequeños (y URLs batch).
+    // Subida PUT simple para archivos pequeños. Pedir URLs por lotes (máx 500 por petición) para no saturar Lambda.
+    const UPLOAD_URLS_BATCH_SIZE: usize = 500;
     if !simple_files.is_empty() {
+        super::sync_logger::log_operation(
+            "upload_simple_batch",
+            &format!("gameId={} file_count={}", game_id, simple_files.len()),
+        );
         let filenames: Vec<String> = simple_files.iter().map(|((_, r), _)| r.clone()).collect();
-        let upload_urls = api::get_upload_urls(api_base, user_id, api_key, &game_id, &filenames)
-            .await
-            .map_err(|e| format!("upload-urls: {}", e))?;
+        let mut upload_urls = Vec::with_capacity(filenames.len());
+        for chunk in filenames.chunks(UPLOAD_URLS_BATCH_SIZE) {
+            let batch = api::get_upload_urls(api_base, user_id, api_key, &game_id, chunk)
+                .await
+                .map_err(|e| {
+                    super::sync_logger::log_error(
+                        "upload_urls",
+                        &format!("gameId={}", game_id),
+                        &e,
+                    );
+                    format!("upload-urls: {}", e)
+                })?;
+            upload_urls.extend(batch);
+        }
         if upload_urls.len() != simple_files.len() {
             return Err(format!(
                 "API devolvió {} URLs para {} archivos",
@@ -282,11 +303,23 @@ pub(crate) async fn sync_upload_game_impl(
             ));
         }
 
+        let total_simple = upload_urls.len();
+        super::sync_logger::log_operation(
+            "upload_simple_urls_ok",
+            &format!(
+                "gameId={} total={} batches={}",
+                game_id,
+                total_simple,
+                (total_simple + UPLOAD_URLS_BATCH_SIZE - 1) / UPLOAD_URLS_BATCH_SIZE
+            ),
+        );
+
         let client = reqwest::Client::builder()
             .user_agent("sync-games-desktop/1.0")
             .build()
             .map_err(|e| e.to_string())?;
 
+        let mut put_count: usize = 0;
         for (((absolute, relative), total), (upload_url, _)) in
             simple_files.into_iter().zip(upload_urls)
         {
@@ -294,6 +327,13 @@ pub(crate) async fn sync_upload_game_impl(
                 if t.upload_pause_requested() || t.upload_cancel_requested() {
                     break;
                 }
+            }
+            put_count += 1;
+            if put_count % 500 == 0 {
+                super::sync_logger::log_operation(
+                    "upload_simple_progress",
+                    &format!("gameId={} done={}/{}", game_id, put_count, total_simple),
+                );
             }
             let body_stream = file_stream_with_progress(
                 std::path::Path::new(absolute.as_str()),
@@ -313,12 +353,27 @@ pub(crate) async fn sync_upload_game_impl(
                 .map_err(|e| format!("{}: {}", relative, e))?;
 
             if !put_res.status().is_success() {
-                errors.push(format!("{}: S3 PUT {}", relative, put_res.status()));
+                let err_msg = format!("{}: S3 PUT {}", relative, put_res.status());
+                super::sync_logger::log_error(
+                    "upload_put",
+                    &super::sync_logger::upload_context(
+                        game_id.as_str(),
+                        relative.as_str(),
+                        absolute.as_str(),
+                    ),
+                    &err_msg,
+                );
+                errors.push(err_msg);
                 err_count += 1;
             } else {
                 ok_count += 1;
             }
         }
+
+        super::sync_logger::log_operation(
+            "upload_simple_done",
+            &format!("gameId={} files={}", game_id, total_simple),
+        );
     }
 
     let result = SyncResultDto {

@@ -12,10 +12,11 @@
 pub(crate) mod api;
 pub(crate) mod backup;
 pub(crate) mod download;
-pub(crate) mod multipart_upload;
 mod models;
+pub(crate) mod multipart_upload;
 mod path_utils;
 pub(crate) mod preview;
+pub(crate) mod sync_logger;
 pub(crate) mod upload;
 
 use models::SaveFileDto;
@@ -57,4 +58,11 @@ pub fn check_game_running(game_id: String) -> bool {
 #[tauri::command]
 pub fn check_games_running(game_ids: Vec<String>) -> std::collections::HashMap<String, bool> {
     crate::process_check::are_games_running(&game_ids)
+}
+
+/// Ruta del archivo de log de diagnóstico de sincronización (sync-debug.log).
+/// Útil para abrirlo cuando hay errores 500 u otros fallos y ver qué ocurrió.
+#[tauri::command]
+pub fn get_sync_debug_log_path() -> Option<String> {
+    sync_logger::log_file_path()
 }
