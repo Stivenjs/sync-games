@@ -1,5 +1,5 @@
 /**
- * Formatea bytes a string legible (KB, MB, GB).
+ * Formatea bytes a string legible (KB, MB, GB, TB).
  */
 export function formatBytes(bytes: number): string {
   return formatSize(bytes);
@@ -9,11 +9,25 @@ export function formatBytes(bytes: number): string {
  * Alias usado por GamesStats. Formatea bytes a string legible.
  */
 function formatSizeImpl(bytes: number): string {
-  if (bytes === 0) return "0 B";
+  if (bytes === 0 || !Number.isFinite(bytes)) return "0 B";
   const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let value = bytes;
+  while (value >= k && i < sizes.length - 1) {
+    value /= k;
+    i += 1;
+  }
+  const unit = sizes[i];
+  const formatted =
+    i === 0
+      ? String(Math.round(value))
+      : value >= 100
+      ? Math.round(value).toLocaleString()
+      : value >= 1
+      ? value.toFixed(1)
+      : value.toFixed(2);
+  return `${formatted} ${unit}`;
 }
 
 export function formatSize(bytes: number): string {
