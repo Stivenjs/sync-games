@@ -5,6 +5,7 @@ import type { GameStats } from "@services/tauri";
 import { useGameStats } from "@hooks/useGameStats";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
+import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
 
@@ -83,6 +84,7 @@ export function GamesList({
   const gameRunningStatus = useGameRunningStatus(
     games.map((g) => g.id)
   );
+  const { syncOperation, progress } = useSyncProgress();
 
   if (games.length === 0) {
     const isEmptyState = !emptyFilterMessage;
@@ -162,6 +164,11 @@ export function GamesList({
           onRestoreBackup={onRestoreBackup}
           onEdit={onEdit}
           onShare={onShare}
+          syncProgress={
+            syncOperation?.mode === "single" && syncOperation.gameId === game.id
+              ? progress ?? null
+              : undefined
+          }
         />
       ))}
     </div>

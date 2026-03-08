@@ -31,6 +31,7 @@ export default defineConfig(async () => ({
       "@services": resolve(__dirname, "src/services"),
       "@utils": resolve(__dirname, "src/utils"),
       "@app-types": resolve(__dirname, "src/types"),
+      "@contexts": resolve(__dirname, "src/contexts"),
     },
   },
 

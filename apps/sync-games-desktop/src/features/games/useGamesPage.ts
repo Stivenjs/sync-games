@@ -20,6 +20,7 @@ import { toastDownloadResult, toastError, toastSyncResult } from "@utils/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
+import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { filterGames, type OriginFilter } from "@features/games/GamesFilters";
 
 export interface OperationResult {
@@ -201,6 +202,8 @@ export function useGamesPage() {
     refetch: refetchLastSync,
   } = useLastSyncInfo(hasSyncConfig);
 
+  const { setSyncOperation } = useSyncProgress();
+
   const { data: unsyncedGames } = useQuery({
     queryKey: ["unsynced-games"],
     queryFn: syncCheckUnsyncedGames,
@@ -316,6 +319,7 @@ export function useGamesPage() {
     const game = syncPreviewGame;
     if (syncPreviewType === "upload") {
       dispatch({ type: "SET_SYNCING", value: game.id });
+      setSyncOperation({ type: "upload", mode: "single", gameId: game.id });
       dispatch({ type: "SET_OPERATION_RESULT", value: null });
       try {
         const result = await syncUploadGame(game.id);
@@ -344,6 +348,7 @@ export function useGamesPage() {
       }
     } else {
       dispatch({ type: "SET_DOWNLOADING", value: game.id });
+      setSyncOperation({ type: "download", mode: "single", gameId: game.id });
       try {
         await executeDownload(game);
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
@@ -410,6 +415,7 @@ export function useGamesPage() {
     if (!downloadConflictGame) return;
     const game = downloadConflictGame;
     dispatch({ type: "SET_DOWNLOADING", value: game.id });
+    setSyncOperation({ type: "download", mode: "single", gameId: game.id });
     try {
       await executeDownload(game);
       dispatch({ type: "SET_DOWNLOAD_CONFLICT", game: null, conflicts: [] });
@@ -426,6 +432,7 @@ export function useGamesPage() {
   const executeSyncAll = async () => {
     if (!config?.games?.length) return;
     dispatch({ type: "SET_SYNCING", value: "all" });
+    setSyncOperation({ type: "upload", mode: "batch", gameId: null });
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
     try {
       const results = await syncUploadAllGames();
@@ -486,6 +493,7 @@ export function useGamesPage() {
 
   const executeDownloadAll = async () => {
     if (!config?.games?.length) return;
+    setSyncOperation({ type: "download", mode: "batch", gameId: null });
     try {
       const results = await syncDownloadAllGames();
       const totalResult = {

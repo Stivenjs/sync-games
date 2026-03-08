@@ -24,8 +24,10 @@ import {
 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
+import type { SyncProgressState } from "@components/layout";
 import { formatGameDisplayName, getGameImageUrl } from "@utils/gameImage";
 import { formatBytes, formatRelativeDate } from "@utils/format";
+import { GameCardSyncProgress } from "@features/games/GameCardSyncProgress";
 
 export interface GameCardProps {
   game: ConfiguredGame;
@@ -57,6 +59,8 @@ export interface GameCardProps {
   onShare?: (game: ConfiguredGame) => void;
   /** Estado de sincronización con la nube (para mostrar badge). */
   syncStatus?: "pending_upload" | "pending_download" | "in_sync" | null;
+  /** Progreso de subida/descarga de un solo juego (muestra barra inline en la tarjeta). */
+  syncProgress?: SyncProgressState | null;
 }
 
 /**
@@ -80,6 +84,7 @@ export function GameCard({
   onEdit,
   onShare,
   syncStatus,
+  syncProgress,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -271,6 +276,9 @@ export function GameCard({
             </DropdownMenu>
           </Dropdown>
         </div>
+      )}
+      {syncProgress && syncProgress.total > 0 && (
+        <GameCardSyncProgress progress={syncProgress} />
       )}
       {showImage ? (
         <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large">

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Gamepad2, History, Info, Settings, Users } from "lucide-react";
 import { AppLayout, type NavItem } from "@components/layout";
 import { SyncProgressBar } from "@components/layout";
+import { SyncProgressProvider } from "@contexts/SyncProgressContext";
 import { GamesPage } from "@features/games";
 import { FriendsPage } from "@features/friends/FriendsPage";
 import { HistoryPage } from "@features/history/HistoryPage";
@@ -140,7 +141,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <SyncProgressProvider>
       <UnsyncedSavesModal
         isOpen={showUnsyncedModal}
         onClose={closeModal}
@@ -168,7 +169,7 @@ function App() {
       </AppLayout>
 
       <SyncProgressBar />
-    </>
+    </SyncProgressProvider>
   );
 }
 
