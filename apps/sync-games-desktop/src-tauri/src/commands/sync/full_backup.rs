@@ -4,6 +4,7 @@
 //! Pensado para juegos pesados con muchos archivos (una sola subida/descarga en lugar de miles).
 
 use std::fs;
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
@@ -23,7 +24,8 @@ const BACKUPS_PREFIX: &str = "backups/";
 /// No comprime (solo agrupa); muchos juegos ya están comprimidos.
 fn create_tar_archive(source_dir: &Path, dest_path: &Path) -> Result<u64, String> {
     let file = fs::File::create(dest_path).map_err(|e| e.to_string())?;
-    let mut builder = tar::Builder::new(file);
+    let writer = BufWriter::new(file);
+    let mut builder = tar::Builder::new(writer);
     builder
         .append_dir_all(".", source_dir)
         .map_err(|e| e.to_string())?;
@@ -162,7 +164,14 @@ pub async fn create_and_upload_full_backup(
             total: 1,
         },
     );
-    let size = create_tar_archive(&source_dir, &tar_path)?;
+
+    // Empaquetado bloqueante en un hilo dedicado para no bloquear el runtime async.
+    let source_dir_clone = source_dir.clone();
+    let tar_path_clone = tar_path.clone();
+    let size =
+        tokio::task::spawn_blocking(move || create_tar_archive(&source_dir_clone, &tar_path_clone))
+            .await
+            .map_err(|e| e.to_string())??;
     // Eliminar el .tar de disco siempre al salir (tras subir o si falla la subida).
     let _temp_guard = TempFileGuard(tar_path.clone());
     // Fase "Subiendo paquete": la multipart emitirá el progreso real por bytes.
