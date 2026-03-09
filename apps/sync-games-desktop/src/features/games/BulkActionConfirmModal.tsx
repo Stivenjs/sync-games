@@ -31,8 +31,12 @@ export function BulkActionConfirmModal({
     ? "Subir guardados de todos los juegos"
     : "Descargar guardados de todos los juegos";
   const message = isSync
-    ? `¿Subir guardados de ${count} ${count === 1 ? "juego" : "juegos"} a la nube?`
-    : `¿Descargar guardados de ${count} ${count === 1 ? "juego" : "juegos"} desde la nube?`;
+    ? `¿Subir guardados de ${count} ${
+        count === 1 ? "juego" : "juegos"
+      } a la nube?`
+    : `¿Descargar guardados de ${count} ${
+        count === 1 ? "juego" : "juegos"
+      } desde la nube?`;
   const showPackageRecommendation =
     isSync && gamesOverSizeThreshold > 0 && count > 0;
 
@@ -60,10 +64,7 @@ export function BulkActionConfirmModal({
           {showPackageRecommendation && (
             <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
               <p className="flex items-start gap-2">
-                <Sparkles
-                  size={18}
-                  className="mt-0.5 shrink-0 text-primary"
-                />
+                <Sparkles size={18} className="mt-0.5 shrink-0 text-primary" />
                 <span>
                   <strong>{gamesOverSizeThreshold}</strong> de {count}{" "}
                   {count === 1 ? "juego" : "juegos"} superan 400 MB. Para una

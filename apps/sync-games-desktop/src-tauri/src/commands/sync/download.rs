@@ -507,26 +507,32 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
     Ok(result)
 }
 
-/// Número de juegos que se descargan en paralelo en "descargar todos".
+/// Número de juegos que se descargan en paralelo en "descargar todos" (solo archivos, no empaquetados).
 const DOWNLOAD_BATCH_CONCURRENCY: usize = 4;
 
-/// Descarga los guardados de todos los juegos configurados (operación batch, varios juegos en paralelo).
+/// Máximo de restauraciones de backups empaquetados en paralelo (evita saturar disco/CPU).
+const RESTORE_PACKAGED_CONCURRENCY: usize = 2;
+
+/// Descarga los guardados de todos los juegos. Si un juego tiene backup empaquetado en la nube,
+/// restaura ese .tar (descarga + extracción); si no, descarga archivo a archivo. Restauraciones
+/// empaquetadas se limitan a RESTORE_PACKAGED_CONCURRENCY para no saturar el PC.
 #[tauri::command]
 pub async fn sync_download_all_games(
     app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<Vec<GameSyncResultDto>, String> {
     let cfg = crate::config::load_config();
-    let _ = cfg
+    let api_base = cfg
         .api_base_url
         .as_deref()
         .filter(|s| !s.trim().is_empty())
         .ok_or("Configura apiBaseUrl en Configuración")?;
-    let _ = cfg
+    let user_id = cfg
         .user_id
         .as_deref()
         .filter(|s| !s.trim().is_empty())
         .ok_or("Configura userId en Configuración")?;
+    let api_key = cfg.api_key.as_deref().unwrap_or("");
 
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
@@ -552,14 +558,92 @@ pub async fn sync_download_all_games(
         }
     }
 
-    let to_download: Vec<String> = cfg
+    let to_process: Vec<String> = cfg
         .games
         .iter()
         .filter(|g| !results_by_id.contains_key(&g.id))
         .map(|g| g.id.clone())
         .collect();
 
-    let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_download)
+    let api_base = api_base.to_string();
+    let user_id = user_id.to_string();
+    let backups_fetched: Vec<(String, Option<String>)> = stream::iter(to_process.clone())
+        .map(|game_id| {
+            let api_base = api_base.clone();
+            let user_id = user_id.clone();
+            async move {
+                let list =
+                    super::full_backup::list_cloud_backups(&api_base, &user_id, api_key, &game_id)
+                        .await
+                        .ok()
+                        .filter(|l| !l.is_empty());
+                let backup_key = list.and_then(|mut list| {
+                    list.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+                    list.into_iter().next().map(|b| b.key)
+                });
+                (game_id, backup_key)
+            }
+        })
+        .buffer_unordered(8)
+        .collect()
+        .await;
+
+    let (to_restore, to_download_normal): (Vec<_>, Vec<_>) = backups_fetched
+        .into_iter()
+        .partition(|(_, key)| key.is_some());
+    let to_restore: Vec<(String, String)> = to_restore
+        .into_iter()
+        .map(|(id, k)| (id, k.unwrap()))
+        .collect();
+    let to_download_normal: Vec<String> =
+        to_download_normal.into_iter().map(|(id, _)| id).collect();
+
+    let tray_inner = tray_state.0.clone();
+    let restore_results: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_restore)
+        .map(|(game_id, backup_key)| {
+            let app = app.clone();
+            let tray = tray_inner.clone();
+            async move {
+                let r = super::full_backup::download_and_restore_full_backup_impl(
+                    game_id.clone(),
+                    backup_key,
+                    app,
+                    tray,
+                    false,
+                )
+                .await;
+                let result = match r {
+                    Ok(()) => SyncResultDto {
+                        ok_count: 1,
+                        err_count: 0,
+                        errors: vec![],
+                    },
+                    Err(e) => SyncResultDto {
+                        ok_count: 0,
+                        err_count: 1,
+                        errors: vec![e],
+                    },
+                };
+                (game_id, Ok(result))
+            }
+        })
+        .buffer_unordered(RESTORE_PACKAGED_CONCURRENCY)
+        .collect()
+        .await;
+
+    for (game_id, r) in restore_results {
+        let result = match r {
+            Ok(x) => x,
+            Err(e) => SyncResultDto {
+                ok_count: 0,
+                err_count: 1,
+                errors: vec![e],
+            },
+        };
+        results_by_id.insert(game_id.clone(), GameSyncResultDto { game_id, result });
+    }
+
+    let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_download_normal)
         .map(|game_id| {
             let app = app.clone();
             async move {

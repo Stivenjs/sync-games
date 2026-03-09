@@ -5,6 +5,24 @@
 export const PACKAGE_RECOMMEND_MIN_FILES = 300;
 export const PACKAGE_RECOMMEND_MIN_BYTES = 400 * 1024 * 1024; // 400 MB
 
+/**
+ * Umbrales para PROHIBIR subida archivo a archivo. Por encima de estos valores
+ * el usuario debe usar "Empaquetar y subir" obligatoriamente.
+ */
+export const LARGE_GAME_BLOCK_FILE_COUNT = 200;
+export const LARGE_GAME_BLOCK_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
+
+/** Indica si un juego es demasiado grande para subir archivo a archivo (debe empaquetar). */
+export function isGameTooLargeForSync(
+  fileCount: number,
+  totalBytes: number
+): boolean {
+  return (
+    fileCount >= LARGE_GAME_BLOCK_FILE_COUNT ||
+    totalBytes >= LARGE_GAME_BLOCK_SIZE_BYTES
+  );
+}
+
 export interface PackageRecommendation {
   recommend: boolean;
   reason: string;

@@ -21,6 +21,11 @@ const PROGRESS_CHUNK_BYTES: usize = 256 * 1024;
 /// Cuántos PUTs simples se ejecutan en paralelo (acelera mucho cuando hay miles de archivos).
 const SIMPLE_PUT_CONCURRENCY: usize = 24;
 
+/// Umbrales para prohibir subida archivo a archivo. Por encima de estos valores
+/// el usuario debe usar "Empaquetar y subir" obligatoriamente.
+const LARGE_GAME_BLOCK_FILE_COUNT: usize = 200;
+const LARGE_GAME_BLOCK_SIZE_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
+
 /// Stream que recibe chunks de un canal (llenado por un hilo que lee el archivo).
 #[allow(dead_code)]
 struct FileProgressStream {
@@ -228,6 +233,18 @@ pub(crate) async fn sync_upload_game_impl(
             Ok(((abs.clone(), rel.clone()), size))
         })
         .collect::<Result<Vec<_>, String>>()?;
+
+    let file_count = files_with_size.len();
+    let total_size: u64 = files_with_size.iter().map(|(_, s)| s).sum();
+    if file_count >= LARGE_GAME_BLOCK_FILE_COUNT
+        || total_size >= LARGE_GAME_BLOCK_SIZE_BYTES
+    {
+        return Err(format!(
+            "Este juego es demasiado grande para subir archivo a archivo ({} archivos, {} MB). Usa \"Empaquetar y subir\" desde el menú del juego.",
+            file_count,
+            total_size / (1024 * 1024)
+        ));
+    }
 
     let (multipart_files, simple_files): (Vec<_>, Vec<_>) = files_with_size
         .into_iter()

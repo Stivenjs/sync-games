@@ -224,14 +224,15 @@ pub async fn list_full_backups(game_id: String) -> Result<Vec<CloudBackupInfo>, 
 /// Cada cuántos bytes emitimos progreso de descarga del empaquetado.
 const FULL_BACKUP_DOWNLOAD_EMIT_BYTES: u64 = 256 * 1024;
 
-/// Descarga un backup por key y lo extrae en la carpeta del juego.
-/// Emite sync-download-progress y sync-download-done para la barra de progreso.
-#[tauri::command]
-pub async fn download_and_restore_full_backup(
+/// Implementación de descarga + extracción de un backup empaquetado.
+/// Si `emit_done` es false (p. ej. en "descargar todos"), no emite sync-download-done al terminar
+/// para que la barra de progreso siga visible hasta que termine toda la operación.
+pub async fn download_and_restore_full_backup_impl(
     game_id: String,
     backup_key: String,
     app: AppHandle,
-    tray_state: State<'_, TrayState>,
+    tray_state: std::sync::Arc<crate::tray_state::TrayStateInner>,
+    emit_done: bool,
 ) -> Result<(), String> {
     let cfg = config::load_config();
     let api_base = cfg
@@ -348,9 +349,23 @@ pub async fn download_and_restore_full_backup(
     extract_tar_archive(&tar_path, &dest_dir)?;
     let _ = fs::remove_file(&tar_path);
 
-    tray_state.0.set_just_restored(&game_id);
-    let _ = app.emit("sync-download-done", ());
+    tray_state.set_just_restored(&game_id);
+    if emit_done {
+        let _ = app.emit("sync-download-done", ());
+    }
     Ok(())
+}
+
+/// Comando Tauri: descarga un backup por key y lo extrae en la carpeta del juego.
+#[tauri::command]
+pub async fn download_and_restore_full_backup(
+    game_id: String,
+    backup_key: String,
+    app: AppHandle,
+    tray_state: State<'_, TrayState>,
+) -> Result<(), String> {
+    download_and_restore_full_backup_impl(game_id, backup_key, app, tray_state.0.clone(), true)
+        .await
 }
 
 /// Elimina un backup empaquetado de la nube por key.

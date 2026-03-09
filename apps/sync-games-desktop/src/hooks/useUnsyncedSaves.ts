@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  syncCheckUnsyncedGames,
-  syncUploadGame,
-} from "@services/tauri";
+import { syncCheckUnsyncedGames, syncUploadGame } from "@services/tauri";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
 import { toastSyncResult } from "@utils/toast";
@@ -84,5 +81,6 @@ export function useUnsyncedSaves() {
     showUnsyncedModal: unsyncedGameIds.length > 0,
     closeModal,
     uploadAll,
+    refetchUnsynced: check,
   };
 }

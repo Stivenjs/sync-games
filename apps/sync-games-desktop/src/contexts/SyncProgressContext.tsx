@@ -61,6 +61,8 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
   const [pausedUploadInfo, setPausedUploadInfo] =
     useState<PausedUploadInfo | null>(null);
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncOperationRef = useRef<SyncOperation | null>(null);
+  syncOperationRef.current = syncOperation;
 
   const setSyncOperation = useCallback((op: SyncOperation | null) => {
     setSyncOperationState(op);
@@ -112,6 +114,7 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       });
     });
     const unsubUploadDone = listen("sync-upload-done", () => {
+      if (syncOperationRef.current?.mode === "batch") return;
       setProgress((prev) => (prev?.type === "upload" ? null : prev));
       setSyncOperationState(null);
     });

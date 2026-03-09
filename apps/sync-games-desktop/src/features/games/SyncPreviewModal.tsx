@@ -24,7 +24,10 @@ import {
 import type { PreviewFile } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatBytes } from "@utils/format";
-import { getPackageRecommendation } from "@utils/packageRecommendation";
+import {
+  getPackageRecommendation,
+  isGameTooLargeForSync,
+} from "@utils/packageRecommendation";
 import { useQuery } from "@tanstack/react-query";
 
 interface SyncPreviewModalProps {
@@ -73,6 +76,11 @@ export function SyncPreviewModal({
       ? getPackageRecommendation(fileCount, totalBytes)
       : { recommend: false, reason: "" };
 
+  const isUploadBlocked =
+    type === "upload" &&
+    fileCount > 0 &&
+    isGameTooLargeForSync(fileCount, totalBytes);
+
   return (
     <Modal isOpen={isOpen} onOpenChange={(o) => !o && onClose()} size="lg">
       <ModalContent>
@@ -102,33 +110,70 @@ export function SyncPreviewModal({
               <p className="text-default-600">
                 <strong>{gameName}</strong>
               </p>
-              {type === "upload" &&
-                packageRecommendation.recommend &&
-                onFullBackupInstead && (
-                  <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
-                    <p className="flex items-start gap-2 font-medium">
-                      <Sparkles
-                        size={18}
-                        className="mt-0.5 shrink-0 text-primary"
-                      />
-                      <span>{packageRecommendation.reason}</span>
-                    </p>
-                    <Button
-                      size="sm"
-                      className="mt-3"
-                      color="primary"
-                      variant="flat"
-                      startContent={<Archive size={16} />}
-                      onPress={() => {
-                        onFullBackupInstead();
-                        onClose();
-                      }}
-                      isDisabled={isLoading}
-                    >
-                      Recomendado: empaquetar y subir
-                    </Button>
-                  </div>
-                )}
+              {type === "upload" && onFullBackupInstead && (
+                <div
+                  className={`rounded-lg border p-3 text-sm text-foreground ${
+                    isUploadBlocked
+                      ? "border-warning bg-warning/10"
+                      : "border-primary/40 bg-primary/10"
+                  }`}
+                >
+                  {isUploadBlocked ? (
+                    <>
+                      <p className="flex items-start gap-2 font-medium">
+                        <Sparkles
+                          size={18}
+                          className="mt-0.5 shrink-0 text-warning"
+                        />
+                        <span>
+                          Este juego es demasiado grande para subir archivo a
+                          archivo. Debes usar &quot;Empaquetar y subir&quot;.
+                        </span>
+                      </p>
+                      <Button
+                        size="sm"
+                        className="mt-3"
+                        color="warning"
+                        variant="flat"
+                        startContent={<Archive size={16} />}
+                        onPress={() => {
+                          onFullBackupInstead();
+                          onClose();
+                        }}
+                        isDisabled={isLoading}
+                      >
+                        Empaquetar y subir (obligatorio)
+                      </Button>
+                    </>
+                  ) : (
+                    packageRecommendation.recommend && (
+                      <>
+                        <p className="flex items-start gap-2 font-medium">
+                          <Sparkles
+                            size={18}
+                            className="mt-0.5 shrink-0 text-primary"
+                          />
+                          <span>{packageRecommendation.reason}</span>
+                        </p>
+                        <Button
+                          size="sm"
+                          className="mt-3"
+                          color="primary"
+                          variant="flat"
+                          startContent={<Archive size={16} />}
+                          onPress={() => {
+                            onFullBackupInstead();
+                            onClose();
+                          }}
+                          isDisabled={isLoading}
+                        >
+                          Recomendado: empaquetar y subir
+                        </Button>
+                      </>
+                    )
+                  )}
+                </div>
+              )}
               <div className="rounded-lg bg-default-100 p-4 text-sm">
                 <p>
                   {type === "upload"
@@ -143,7 +188,8 @@ export function SyncPreviewModal({
                 </p>
                 {type === "upload" &&
                   onFullBackupInstead &&
-                  !packageRecommendation.recommend && (
+                  !packageRecommendation.recommend &&
+                  !isUploadBlocked && (
                     <p className="mt-3">
                       <Button
                         size="sm"
@@ -214,7 +260,11 @@ export function SyncPreviewModal({
             color="primary"
             onPress={onConfirm}
             isLoading={isLoading}
-            isDisabled={loadingPreview || fileCount === 0}
+            isDisabled={
+              loadingPreview ||
+              fileCount === 0 ||
+              (type === "upload" && isUploadBlocked)
+            }
             startContent={
               type === "upload" ? (
                 <CloudUpload size={18} />

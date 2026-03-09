@@ -570,7 +570,10 @@ export function useGamesPage() {
       const gamesWithConflicts: { gameId: string; conflictCount: number }[] =
         batchResults
           .filter((r) => r.conflicts.length > 0)
-          .map((r) => ({ gameId: r.gameId, conflictCount: r.conflicts.length }));
+          .map((r) => ({
+            gameId: r.gameId,
+            conflictCount: r.conflicts.length,
+          }));
       if (gamesWithConflicts.length > 0) {
         dispatch({
           type: "SET_DOWNLOAD_ALL_CONFLICTS",

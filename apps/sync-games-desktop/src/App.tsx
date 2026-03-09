@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "framer-motion";
 import { Gamepad2, History, Info, Settings, Users } from "lucide-react";
@@ -10,12 +10,15 @@ import { FriendsPage } from "@features/friends/FriendsPage";
 import { HistoryPage } from "@features/history/HistoryPage";
 import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { SettingsPage } from "@features/settings";
+import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
 import {
   backupConfigToCloud,
   checkForUpdatesWithPrompt,
+  createAndUploadFullBackup,
+  syncUploadGame,
 } from "@services/tauri";
-import { toastSyncResult } from "@utils/toast";
+import { toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import { notifySyncComplete, notifySyncError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 
@@ -55,15 +58,92 @@ function PageContent({ activeId }: { activeId: string }) {
   }
 }
 
-function App() {
-  const [activeNavId, setActiveNavId] = useState("games");
+function UnsyncedSavesModalWithProgress() {
+  const { setSyncOperation } = useSyncProgress();
   const {
     unsyncedGameIds,
     showUnsyncedModal,
     closeModal,
     uploadAll,
     isUploading,
+    refetchUnsynced,
   } = useUnsyncedSaves();
+  const [loadingGameId, setLoadingGameId] = useState<string | null>(null);
+
+  const handleUploadAll = useCallback(async () => {
+    setSyncOperation({ type: "upload", mode: "batch", gameId: null });
+    try {
+      await uploadAll();
+    } finally {
+      setSyncOperation(null);
+    }
+  }, [uploadAll, setSyncOperation]);
+
+  const handleUploadGame = useCallback(
+    async (gameId: string) => {
+      setLoadingGameId(gameId);
+      setSyncOperation({ type: "upload", mode: "single", gameId });
+      try {
+        const result = await syncUploadGame(gameId);
+        toastSyncResult(result, formatGameDisplayName(gameId));
+        await refetchUnsynced();
+      } catch (e) {
+        toastSyncResult(
+          {
+            okCount: 0,
+            errCount: 1,
+            errors: [e instanceof Error ? e.message : String(e)],
+          },
+          formatGameDisplayName(gameId)
+        );
+      } finally {
+        setLoadingGameId(null);
+        setSyncOperation(null);
+      }
+    },
+    [refetchUnsynced, setSyncOperation]
+  );
+
+  const handleFullBackupGame = useCallback(
+    async (gameId: string) => {
+      setLoadingGameId(gameId);
+      setSyncOperation({ type: "upload", mode: "single", gameId });
+      try {
+        await createAndUploadFullBackup(gameId);
+        toastSuccess(
+          "Backup completo subido",
+          `${formatGameDisplayName(gameId)}: empaquetado subido a la nube.`
+        );
+        await refetchUnsynced();
+      } catch (e) {
+        toastError(
+          "Error al empaquetar y subir",
+          e instanceof Error ? e.message : String(e)
+        );
+      } finally {
+        setLoadingGameId(null);
+        setSyncOperation(null);
+      }
+    },
+    [refetchUnsynced, setSyncOperation]
+  );
+
+  return (
+    <UnsyncedSavesModal
+      isOpen={showUnsyncedModal}
+      onClose={closeModal}
+      gameIds={unsyncedGameIds}
+      onUploadAll={handleUploadAll}
+      onUploadGame={handleUploadGame}
+      onFullBackupGame={handleFullBackupGame}
+      isLoadingAll={isUploading}
+      loadingGameId={loadingGameId}
+    />
+  );
+}
+
+function App() {
+  const [activeNavId, setActiveNavId] = useState("games");
 
   // Respaldo periódico del config a la nube (cada 5 min) para mantenerlo actualizado
   useEffect(() => {
@@ -142,13 +222,7 @@ function App() {
 
   return (
     <SyncProgressProvider>
-      <UnsyncedSavesModal
-        isOpen={showUnsyncedModal}
-        onClose={closeModal}
-        gameIds={unsyncedGameIds}
-        onUploadAll={uploadAll}
-        isLoading={isUploading}
-      />
+      <UnsyncedSavesModalWithProgress />
       <AppLayout
         navItems={NAV_ITEMS}
         activeNavId={activeNavId}
