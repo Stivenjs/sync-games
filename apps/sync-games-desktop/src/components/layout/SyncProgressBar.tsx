@@ -42,18 +42,19 @@ export function SyncProgressBar() {
     progress?.filename?.endsWith(".tar");
   const showFloatingBar =
     progress &&
-    progress.total > 0 &&
     (syncOperation?.mode === "batch" || isPackagedOperation);
 
   const isIndeterminate =
     progress &&
-    progress.total > 0 &&
     (progress.filename?.includes("Empaquetando") ||
-      progress.filename?.includes("Extrayendo"));
+      progress.filename?.includes("Extrayendo") ||
+      progress.total <= 0);
   const value =
     progress && progress.total > 0
       ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
       : 0;
+  const canPause =
+    progress?.type === "upload" && !(isPackagedOperation && progress.total <= 0);
 
   return (
     <AnimatePresence>
@@ -90,13 +91,15 @@ export function SyncProgressBar() {
             </p>
             {progress.type === "upload" && (
               <span className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={onPauseUpload}
-                  className="text-xs font-medium text-foreground hover:underline"
-                >
-                  Pausar
-                </button>
+                {canPause ? (
+                  <button
+                    type="button"
+                    onClick={onPauseUpload}
+                    className="text-xs font-medium text-foreground hover:underline"
+                  >
+                    Pausar
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={onCancelUpload}

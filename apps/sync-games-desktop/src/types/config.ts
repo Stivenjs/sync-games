@@ -26,4 +26,8 @@ export interface Config {
   readonly customScanPaths?: readonly string[];
   /** Cuántos backups locales mantener por juego (valor por defecto del selector y auto-limpieza tras descargas). */
   readonly keepBackupsPerGame?: number;
+  /** Experimental: backup completo (tar) en streaming, sin .tar temporal. */
+  readonly fullBackupStreaming?: boolean;
+  /** Modo prueba: streaming sin subir a la nube. */
+  readonly fullBackupStreamingDryRun?: boolean;
 }

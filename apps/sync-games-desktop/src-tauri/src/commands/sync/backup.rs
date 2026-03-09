@@ -238,3 +238,17 @@ pub fn cleanup_old_backups(keep_last_n: u32) -> Result<CleanupBackupsResultDto, 
         games_affected,
     })
 }
+
+/// Elimina todos los backups locales (carpeta sync-games/backups completa).
+#[tauri::command]
+pub fn delete_all_local_backups() -> Result<(), String> {
+    let backup_root = crate::config::config_dir()
+        .ok_or("No se pudo obtener directorio de configuración")?
+        .join("backups");
+
+    if !backup_root.exists() || !backup_root.is_dir() {
+        return Ok(());
+    }
+
+    std::fs::remove_dir_all(&backup_root).map_err(|e| e.to_string())
+}

@@ -15,6 +15,7 @@ pub(crate) mod download;
 pub(crate) mod full_backup;
 mod models;
 pub(crate) mod multipart_upload;
+pub(crate) mod streaming;
 mod path_utils;
 pub(crate) mod preview;
 pub(crate) mod sync_logger;

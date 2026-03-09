@@ -13,6 +13,7 @@ use tokio::io::AsyncWriteExt;
 use super::api;
 use super::models::SyncProgressPayload;
 use super::multipart_upload;
+use super::streaming;
 use crate::config;
 use crate::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
@@ -154,6 +155,9 @@ pub async fn create_and_upload_full_backup(
     let tar_path = temp_dir.join(&filename);
     let relative_filename = format!("{}{}", BACKUPS_PREFIX, filename);
 
+    tray_state.0.reset_upload_cancel();
+    tray_state.0.reset_upload_pause();
+
     // Progreso para la UI: fase "Empaquetando..." (total=1 para que se muestre la barra).
     let _ = app.emit(
         "sync-upload-progress",
@@ -165,40 +169,74 @@ pub async fn create_and_upload_full_backup(
         },
     );
 
-    // Empaquetado bloqueante en un hilo dedicado para no bloquear el runtime async.
-    let source_dir_clone = source_dir.clone();
-    let tar_path_clone = tar_path.clone();
-    let size =
-        tokio::task::spawn_blocking(move || create_tar_archive(&source_dir_clone, &tar_path_clone))
-            .await
-            .map_err(|e| e.to_string())??;
-    // Eliminar el .tar de disco siempre al salir (tras subir o si falla la subida).
-    let _temp_guard = TempFileGuard(tar_path.clone());
-    // Fase "Subiendo paquete": la multipart emitirá el progreso real por bytes.
-    let _ = app.emit(
-        "sync-upload-progress",
-        SyncProgressPayload {
-            game_id: game_id.clone(),
-            filename: relative_filename.clone(),
-            loaded: 0,
-            total: size,
-        },
-    );
+    let use_streaming = cfg.full_backup_streaming.unwrap_or(false);
+    let dry_run = cfg.full_backup_streaming_dry_run.unwrap_or(false);
 
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
-    let result = multipart_upload::upload_one_file_multipart(
-        &tar_path,
-        &relative_filename,
-        size,
-        &game_id,
-        api_base,
-        user_id,
-        api_key,
-        app.clone(),
-        Some(tray_state.0.clone()),
-    )
-    .await;
+
+    let result = if use_streaming && dry_run {
+        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(source_dir.clone(), 8);
+        let upload_res = streaming::multipart::upload_tar_stream_multipart_dry_run(
+            rx,
+            &game_id,
+            &relative_filename,
+            app.clone(),
+            Some(tray_state.0.clone()),
+        )
+        .await;
+        let _ = tar_handle.await;
+        upload_res
+    } else if use_streaming {
+        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(source_dir.clone(), 8);
+        let upload_res = streaming::multipart::upload_tar_stream_multipart(
+            rx,
+            &game_id,
+            &relative_filename,
+            api_base,
+            user_id,
+            api_key,
+            app.clone(),
+            Some(tray_state.0.clone()),
+        )
+        .await;
+        let _ = tar_handle.await;
+        upload_res
+    } else {
+        // Empaquetado bloqueante en un hilo dedicado para no bloquear el runtime async.
+        let source_dir_clone = source_dir.clone();
+        let tar_path_clone = tar_path.clone();
+        let size = tokio::task::spawn_blocking(move || {
+            create_tar_archive(&source_dir_clone, &tar_path_clone)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        // Eliminar el .tar de disco siempre al salir (tras subir o si falla la subida).
+        let _temp_guard = TempFileGuard(tar_path.clone());
+        // Fase "Subiendo paquete": la multipart emitirá el progreso real por bytes.
+        let _ = app.emit(
+            "sync-upload-progress",
+            SyncProgressPayload {
+                game_id: game_id.clone(),
+                filename: relative_filename.clone(),
+                loaded: 0,
+                total: size,
+            },
+        );
+
+        multipart_upload::upload_one_file_multipart(
+            &tar_path,
+            &relative_filename,
+            size,
+            &game_id,
+            api_base,
+            user_id,
+            api_key,
+            app.clone(),
+            Some(tray_state.0.clone()),
+        )
+        .await
+    };
 
     tray_state.0.syncing_dec();
     tray_state.0.update_tooltip();

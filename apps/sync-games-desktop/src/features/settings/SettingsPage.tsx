@@ -1,6 +1,7 @@
 import { AutostartCard } from "@features/settings/AutostartCard";
 import { ConfigSection } from "@features/settings/ConfigSection";
 import { CreateConfigModal } from "@features/settings/CreateConfigModal";
+import { ExperimentalFeaturesCard } from "@features/settings/ExperimentalFeaturesCard";
 import { LocalBackupInfoCard } from "@features/settings/LocalBackupInfoCard";
 import { NotificationsCard } from "@features/settings/NotificationsCard";
 import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
@@ -35,6 +36,8 @@ export function SettingsPage() {
     handleTestNotification,
     handleCreateConfigFile,
     handleAutostartChange,
+    handleFullBackupStreamingChange,
+    handleFullBackupStreamingDryRunChange,
     openCreateConfigModal,
     setCreateApiBaseUrl,
     setCreateApiKey,
@@ -84,6 +87,12 @@ export function SettingsPage() {
       />
 
       <LocalBackupInfoCard />
+      <ExperimentalFeaturesCard
+        fullBackupStreaming={!!config?.fullBackupStreaming}
+        onFullBackupStreamingChange={handleFullBackupStreamingChange}
+        fullBackupStreamingDryRun={!!config?.fullBackupStreamingDryRun}
+        onFullBackupStreamingDryRunChange={handleFullBackupStreamingDryRunChange}
+      />
 
       <CreateConfigModal
         isOpen={createConfigModalOpen}

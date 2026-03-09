@@ -350,6 +350,8 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
         games,
         custom_scan_paths: imported.custom_scan_paths,
         keep_backups_per_game: None,
+        full_backup_streaming: None,
+        full_backup_streaming_dry_run: None,
     })
 }
 

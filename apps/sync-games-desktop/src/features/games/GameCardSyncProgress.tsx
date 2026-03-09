@@ -28,11 +28,20 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
     requestUploadPause().catch(() => {});
   }, []);
 
-  if (progress.total <= 0) return null;
+  const isPackagedOperation =
+    progress.filename?.includes("Empaquetando") ||
+    progress.filename?.includes("Extrayendo") ||
+    progress.filename?.startsWith("backups/") ||
+    progress.filename?.endsWith(".tar");
+
+  // No mostramos nada para operaciones sin total y que no son empaquetados/backups.
+  if (progress.total <= 0 && !isPackagedOperation) return null;
 
   const isIndeterminate =
     progress.filename?.includes("Empaquetando") ||
-    progress.filename?.includes("Extrayendo");
+    progress.filename?.includes("Extrayendo") ||
+    progress.total <= 0;
+
   const percent = Math.min(
     100,
     Math.round((progress.loaded / progress.total) * 100)
@@ -82,7 +91,9 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
                 stroke="currentColor"
                 strokeWidth={RING_STROKE}
                 strokeLinecap="round"
-                strokeDasharray={`${CIRCUMFERENCE * 0.25} ${CIRCUMFERENCE * 0.75}`}
+                strokeDasharray={`${CIRCUMFERENCE * 0.25} ${
+                  CIRCUMFERENCE * 0.75
+                }`}
                 className="text-primary"
               />
             </svg>
@@ -129,12 +140,14 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
         <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-default-200 bg-default-100 px-2 py-1.5 shadow-lg">
           <p className="truncate text-[10px] font-medium text-foreground">
             {progress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
-            <span className="truncate text-default-600">{progress.filename}</span>
+            <span className="truncate text-default-600">
+              {progress.filename}
+            </span>
           </p>
           <p className="mt-0.5 text-[10px] tabular-nums text-default-500">
             {isIndeterminate ? "—" : `${percent}%`}
           </p>
-          {progress.type === "upload" && (
+          {progress.type === "upload" && !isIndeterminate && (
             <div className="mt-1.5 flex gap-2">
               <button
                 type="button"

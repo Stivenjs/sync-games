@@ -564,6 +564,23 @@ export async function setKeepBackupsPerGame(keepLastN: number): Promise<void> {
   await invoke("set_keep_backups_per_game", { keepLastN });
 }
 
+/** Experimental: activa/desactiva backup completo en streaming (sin .tar temporal). */
+export async function setFullBackupStreaming(enabled: boolean): Promise<void> {
+  await invoke("set_full_backup_streaming", { enabled });
+}
+
+/** Modo prueba: backup streaming sin subir a la nube. */
+export async function setFullBackupStreamingDryRun(
+  enabled: boolean
+): Promise<void> {
+  await invoke("set_full_backup_streaming_dry_run", { enabled });
+}
+
+/** Elimina todos los backups locales (carpeta sync-games/backups completa). */
+export async function deleteAllLocalBackups(): Promise<void> {
+  await invoke("delete_all_local_backups");
+}
+
 /** Archivo en la previsualización */
 export interface PreviewFile {
   filename: string;

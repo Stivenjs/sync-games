@@ -17,6 +17,8 @@ pub struct ConfigDto {
     pub games: Vec<GameDto>,
     pub custom_scan_paths: Vec<String>,
     pub keep_backups_per_game: Option<u32>,
+    pub full_backup_streaming: Option<bool>,
+    pub full_backup_streaming_dry_run: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -70,6 +72,8 @@ pub fn get_config() -> ConfigDto {
             .collect(),
         custom_scan_paths: cfg.custom_scan_paths,
         keep_backups_per_game: cfg.keep_backups_per_game,
+        full_backup_streaming: cfg.full_backup_streaming,
+        full_backup_streaming_dry_run: cfg.full_backup_streaming_dry_run,
     }
 }
 
@@ -139,6 +143,22 @@ pub fn create_config_file(
 pub fn set_keep_backups_per_game(keep_last_n: u32) -> Result<(), String> {
     let mut cfg = config::load_config();
     cfg.keep_backups_per_game = Some(keep_last_n);
+    config::save_config(&cfg)
+}
+
+/// Feature flag (experimental): activa/desactiva el backup completo en modo streaming (sin .tar temporal).
+#[tauri::command]
+pub fn set_full_backup_streaming(enabled: bool) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    cfg.full_backup_streaming = Some(enabled);
+    config::save_config(&cfg)
+}
+
+/// Modo prueba para backup streaming: no sube a la nube, solo genera el TAR en streaming y mide rendimiento.
+#[tauri::command]
+pub fn set_full_backup_streaming_dry_run(enabled: bool) -> Result<(), String> {
+    let mut cfg = config::load_config();
+    cfg.full_backup_streaming_dry_run = Some(enabled);
     config::save_config(&cfg)
 }
 

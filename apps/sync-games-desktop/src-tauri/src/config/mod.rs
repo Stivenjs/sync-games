@@ -42,6 +42,14 @@ pub struct Config {
     /// Cuántos backups locales mantener por juego (auto-limpieza y valor por defecto en la UI). Si no está definido, se usa 10.
     #[serde(default)]
     pub keep_backups_per_game: Option<u32>,
+    /// Feature flag: backup completo (tar) en modo streaming (sin escribir .tar a disco).
+    /// Experimental. Si no está definido, se considera false.
+    #[serde(default)]
+    pub full_backup_streaming: Option<bool>,
+    /// Modo prueba: usa streaming pero sin subir a la nube (no llama a la API ni S3).
+    /// Útil para medir rendimiento sin coste.
+    #[serde(default)]
+    pub full_backup_streaming_dry_run: Option<bool>,
     #[serde(default)]
     pub operation_history: Vec<OperationLogEntry>,
 }

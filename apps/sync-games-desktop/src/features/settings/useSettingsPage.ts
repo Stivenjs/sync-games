@@ -11,6 +11,8 @@ import {
   restoreConfigFromCloud,
   scheduleConfigBackupToCloud,
   checkForUpdatesWithPrompt,
+  setFullBackupStreaming,
+  setFullBackupStreamingDryRun,
 } from "@services/tauri";
 import { useConfig } from "@hooks/useConfig";
 import { useQueryClient } from "@tanstack/react-query";
@@ -324,6 +326,46 @@ export function useSettingsPage() {
     }
   };
 
+  const handleFullBackupStreamingChange = async (enabled: boolean) => {
+    try {
+      await setFullBackupStreaming(enabled);
+      scheduleConfigBackupToCloud();
+      refetchConfig?.();
+      queryClient.invalidateQueries({ queryKey: ["config"] });
+      toastSuccess(
+        "Configuración guardada",
+        enabled
+          ? "Backup completo en streaming activado."
+          : "Backup completo en streaming desactivado."
+      );
+    } catch (e) {
+      toastError(
+        "Error al guardar",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  };
+
+  const handleFullBackupStreamingDryRunChange = async (enabled: boolean) => {
+    try {
+      await setFullBackupStreamingDryRun(enabled);
+      scheduleConfigBackupToCloud();
+      refetchConfig?.();
+      queryClient.invalidateQueries({ queryKey: ["config"] });
+      toastSuccess(
+        "Configuración guardada",
+        enabled
+          ? "Modo prueba de backup streaming activado (no sube a la nube)."
+          : "Modo prueba de backup streaming desactivado."
+      );
+    } catch (e) {
+      toastError(
+        "Error al guardar",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  };
+
   const openCreateConfigModal = () => {
     dispatch({ type: "SET_CREATE_CONFIG_ERROR", payload: null });
     dispatch({ type: "SET_CREATE_MODAL", open: true });
@@ -354,6 +396,8 @@ export function useSettingsPage() {
     handleTestNotification,
     handleCreateConfigFile,
     handleAutostartChange,
+    handleFullBackupStreamingChange,
+    handleFullBackupStreamingDryRunChange,
     openCreateConfigModal,
     setCreateApiBaseUrl: (v: string) =>
       dispatch({ type: "SET_CREATE_API_BASE_URL", payload: v }),

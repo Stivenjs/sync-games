@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   cleanupOldBackups,
   setKeepBackupsPerGame,
+  deleteAllLocalBackups,
 } from "@services/tauri/config.service";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useConfig } from "@hooks/useConfig";
@@ -15,6 +16,7 @@ export function LocalBackupInfoCard() {
   const { config, refetch } = useConfig();
   const [keepLastN, setKeepLastN] = useState(DEFAULT_KEEP);
   const [cleaning, setCleaning] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   useEffect(() => {
     const n = config?.keepBackupsPerGame ?? DEFAULT_KEEP;
@@ -109,6 +111,56 @@ export function LocalBackupInfoCard() {
           >
             Liberar espacio ahora
           </Button>
+          {confirmDeleteAll ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-default-600">
+              <span className="font-medium">
+                ¿Borrar TODOS los backups locales? Esta acción no se puede
+                deshacer.
+              </span>
+              <Button
+                size="sm"
+                variant="flat"
+                color="danger"
+                isLoading={cleaning}
+                onPress={async () => {
+                  setCleaning(true);
+                  try {
+                    await deleteAllLocalBackups();
+                    toastSuccess(
+                      "Backups locales eliminados",
+                      "Se borraron todas las copias locales en sync-games/backups."
+                    );
+                    setConfirmDeleteAll(false);
+                  } catch (e) {
+                    toastError(
+                      "Error al borrar backups",
+                      e instanceof Error ? e.message : String(e)
+                    );
+                  } finally {
+                    setCleaning(false);
+                  }
+                }}
+              >
+                Confirmar borrado
+              </Button>
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setConfirmDeleteAll(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="flat"
+              color="danger"
+              onPress={() => setConfirmDeleteAll(true)}
+            >
+              Borrar todos los backups locales
+            </Button>
+          )}
         </div>
       </CardBody>
     </Card>
