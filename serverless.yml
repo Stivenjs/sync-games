@@ -74,7 +74,7 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         AccelerateConfiguration:
-          AccelerationStatus: Enabled
+          AccelerationStatus: Suspended
         BucketEncryption:
           ServerSideEncryptionConfiguration:
             - ServerSideEncryptionByDefault:

@@ -7,7 +7,7 @@ import { ShareTokenS3 } from "@infrastructure/share/ShareTokenS3";
 const bucketName = process.env.BUCKET_NAME ?? "";
 const s3 = new S3Client({
   region: process.env.AWS_REGION ?? "us-east-2",
-  useAccelerateEndpoint: true,
+  useAccelerateEndpoint: process.env.USE_ACCELERATE_ENDPOINT === "true",
 });
 const saveRepository = new S3SaveRepository(s3, bucketName);
 const shareTokenStore = new ShareTokenS3(s3, bucketName);
