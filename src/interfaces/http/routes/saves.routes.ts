@@ -5,6 +5,7 @@ import type { GetDownloadUrlUseCase } from "@application/use-cases/GetDownloadUr
 import type { GetDownloadUrlsUseCase } from "@application/use-cases/GetDownloadUrlsUseCase";
 import type { DeleteGameFromCloudUseCase } from "@application/use-cases/DeleteGameFromCloudUseCase";
 import type { RenameGameInCloudUseCase } from "@application/use-cases/RenameGameInCloudUseCase";
+import type { ListBackupsUseCase } from "@application/use-cases/ListBackupsUseCase";
 import type { ListSavesUseCase } from "@application/use-cases/ListSavesUseCase";
 import type { CreateMultipartUploadUseCase } from "@application/use-cases/CreateMultipartUploadUseCase";
 import type { CreateMultipartUploadWithPartUrlsUseCase } from "@application/use-cases/CreateMultipartUploadWithPartUrlsUseCase";
@@ -47,6 +48,7 @@ export async function registerSavesRoutes(
     deleteGameFromCloudUseCase: DeleteGameFromCloudUseCase;
     renameGameInCloudUseCase: RenameGameInCloudUseCase;
     listSavesUseCase: ListSavesUseCase;
+    listBackupsUseCase: ListBackupsUseCase;
     createMultipartUploadUseCase: CreateMultipartUploadUseCase;
     createMultipartUploadWithPartUrlsUseCase: CreateMultipartUploadWithPartUrlsUseCase;
     getUploadPartUrlsUseCase: GetUploadPartUrlsUseCase;
@@ -58,6 +60,19 @@ export async function registerSavesRoutes(
     const userId = getUserId(request);
     const saves = await deps.listSavesUseCase.execute({ userId });
     return reply.send(saves);
+  });
+
+  app.get("/saves/backups", async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = getUserId(request);
+    const gameId = (request.query as { gameId?: string })?.gameId?.trim();
+    if (!gameId) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "query gameId is required",
+      });
+    }
+    const result = await deps.listBackupsUseCase.execute({ userId, gameId });
+    return reply.send(result);
   });
 
   app.post<{
@@ -185,32 +200,44 @@ export async function registerSavesRoutes(
       range?: { start: number; end: number };
     };
   }>("/saves/download-url", async (request, reply) => {
-    const userId = getUserId(request);
-    const body = request.body as {
-      gameId?: string;
-      key?: string;
-      range?: { start?: number; end?: number };
-    };
-    const { gameId, key, range } = body ?? {};
-    if (!gameId?.trim() || !key?.trim()) {
-      return reply.status(400).send({
-        error: "Bad Request",
-        message: "gameId and key are required",
+    try {
+      const userId = getUserId(request);
+      const body = request.body as {
+        gameId?: string;
+        key?: string;
+        range?: { start?: number; end?: number };
+      };
+      const { gameId, key, range } = body ?? {};
+      if (!gameId?.trim() || !key?.trim()) {
+        return reply.status(400).send({
+          error: "Bad Request",
+          message: "gameId and key are required",
+        });
+      }
+      const rangeArg =
+        range != null &&
+        typeof range.start === "number" &&
+        typeof range.end === "number"
+          ? { start: range.start, end: range.end }
+          : undefined;
+      const result = await deps.getDownloadUrlUseCase.execute({
+        userId,
+        gameId: gameId.trim(),
+        key: key.trim(),
+        range: rangeArg,
+      });
+      return reply.send(result);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      if (message.startsWith("Invalid key:")) {
+        return reply.status(400).send({ error: "Bad Request", message });
+      }
+      request.log.error({ err, message }, "download-url failed");
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message,
       });
     }
-    const rangeArg =
-      range != null &&
-      typeof range.start === "number" &&
-      typeof range.end === "number"
-        ? { start: range.start, end: range.end }
-        : undefined;
-    const result = await deps.getDownloadUrlUseCase.execute({
-      userId,
-      gameId: gameId.trim(),
-      key: key.trim(),
-      range: rangeArg,
-    });
-    return reply.send(result);
   });
 
   // --- Multipart upload (archivos grandes: pausar, reanudar, cancelar) ---

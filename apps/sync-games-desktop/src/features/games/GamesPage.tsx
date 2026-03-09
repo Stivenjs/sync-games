@@ -6,6 +6,7 @@ import { AddGameModal } from "@features/games/AddGameModal";
 import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
 import { EditGameModal } from "@features/games/EditGameModal";
 import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
+import { FullBackupConfirmModal } from "@features/games/FullBackupConfirmModal";
 import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
 import { SyncPreviewModal } from "@features/games/SyncPreviewModal";
 import { GamesFilters } from "@features/games/GamesFilters";
@@ -17,7 +18,9 @@ import { BulkActionConfirmModal } from "@features/games/BulkActionConfirmModal";
 import { RemoveGameModal } from "@features/games/RemoveGameModal";
 import { ScanModal } from "@features/games/ScanModal";
 import { useGamesPage } from "@features/games/useGamesPage";
+import { useGameStats } from "@hooks/useGameStats";
 import { scheduleConfigBackupToCloud } from "@services/tauri";
+import { countGamesOverSizeThreshold } from "@utils/packageRecommendation";
 import { createShareLink } from "@services/share.service";
 import { toastError, toastSuccess } from "@utils/toast";
 
@@ -57,6 +60,7 @@ export function GamesPage() {
     handleCloseDownloadAllConflict,
     syncing,
     downloading,
+    fullBackupUploadingGameId,
     operationResult,
     handleScanSelect,
     handleConfigureFromCloud,
@@ -64,6 +68,7 @@ export function GamesPage() {
     handleConfirmRemove,
     handleSyncOne,
     handleDownloadOne,
+    handleFullBackupUpload,
     syncPreviewGame,
     syncPreviewType,
     handleConfirmSyncPreview,
@@ -87,7 +92,11 @@ export function GamesPage() {
     handleRetryOperationError,
   } = useGamesPage();
 
+  const { statsByGameId } = useGameStats(!!config?.games?.length);
+
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
+  const [gameToFullBackupConfirm, setGameToFullBackupConfirm] =
+    useState<ConfiguredGame | null>(null);
 
   const handleShare = async (game: ConfiguredGame) => {
     const base = config?.apiBaseUrl?.trim();
@@ -164,9 +173,7 @@ export function GamesPage() {
 
       {/* Tu User ID (para compartir con amigos) */}
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-default-500">
-          Tu cuenta
-        </h2>
+        <h2 className="text-sm font-medium text-default-500">Tu cuenta</h2>
         <Card className="border border-default-200">
           <CardBody className="flex flex-row flex-wrap items-center justify-between gap-3 py-3">
             <div className="flex items-center gap-2">
@@ -242,6 +249,14 @@ export function GamesPage() {
         isOpen={!!bulkConfirm}
         type={bulkConfirm?.type ?? "sync"}
         count={bulkConfirm?.count ?? 0}
+        gamesOverSizeThreshold={
+          bulkConfirm?.type === "sync" && config?.games?.length
+            ? countGamesOverSizeThreshold(
+                config.games.map((g) => g.id),
+                statsByGameId
+              )
+            : 0
+        }
         onConfirm={handleConfirmBulkAction}
         onClose={handleCancelBulkAction}
       />
@@ -258,10 +273,29 @@ export function GamesPage() {
         type={syncPreviewType ?? "upload"}
         gameId={syncPreviewGame?.id ?? ""}
         onConfirm={handleConfirmSyncPreview}
+        onFullBackupInstead={
+          syncPreviewType === "upload" && syncPreviewGame
+            ? () => {
+                handleCloseSyncPreview();
+                setGameToFullBackupConfirm(syncPreviewGame);
+              }
+            : undefined
+        }
         isLoading={
           (!!syncing && syncing === syncPreviewGame?.id) ||
           (!!downloading && downloading === syncPreviewGame?.id)
         }
+      />
+      <FullBackupConfirmModal
+        isOpen={!!gameToFullBackupConfirm}
+        onClose={() => setGameToFullBackupConfirm(null)}
+        game={gameToFullBackupConfirm}
+        onConfirm={() => {
+          const g = gameToFullBackupConfirm;
+          setGameToFullBackupConfirm(null);
+          if (g) handleFullBackupUpload(g);
+        }}
+        isLoading={fullBackupUploadingGameId === gameToFullBackupConfirm?.id}
       />
       <RestoreBackupModal
         isOpen={!!gameToRestoreBackup}
@@ -282,9 +316,7 @@ export function GamesPage() {
 
       {/* Resumen: última sync y juegos en la nube */}
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-default-500">
-          Resumen y nube
-        </h2>
+        <h2 className="text-sm font-medium text-default-500">Resumen y nube</h2>
         <GamesStats
           gamesCount={config?.games?.length ?? 0}
           lastSyncAt={lastSyncAt}
@@ -331,8 +363,13 @@ export function GamesPage() {
           downloadingId={downloading}
           onOpenFolder={handleOpenFolder}
           onRestoreBackup={handleRestoreBackup}
+          onFullBackupUpload={
+            hasSyncConfig ? setGameToFullBackupConfirm : undefined
+          }
+          fullBackupUploadingGameId={fullBackupUploadingGameId}
           onEdit={setGameToEdit}
           onShare={hasSyncConfig ? handleShare : undefined}
+          hasSyncConfig={hasSyncConfig}
         />
       </section>
 

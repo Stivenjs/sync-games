@@ -4151,6 +4151,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sysinfo",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",

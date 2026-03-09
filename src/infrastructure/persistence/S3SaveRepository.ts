@@ -13,6 +13,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { GameSave } from "@domain/entities/GameSave";
 import type {
+  BackupMetadata,
   CompletedPart,
   CreateMultipartUploadResult,
   DownloadUrlItem,
@@ -221,6 +222,36 @@ export class S3SaveRepository implements SaveRepository {
     }));
 
     return saves;
+  }
+
+  async listBackups(userId: string, gameId: string): Promise<BackupMetadata[]> {
+    const prefix = `${userId}/${gameId}/backups/`;
+    const allContents: { Key: string; LastModified?: Date; Size?: number }[] = [];
+    let continuationToken: string | undefined;
+    do {
+      const response = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+      const contents = (response.Contents ?? []).filter(
+        (obj): obj is { Key: string; LastModified?: Date; Size?: number } =>
+          !!obj.Key
+      );
+      allContents.push(...contents);
+      continuationToken = response.IsTruncated
+        ? response.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return allContents.map((obj) => ({
+      key: obj.Key,
+      lastModified: obj.LastModified ?? new Date(0),
+      size: obj.Size,
+      filename: obj.Key.slice(prefix.length) || obj.Key,
+    }));
   }
 
   async deleteGame(userId: string, gameId: string): Promise<void> {

@@ -8,7 +8,13 @@ import {
   ScrollShadow,
   Spinner,
 } from "@heroui/react";
-import { CloudDownload, CloudUpload, FileText } from "lucide-react";
+import {
+  Archive,
+  CloudDownload,
+  CloudUpload,
+  FileText,
+  Sparkles,
+} from "lucide-react";
 import {
   previewDownload,
   previewUpload,
@@ -18,6 +24,7 @@ import {
 import type { PreviewFile } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatBytes } from "@utils/format";
+import { getPackageRecommendation } from "@utils/packageRecommendation";
 import { useQuery } from "@tanstack/react-query";
 
 interface SyncPreviewModalProps {
@@ -26,6 +33,8 @@ interface SyncPreviewModalProps {
   type: "upload" | "download";
   gameId: string;
   onConfirm: () => void;
+  /** Si se pasa y type es "upload", muestra opción para empaquetar y subir (backup completo). */
+  onFullBackupInstead?: () => void;
   isLoading?: boolean;
 }
 
@@ -35,6 +44,7 @@ export function SyncPreviewModal({
   type,
   gameId,
   onConfirm,
+  onFullBackupInstead,
   isLoading = false,
 }: SyncPreviewModalProps) {
   const gameName = formatGameDisplayName(gameId);
@@ -46,15 +56,22 @@ export function SyncPreviewModal({
     enabled: isOpen,
   });
 
-  const uploadData = type === "upload" ? (data as PreviewUpload | undefined) : undefined;
+  const uploadData =
+    type === "upload" ? (data as PreviewUpload | undefined) : undefined;
   const downloadData =
     type === "download" ? (data as PreviewDownload | undefined) : undefined;
 
   const fileCount = uploadData?.fileCount ?? downloadData?.fileCount ?? 0;
-  const totalBytes = uploadData?.totalSizeBytes ?? downloadData?.totalSizeBytes ?? 0;
+  const totalBytes =
+    uploadData?.totalSizeBytes ?? downloadData?.totalSizeBytes ?? 0;
   const conflictCount = downloadData?.conflictCount ?? 0;
   const files: PreviewFile[] =
     type === "upload" ? uploadData?.files ?? [] : downloadData?.files ?? [];
+
+  const packageRecommendation =
+    type === "upload" && fileCount > 0
+      ? getPackageRecommendation(fileCount, totalBytes)
+      : { recommend: false, reason: "" };
 
   return (
     <Modal isOpen={isOpen} onOpenChange={(o) => !o && onClose()} size="lg">
@@ -65,7 +82,9 @@ export function SyncPreviewModal({
           ) : (
             <CloudDownload size={22} className="text-primary" />
           )}
-          {type === "upload" ? "Vista previa: Subir" : "Vista previa: Descargar"}
+          {type === "upload"
+            ? "Vista previa: Subir"
+            : "Vista previa: Descargar"}
         </ModalHeader>
         <ModalBody>
           {loadingPreview ? (
@@ -83,14 +102,64 @@ export function SyncPreviewModal({
               <p className="text-default-600">
                 <strong>{gameName}</strong>
               </p>
+              {type === "upload" &&
+                packageRecommendation.recommend &&
+                onFullBackupInstead && (
+                  <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
+                    <p className="flex items-start gap-2 font-medium">
+                      <Sparkles
+                        size={18}
+                        className="mt-0.5 shrink-0 text-primary"
+                      />
+                      <span>{packageRecommendation.reason}</span>
+                    </p>
+                    <Button
+                      size="sm"
+                      className="mt-3"
+                      color="primary"
+                      variant="flat"
+                      startContent={<Archive size={16} />}
+                      onPress={() => {
+                        onFullBackupInstead();
+                        onClose();
+                      }}
+                      isDisabled={isLoading}
+                    >
+                      Recomendado: empaquetar y subir
+                    </Button>
+                  </div>
+                )}
               <div className="rounded-lg bg-default-100 p-4 text-sm">
                 <p>
                   {type === "upload"
-                    ? `${fileCount} archivo${fileCount !== 1 ? "s" : ""} a subir`
-                    : `${fileCount} archivo${fileCount !== 1 ? "s" : ""} a descargar`}
+                    ? `${fileCount} archivo${
+                        fileCount !== 1 ? "s" : ""
+                      } a subir`
+                    : `${fileCount} archivo${
+                        fileCount !== 1 ? "s" : ""
+                      } a descargar`}
                   {" · "}
                   <strong>{formatBytes(totalBytes)}</strong>
                 </p>
+                {type === "upload" &&
+                  onFullBackupInstead &&
+                  !packageRecommendation.recommend && (
+                    <p className="mt-3">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="secondary"
+                        startContent={<Archive size={16} />}
+                        onPress={() => {
+                          onFullBackupInstead();
+                          onClose();
+                        }}
+                        isDisabled={isLoading}
+                      >
+                        Empaquetar todo y subir (backup completo)
+                      </Button>
+                    </p>
+                  )}
                 {type === "download" && conflictCount > 0 && (
                   <p className="mt-1 text-warning">
                     {conflictCount} archivo{conflictCount !== 1 ? "s" : ""} con

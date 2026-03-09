@@ -1,6 +1,7 @@
 import { useReducer } from "react";
 import {
   addGame,
+  createAndUploadFullBackup,
   deleteGameFromCloud,
   openSaveFolder,
   removeGame,
@@ -16,7 +17,12 @@ import {
 } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
-import { toastDownloadResult, toastError, toastSyncResult } from "@utils/toast";
+import {
+  toastDownloadResult,
+  toastError,
+  toastSuccess,
+  toastSyncResult,
+} from "@utils/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
@@ -48,6 +54,7 @@ type GamesPageState = {
   downloadAllConflictGames: { gameId: string; conflictCount: number }[];
   syncing: string | "all" | null;
   downloading: string | "all" | null;
+  fullBackupUploadingGameId: string | null;
   operationResult: OperationResult | null;
   syncPreviewGame: ConfiguredGame | null;
   syncPreviewType: "upload" | "download" | null;
@@ -78,6 +85,7 @@ type GamesPageAction =
     }
   | { type: "SET_SYNCING"; value: string | "all" | null }
   | { type: "SET_DOWNLOADING"; value: string | "all" | null }
+  | { type: "SET_FULL_BACKUP_UPLOADING"; gameId: string | null }
   | { type: "SET_OPERATION_RESULT"; value: OperationResult | null }
   | {
       type: "SET_SYNC_PREVIEW";
@@ -101,6 +109,7 @@ const initialState: GamesPageState = {
   downloadAllConflictGames: [],
   syncing: null,
   downloading: null,
+  fullBackupUploadingGameId: null,
   operationResult: null,
   syncPreviewGame: null,
   syncPreviewType: null,
@@ -142,6 +151,8 @@ function gamesPageReducer(
       return { ...state, syncing: action.value };
     case "SET_DOWNLOADING":
       return { ...state, downloading: action.value };
+    case "SET_FULL_BACKUP_UPLOADING":
+      return { ...state, fullBackupUploadingGameId: action.gameId };
     case "SET_OPERATION_RESULT":
       return { ...state, operationResult: action.value };
     case "SET_SYNC_PREVIEW":
@@ -177,6 +188,7 @@ export function useGamesPage() {
     downloadAllConflictGames,
     syncing,
     downloading,
+    fullBackupUploadingGameId,
     operationResult,
     syncPreviewGame,
     syncPreviewType,
@@ -312,6 +324,28 @@ export function useGamesPage() {
 
   const handleSyncOne = (game: ConfiguredGame) => {
     dispatch({ type: "SET_SYNC_PREVIEW", game, previewType: "upload" });
+  };
+
+  const handleFullBackupUpload = async (game: ConfiguredGame) => {
+    dispatch({ type: "SET_FULL_BACKUP_UPLOADING", gameId: game.id });
+    try {
+      await createAndUploadFullBackup(game.id);
+      toastSuccess(
+        "Backup completo subido",
+        "Se empaquetó y subió a la nube. Recomendado para juegos con muchos archivos."
+      );
+      refetchLastSync?.();
+      queryClient.invalidateQueries({ queryKey: ["game-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["cloud-backups", game.id] });
+      queryClient.invalidateQueries({ queryKey: ["cloud-backup-counts"] });
+    } catch (e) {
+      toastError(
+        "Error al empaquetar y subir",
+        e instanceof Error ? e.message : String(e)
+      );
+    } finally {
+      dispatch({ type: "SET_FULL_BACKUP_UPLOADING", gameId: null });
+    }
   };
 
   const handleConfirmSyncPreview = async () => {
@@ -649,6 +683,7 @@ export function useGamesPage() {
     handleCloseDownloadAllConflict,
     syncing,
     downloading,
+    fullBackupUploadingGameId,
     operationResult,
     handleScanSelect,
     handleConfigureFromCloud,
@@ -656,6 +691,7 @@ export function useGamesPage() {
     handleConfirmRemove,
     handleSyncOne,
     handleDownloadOne,
+    handleFullBackupUpload,
     syncPreviewGame,
     syncPreviewType,
     handleConfirmSyncPreview,

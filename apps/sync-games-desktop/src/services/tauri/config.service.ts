@@ -492,6 +492,37 @@ export async function restoreBackup(
   };
 }
 
+/** Información de un backup completo en la nube (un .tar por juego) */
+export interface CloudBackupInfo {
+  key: string;
+  lastModified: string;
+  size?: number;
+  filename: string;
+}
+
+/** Crea un .tar de la carpeta del juego y lo sube a la nube (recomendado para juegos grandes). */
+export async function createAndUploadFullBackup(gameId: string): Promise<string> {
+  return invoke<string>("create_and_upload_full_backup", { gameId });
+}
+
+/** Lista los backups completos en la nube para un juego. */
+export async function listFullBackups(
+  gameId: string
+): Promise<CloudBackupInfo[]> {
+  return invoke<CloudBackupInfo[]>("list_full_backups", { gameId });
+}
+
+/** Descarga un backup completo por key y lo extrae en la carpeta del juego. */
+export async function downloadAndRestoreFullBackup(
+  gameId: string,
+  backupKey: string
+): Promise<void> {
+  await invoke("download_and_restore_full_backup", {
+    gameId,
+    backupKey,
+  });
+}
+
 /** Resultado de la limpieza de backups antiguos */
 export interface CleanupBackupsResult {
   backupsDeleted: number;

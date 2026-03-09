@@ -2,6 +2,7 @@ import { Button, Card, CardBody, Code } from "@heroui/react";
 import { FolderSearch, Gamepad2, PlusCircle } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
+import { useCloudBackupCounts } from "@hooks/useCloudBackupCounts";
 import { useGameStats } from "@hooks/useGameStats";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
@@ -57,10 +58,16 @@ interface GamesListProps {
   onOpenFolder?: (game: ConfiguredGame) => void;
   /** Callback para restaurar desde backup. */
   onRestoreBackup?: (game: ConfiguredGame) => void;
+  /** Callback para empaquetar y subir (backup completo). */
+  onFullBackupUpload?: (game: ConfiguredGame) => void;
+  /** ID del juego que está empaquetando/subiendo backup completo. */
+  fullBackupUploadingGameId?: string | null;
   /** Callback para editar el juego. */
   onEdit?: (game: ConfiguredGame) => void;
   /** Callback para compartir por link. */
   onShare?: (game: ConfiguredGame) => void;
+  /** Si hay configuración de nube (para cargar conteo de backups empaquetados). */
+  hasSyncConfig?: boolean;
 }
 
 export function GamesList({
@@ -76,11 +83,18 @@ export function GamesList({
   downloadingId,
   onOpenFolder,
   onRestoreBackup,
+  onFullBackupUpload,
+  fullBackupUploadingGameId,
   onEdit,
   onShare,
+  hasSyncConfig = false,
 }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
   const { statsByGameId } = useGameStats(games.length > 0);
+  const { countByGameId: cloudBackupCountByGameId } = useCloudBackupCounts(
+    games.map((g) => g.id),
+    hasSyncConfig && games.length > 0
+  );
   const gameRunningStatus = useGameRunningStatus(
     games.map((g) => g.id)
   );
@@ -147,11 +161,18 @@ export function GamesList({
           stats={statsByGameId.get(game.id)}
           resolvedSteamAppId={resolvedSteamAppIds[game.id]}
           isGameRunning={gameRunningStatus[game.id]}
-          syncStatus={getSyncStatus(
-            game.id,
-            statsByGameId.get(game.id),
-            unsyncedGameIds
-          )}
+          syncStatus={(() => {
+            const status = getSyncStatus(
+              game.id,
+              statsByGameId.get(game.id),
+              unsyncedGameIds
+            );
+            // Si tiene backup empaquetado en la nube, no mostrar "Pendiente subir"
+            const cloudBackups = cloudBackupCountByGameId[game.id] ?? 0;
+            if (status === "pending_upload" && cloudBackups > 0) return null;
+            return status;
+          })()}
+          cloudBackupCount={cloudBackupCountByGameId[game.id] ?? 0}
           isLoading={
             needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined
           }
@@ -162,6 +183,8 @@ export function GamesList({
           isDownloading={downloadingId === game.id || downloadingId === "all"}
           onOpenFolder={onOpenFolder}
           onRestoreBackup={onRestoreBackup}
+          onFullBackupUpload={onFullBackupUpload}
+          isFullBackupUploading={fullBackupUploadingGameId === game.id}
           onEdit={onEdit}
           onShare={onShare}
           syncProgress={

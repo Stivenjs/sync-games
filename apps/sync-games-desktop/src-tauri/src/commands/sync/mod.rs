@@ -12,6 +12,7 @@
 pub(crate) mod api;
 pub(crate) mod backup;
 pub(crate) mod download;
+pub(crate) mod full_backup;
 mod models;
 pub(crate) mod multipart_upload;
 mod path_utils;

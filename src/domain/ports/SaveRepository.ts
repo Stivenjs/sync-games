@@ -23,6 +23,15 @@ export interface DownloadUrlResult {
   key: string;
 }
 
+/** Metadato de un backup (archivo .tar) subido para un juego. */
+export interface BackupMetadata {
+  key: string;
+  lastModified: Date;
+  size?: number;
+  /** Nombre del archivo (ej. backups/2026-03-08_12-00-00.tar). */
+  filename: string;
+}
+
 /** Resultado de iniciar una subida multipart (archivos grandes, pausable/cancelable). */
 export interface CreateMultipartUploadResult {
   uploadId: string;
@@ -68,6 +77,8 @@ export interface SaveRepository {
     items: DownloadUrlItem[]
   ): Promise<DownloadUrlResult[]>;
   listByUser(userId: string): Promise<GameSave[]>;
+  /** Lista backups (archivos .tar) del juego bajo userId/gameId/backups/ */
+  listBackups(userId: string, gameId: string): Promise<BackupMetadata[]>;
   /** Borra todos los objetos en S3 bajo userId/gameId/ */
   deleteGame(userId: string, gameId: string): Promise<void>;
   /** Copia todos los objetos de userId/oldGameId/ a userId/newGameId/ y borra los antiguos */

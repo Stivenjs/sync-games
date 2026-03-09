@@ -11,6 +11,7 @@ import {
 } from "@heroui/react";
 import {
   AlertTriangle,
+  Archive,
   Check,
   CloudDownload,
   CloudUpload,
@@ -53,12 +54,18 @@ export interface GameCardProps {
   onOpenFolder?: (game: ConfiguredGame) => void;
   /** Callback para restaurar desde backup. */
   onRestoreBackup?: (game: ConfiguredGame) => void;
+  /** Callback para empaquetar y subir (backup completo en la nube). */
+  onFullBackupUpload?: (game: ConfiguredGame) => void;
+  /** Muestra spinner en empaquetar y subir. */
+  isFullBackupUploading?: boolean;
   /** Callback para editar el juego. Si no se pasa, no se muestra el botón. */
   onEdit?: (game: ConfiguredGame) => void;
   /** Callback para compartir por link (genera URL y copia al portapapeles). */
   onShare?: (game: ConfiguredGame) => void;
   /** Estado de sincronización con la nube (para mostrar badge). */
   syncStatus?: "pending_upload" | "pending_download" | "in_sync" | null;
+  /** Número de backups completos (empaquetados) en la nube para este juego. Se muestra un badge si > 0. */
+  cloudBackupCount?: number;
   /** Progreso de subida/descarga de un solo juego (muestra barra inline en la tarjeta). */
   syncProgress?: SyncProgressState | null;
 }
@@ -81,9 +88,12 @@ export function GameCard({
   isDownloading,
   onOpenFolder,
   onRestoreBackup,
+  onFullBackupUpload,
+  isFullBackupUploading,
   onEdit,
   onShare,
   syncStatus,
+  cloudBackupCount = 0,
   syncProgress,
 }: GameCardProps) {
   const [imgError, setImgError] = useState(false);
@@ -151,10 +161,20 @@ export function GameCard({
             Sincronizado
           </div>
         )}
+        {cloudBackupCount > 0 && (
+          <div
+            className="flex items-center gap-1 rounded-md bg-secondary/90 px-2 py-1 text-xs font-medium text-secondary-foreground backdrop-blur-sm"
+            title={`${cloudBackupCount} backup${cloudBackupCount !== 1 ? "s" : ""} empaquetado${cloudBackupCount !== 1 ? "s" : ""} en la nube. Restaurar desde backup → En la nube.`}
+          >
+            <Archive size={12} />
+            {cloudBackupCount} empaquetado{cloudBackupCount !== 1 ? "s" : ""}
+          </div>
+        )}
       </div>
       {(onOpenFolder ||
         onDownload ||
         onSync ||
+        onFullBackupUpload ||
         onRemove ||
         onRestoreBackup ||
         onEdit ||
@@ -183,15 +203,16 @@ export function GameCard({
                 else if (key === "folder") onOpenFolder?.(game);
                 else if (key === "download") onDownload?.(game);
                 else if (key === "sync") onSync?.(game);
+                else if (key === "fullBackup") onFullBackupUpload?.(game);
                 else if (key === "restore") onRestoreBackup?.(game);
                 else if (key === "share") onShare?.(game);
                 else if (key === "remove") onRemove?.(game);
               }}
               disabledKeys={
-                isDownloading || isSyncing
-                  ? ["folder", "download", "sync", "restore"]
+                isDownloading || isSyncing || isFullBackupUploading
+                  ? ["folder", "download", "sync", "fullBackup", "restore"]
                   : isGameRunning
-                  ? ["download", "sync", "restore"]
+                  ? ["download", "sync", "fullBackup", "restore"]
                   : []
               }
             >
@@ -261,6 +282,20 @@ export function GameCard({
                   }
                 >
                   Subir a la nube
+                </DropdownItem>
+              ) : null}
+              {onFullBackupUpload ? (
+                <DropdownItem
+                  key="fullBackup"
+                  startContent={
+                    isFullBackupUploading ? (
+                      <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <Archive size={16} className="text-default-500" />
+                    )
+                  }
+                >
+                  Empaquetar y subir (backup completo)
                 </DropdownItem>
               ) : null}
               {onRemove ? (
