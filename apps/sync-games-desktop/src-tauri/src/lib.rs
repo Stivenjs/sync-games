@@ -125,7 +125,8 @@ pub fn run() {
 
             let tray_state = tray_state::TrayState::new(tray);
             app.manage(tray_state.clone());
-            commands::watch_sync::spawn_watcher(app.handle().clone(), tray_state.0.clone());
+            // Auto-sync al cambiar archivos deshabilitado por ahora (no subir tras restaurar empaquetado).
+            // commands::watch_sync::spawn_watcher(app.handle().clone(), tray_state.0.clone());
             commands::game_exit_sync::spawn_exit_watcher(
                 app.handle().clone(),
                 tray_state.0.clone(),

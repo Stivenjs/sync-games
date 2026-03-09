@@ -2,6 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
 use tauri::tray::TrayIcon;
 
 pub struct TrayStateInner {
@@ -12,6 +13,8 @@ pub struct TrayStateInner {
     upload_cancel: AtomicBool,
     /// Pide pausar la subida (se guarda estado en disco y se puede reanudar después).
     upload_pause: AtomicBool,
+    /// Juego restaurado recientemente (backup desde nube); el watcher no debe auto-subir ese juego.
+    last_restored: Mutex<Option<(String, Instant)>>,
 }
 
 impl TrayStateInner {
@@ -22,6 +25,38 @@ impl TrayStateInner {
             unsynced_count: Mutex::new(None),
             upload_cancel: AtomicBool::new(false),
             upload_pause: AtomicBool::new(false),
+            last_restored: Mutex::new(None),
+        }
+    }
+
+    /// Marca que se acaba de restaurar un juego desde un backup empaquetado. El watcher no hará
+    /// auto-subida de ese juego hasta que el usuario haga "Subir" manualmente (solo extraemos en PC,
+    /// no tiene sentido subir lo extraído a S3).
+    pub fn set_just_restored(&self, game_id: &str) {
+        if let Ok(mut g) = self.last_restored.lock() {
+            *g = Some((game_id.to_lowercase(), Instant::now()));
+        }
+    }
+
+    /// True si este juego fue restaurado y aún no debe disparar auto-subida (solo se limpia al hacer "Subir" manual).
+    #[allow(dead_code)] // Solo usado por watch_sync (deshabilitado por ahora).
+    pub fn was_just_restored(&self, game_id: &str) -> bool {
+        let key = game_id.to_lowercase();
+        if let Ok(g) = self.last_restored.lock() {
+            if let Some((id, _)) = g.as_ref() {
+                return id == &key;
+            }
+        }
+        false
+    }
+
+    /// Limpia el estado de "restaurado" para este juego (llamar cuando el usuario hace "Subir" manual).
+    pub fn clear_restore_cooldown(&self, game_id: &str) {
+        let key = game_id.to_lowercase();
+        if let Ok(mut g) = self.last_restored.lock() {
+            if g.as_ref().map(|(id, _)| id == &key).unwrap_or(false) {
+                *g = None;
+            }
         }
     }
 

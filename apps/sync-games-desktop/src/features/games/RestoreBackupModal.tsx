@@ -28,6 +28,7 @@ import { formatBytes } from "@utils/format";
 import { toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
+import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { ask } from "@tauri-apps/plugin-dialog";
 import type { ConfiguredGame } from "@app-types/config";
 
@@ -46,6 +47,7 @@ export function RestoreBackupModal({
 }: RestoreBackupModalProps) {
   const gameId = game?.id ?? "";
   const queryClient = useQueryClient();
+  const { setSyncOperation } = useSyncProgress();
 
   const { data: backups, isLoading } = useQuery({
     queryKey: ["backups", gameId],
@@ -111,6 +113,7 @@ export function RestoreBackupModal({
   const handleCreateFullBackup = async () => {
     if (!gameId || !game) return;
     setCreatingFullBackup(true);
+    setSyncOperation({ type: "upload", mode: "single", gameId });
     try {
       await createAndUploadFullBackup(gameId);
       toastSuccess(
@@ -131,6 +134,7 @@ export function RestoreBackupModal({
   const handleRestoreCloud = async (b: CloudBackupInfo) => {
     if (!gameId || !game) return;
     setRestoringCloudKey(b.key);
+    setSyncOperation({ type: "download", mode: "single", gameId });
     try {
       await downloadAndRestoreFullBackup(gameId, b.key);
       toastSuccess(

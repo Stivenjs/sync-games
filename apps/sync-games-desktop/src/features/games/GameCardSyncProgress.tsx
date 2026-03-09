@@ -1,17 +1,25 @@
 import { motion } from "framer-motion";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { SyncProgressState } from "@components/layout";
 import { requestUploadCancel, requestUploadPause } from "@services/tauri";
 
 export interface GameCardSyncProgressProps {
-  /** Progreso de subida o descarga del juego (muestra barra inline). */
+  /** Progreso de subida o descarga del juego. Círculo en esquina; detalles al pasar el cursor. */
   progress: SyncProgressState;
 }
 
+const RING_SIZE = 24;
+const RING_STROKE = 2;
+const R = (RING_SIZE - RING_STROKE) / 2;
+const CX = RING_SIZE / 2;
+const CY = RING_SIZE / 2;
+const CIRCUMFERENCE = 2 * Math.PI * R;
+
 /**
- * Barra de progreso inline para subida/descarga de un solo juego dentro de una GameCard.
+ * Círculo de progreso en esquina de la card. Al pasar el cursor se muestra el detalle (archivo, %, Pausar/Cancelar).
  */
 export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
+  const [hover, setHover] = useState(false);
   const onCancelUpload = useCallback(() => {
     requestUploadCancel().catch(() => {});
   }, []);
@@ -22,21 +30,112 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
 
   if (progress.total <= 0) return null;
 
+  const isIndeterminate =
+    progress.filename?.includes("Empaquetando") ||
+    progress.filename?.includes("Extrayendo");
   const percent = Math.min(
     100,
     Math.round((progress.loaded / progress.total) * 100)
   );
+  const strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 
   return (
-    <div className="absolute bottom-14 left-0 right-0 z-10 mx-2 rounded-md border border-default-200 bg-default-100/95 px-2 py-1.5 shadow-md backdrop-blur">
-      <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-foreground">
-          {progress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
-          <span className="truncate">{progress.filename}</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-1.5">
+    <div
+      className="absolute left-2 top-2 z-10 group"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <div
+        className="flex cursor-default items-center justify-center rounded-full bg-default-100/90 shadow-sm ring-1 ring-default-200/80"
+        title={progress.type === "upload" ? "Subiendo…" : "Descargando…"}
+      >
+        {isIndeterminate ? (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{
+              duration: 0.9,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            className="flex p-0.5"
+          >
+            <svg
+              width={RING_SIZE}
+              height={RING_SIZE}
+              className="-rotate-90"
+              aria-hidden
+            >
+              <circle
+                cx={CX}
+                cy={CY}
+                r={R}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={RING_STROKE}
+                className="text-default-200"
+              />
+              <circle
+                cx={CX}
+                cy={CY}
+                r={R}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={RING_STROKE}
+                strokeLinecap="round"
+                strokeDasharray={`${CIRCUMFERENCE * 0.25} ${CIRCUMFERENCE * 0.75}`}
+                className="text-primary"
+              />
+            </svg>
+          </motion.div>
+        ) : (
+          <div className="relative flex items-center justify-center p-0.5">
+            <svg
+              width={RING_SIZE}
+              height={RING_SIZE}
+              className="-rotate-90"
+              aria-hidden
+            >
+              <circle
+                cx={CX}
+                cy={CY}
+                r={R}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={RING_STROKE}
+                className="text-default-200"
+              />
+              <motion.circle
+                cx={CX}
+                cy={CY}
+                r={R}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={RING_STROKE}
+                strokeLinecap="round"
+                strokeDasharray={CIRCUMFERENCE}
+                strokeDashoffset={strokeDashoffset}
+                className="text-primary"
+                transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold tabular-nums text-foreground">
+              {percent}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      {hover && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-default-200 bg-default-100 px-2 py-1.5 shadow-lg">
+          <p className="truncate text-[10px] font-medium text-foreground">
+            {progress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
+            <span className="truncate text-default-600">{progress.filename}</span>
+          </p>
+          <p className="mt-0.5 text-[10px] tabular-nums text-default-500">
+            {isIndeterminate ? "—" : `${percent}%`}
+          </p>
           {progress.type === "upload" && (
-            <>
+            <div className="mt-1.5 flex gap-2">
               <button
                 type="button"
                 onClick={onPauseUpload}
@@ -51,23 +150,10 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
               >
                 Cancelar
               </button>
-            </>
+            </div>
           )}
-          <span className="text-[10px] tabular-nums text-default-500">
-            {percent}%
-          </span>
-        </span>
-      </div>
-      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-default-200">
-        <motion.div
-          className="h-full rounded-full bg-primary"
-          initial={false}
-          animate={{
-            width: `${Math.min(100, (progress.loaded / progress.total) * 100)}%`,
-          }}
-          transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
-        />
-      </div>
+        </div>
+      )}
     </div>
   );
 }

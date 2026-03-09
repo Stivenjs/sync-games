@@ -54,8 +54,9 @@ const SyncProgressContext = createContext<SyncProgressContextValue | null>(
 const STALE_100_PERCENT_MS = 4000;
 
 export function SyncProgressProvider({ children }: { children: ReactNode }) {
-  const [syncOperation, setSyncOperationState] =
-    useState<SyncOperation | null>(null);
+  const [syncOperation, setSyncOperationState] = useState<SyncOperation | null>(
+    null
+  );
   const [progress, setProgress] = useState<SyncProgressState | null>(null);
   const [pausedUploadInfo, setPausedUploadInfo] =
     useState<PausedUploadInfo | null>(null);
@@ -129,12 +130,17 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       setProgress((prev) => (prev?.type === "download" ? null : prev));
       setSyncOperationState(null);
     });
+    const unsubFullBackupDone = listen("full-backup-done", () => {
+      setProgress((prev) => (prev?.type === "upload" ? null : prev));
+      setSyncOperationState(null);
+    });
     return () => {
       unsubUpload.then((f) => f());
       unsubDownload.then((f) => f());
       unsubUploadDone.then((f) => f());
       unsubDownloadDone.then((f) => f());
       unsubUploadPaused.then((f) => f());
+      unsubFullBackupDone.then((f) => f());
     };
   }, []);
 
@@ -150,8 +156,7 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       }
       return;
     }
-    const is100 =
-      progress.loaded >= progress.total && progress.total > 0;
+    const is100 = progress.loaded >= progress.total && progress.total > 0;
     if (!is100) {
       if (staleTimerRef.current) {
         clearTimeout(staleTimerRef.current);

@@ -328,6 +328,7 @@ export function useGamesPage() {
 
   const handleFullBackupUpload = async (game: ConfiguredGame) => {
     dispatch({ type: "SET_FULL_BACKUP_UPLOADING", gameId: game.id });
+    setSyncOperation({ type: "upload", mode: "single", gameId: game.id });
     try {
       await createAndUploadFullBackup(game.id);
       toastSuccess(

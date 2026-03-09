@@ -6,7 +6,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use futures_util::StreamExt;
+use tokio::io::AsyncWriteExt;
+
 use super::api;
+use super::models::SyncProgressPayload;
 use super::multipart_upload;
 use crate::config;
 use crate::tray_state::TrayState;
@@ -148,11 +152,29 @@ pub async fn create_and_upload_full_backup(
     let tar_path = temp_dir.join(&filename);
     let relative_filename = format!("{}{}", BACKUPS_PREFIX, filename);
 
-    let _ = app.emit("full-backup-progress", ("creating_tar", 0u64, 0u64));
+    // Progreso para la UI: fase "Empaquetando..." (total=1 para que se muestre la barra).
+    let _ = app.emit(
+        "sync-upload-progress",
+        SyncProgressPayload {
+            game_id: game_id.clone(),
+            filename: "Empaquetando…".to_string(),
+            loaded: 0,
+            total: 1,
+        },
+    );
     let size = create_tar_archive(&source_dir, &tar_path)?;
     // Eliminar el .tar de disco siempre al salir (tras subir o si falla la subida).
     let _temp_guard = TempFileGuard(tar_path.clone());
-    let _ = app.emit("full-backup-progress", ("uploading", 0u64, size));
+    // Fase "Subiendo paquete": la multipart emitirá el progreso real por bytes.
+    let _ = app.emit(
+        "sync-upload-progress",
+        SyncProgressPayload {
+            game_id: game_id.clone(),
+            filename: relative_filename.clone(),
+            loaded: 0,
+            total: size,
+        },
+    );
 
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
@@ -172,6 +194,9 @@ pub async fn create_and_upload_full_backup(
     tray_state.0.syncing_dec();
     tray_state.0.update_tooltip();
     let _ = app.emit("full-backup-done", ());
+    if result.is_ok() {
+        let _ = app.emit("sync-upload-done", ());
+    }
 
     result?;
     Ok(relative_filename)
@@ -196,12 +221,17 @@ pub async fn list_full_backups(game_id: String) -> Result<Vec<CloudBackupInfo>, 
     list_cloud_backups(api_base, user_id, api_key, &game_id).await
 }
 
+/// Cada cuántos bytes emitimos progreso de descarga del empaquetado.
+const FULL_BACKUP_DOWNLOAD_EMIT_BYTES: u64 = 256 * 1024;
+
 /// Descarga un backup por key y lo extrae en la carpeta del juego.
+/// Emite sync-download-progress y sync-download-done para la barra de progreso.
 #[tauri::command]
 pub async fn download_and_restore_full_backup(
     game_id: String,
     backup_key: String,
-    _app: AppHandle,
+    app: AppHandle,
+    tray_state: State<'_, TrayState>,
 ) -> Result<(), String> {
     let cfg = config::load_config();
     let api_base = cfg
@@ -258,19 +288,68 @@ pub async fn download_and_restore_full_backup(
         .user_agent("sync-games-desktop/1.0")
         .build()
         .map_err(|e| e.to_string())?;
-    let bytes = client
+    let res = client
         .get(download_url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .bytes()
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Descarga del backup: HTTP {}", res.status()));
+    }
+    let total = res.content_length().unwrap_or(0);
+    let mut stream = res.bytes_stream();
+    let mut file = tokio::fs::File::create(&tar_path)
         .await
         .map_err(|e| e.to_string())?;
-    fs::write(&tar_path, &bytes).map_err(|e| e.to_string())?;
+    let mut loaded: u64 = 0;
+    let mut last_emit: u64 = 0;
 
+    while let Some(item) = stream.next().await {
+        let chunk = item.map_err(|e| e.to_string())?;
+        let n = chunk.len() as u64;
+        loaded += n;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+        if loaded - last_emit >= FULL_BACKUP_DOWNLOAD_EMIT_BYTES || (total > 0 && loaded >= total) {
+            last_emit = loaded;
+            let _ = app.emit(
+                "sync-download-progress",
+                SyncProgressPayload {
+                    game_id: game_id.clone(),
+                    filename: tar_name.to_string(),
+                    loaded,
+                    total,
+                },
+            );
+        }
+    }
+    if total > 0 && loaded < total {
+        let _ = app.emit(
+            "sync-download-progress",
+            SyncProgressPayload {
+                game_id: game_id.clone(),
+                filename: tar_name.to_string(),
+                loaded: total,
+                total,
+            },
+        );
+    }
+    file.flush().await.map_err(|e| e.to_string())?;
+    drop(file);
+
+    let _ = app.emit(
+        "sync-download-progress",
+        SyncProgressPayload {
+            game_id: game_id.clone(),
+            filename: "Extrayendo…".to_string(),
+            loaded: 0,
+            total: 1,
+        },
+    );
     extract_tar_archive(&tar_path, &dest_dir)?;
     let _ = fs::remove_file(&tar_path);
 
+    tray_state.0.set_just_restored(&game_id);
+    let _ = app.emit("sync-download-done", ());
     Ok(())
 }
 

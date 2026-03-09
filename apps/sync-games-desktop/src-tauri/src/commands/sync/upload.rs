@@ -165,6 +165,7 @@ pub async fn sync_upload_game(
 ) -> Result<SyncResultDto, String> {
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
+    tray_state.0.clear_restore_cooldown(&game_id);
 
     tray_state.0.reset_upload_cancel();
     tray_state.0.reset_upload_pause();
@@ -474,6 +475,9 @@ pub async fn sync_upload_all_games(
         .map(|g| g.id.clone())
         .collect();
 
+    for game_id in &to_sync {
+        tray_state.0.clear_restore_cooldown(game_id);
+    }
     let tray_inner = Some(tray_state.0.clone());
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_sync)
         .map(|game_id| {

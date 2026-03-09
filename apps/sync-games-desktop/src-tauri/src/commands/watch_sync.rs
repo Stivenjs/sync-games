@@ -1,5 +1,7 @@
 //! Watcher de archivos para subir guardados automáticamente cuando cambian.
 //! Se ejecuta en background sin afectar el rendimiento del juego.
+//! Deshabilitado en lib.rs; permitir dead_code para poder reactivarlo sin warnings.
+#![allow(dead_code)]
 
 use crate::commands::sync;
 use crate::config;
@@ -125,6 +127,9 @@ pub fn spawn_watcher(
                     }
 
                     for game_id in games_to_sync {
+                        if tray_state.was_just_restored(&game_id) {
+                            continue;
+                        }
                         let cfg = config::load_config();
                         let game = cfg
                             .games
@@ -152,7 +157,8 @@ pub fn spawn_watcher(
                         tray.update_tooltip();
                         tauri::async_runtime::spawn(async move {
                             let res =
-                                sync::upload::sync_upload_game_impl(gid.clone(), app.clone(), None).await;
+                                sync::upload::sync_upload_game_impl(gid.clone(), app.clone(), None)
+                                    .await;
                             tray.syncing_dec();
                             tray.clone().refresh_unsynced_async();
                             match res {

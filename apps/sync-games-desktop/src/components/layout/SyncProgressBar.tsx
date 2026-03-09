@@ -13,12 +13,8 @@ export type { SyncProgressState } from "@contexts/SyncProgressContext";
 
 /** Barra flotante de progreso: solo se muestra en operaciones "subir/descargar todos" (batch). */
 export function SyncProgressBar() {
-  const {
-    syncOperation,
-    progress,
-    pausedUploadInfo,
-    clearPausedUploadInfo,
-  } = useSyncProgress();
+  const { syncOperation, progress, pausedUploadInfo, clearPausedUploadInfo } =
+    useSyncProgress();
   const [resuming, setResuming] = useState(false);
 
   const onCancelUpload = useCallback(() => {
@@ -39,15 +35,24 @@ export function SyncProgressBar() {
     }
   }, [clearPausedUploadInfo]);
 
+  const isPackagedOperation =
+    progress?.filename?.includes("Empaquetando") ||
+    progress?.filename?.includes("Extrayendo") ||
+    progress?.filename?.startsWith("backups/") ||
+    progress?.filename?.endsWith(".tar");
   const showFloatingBar =
-    syncOperation?.mode === "batch" && progress && progress.total > 0;
+    progress &&
+    progress.total > 0 &&
+    (syncOperation?.mode === "batch" || isPackagedOperation);
 
+  const isIndeterminate =
+    progress &&
+    progress.total > 0 &&
+    (progress.filename?.includes("Empaquetando") ||
+      progress.filename?.includes("Extrayendo"));
   const value =
     progress && progress.total > 0
-      ? Math.min(
-          100,
-          Math.round((progress.loaded / progress.total) * 100)
-        )
+      ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
       : 0;
 
   return (
@@ -76,7 +81,7 @@ export function SyncProgressBar() {
               {formatGameDisplayName(progress.gameId)}
             </span>
             <span className="text-xs text-default-500 tabular-nums">
-              {progress.total > 0 ? `${value}%` : "—"}
+              {isIndeterminate ? "—" : progress.total > 0 ? `${value}%` : "—"}
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
@@ -103,14 +108,29 @@ export function SyncProgressBar() {
             )}
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
-            <motion.div
-              className="h-full rounded-full bg-primary"
-              initial={false}
-              animate={{
-                width: `${value}%`,
-              }}
-              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-            />
+            {isIndeterminate ? (
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                initial={false}
+                animate={{
+                  width: ["30%", "70%", "30%"],
+                }}
+                transition={{
+                  duration: 1.2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            ) : (
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                initial={false}
+                animate={{
+                  width: `${value}%`,
+                }}
+                transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+              />
+            )}
           </div>
         </motion.div>
       )}
