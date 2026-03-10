@@ -1,15 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Spinner } from "@heroui/react";
-import { useCallback, useState } from "react";
+import { Spinner, Tooltip } from "@heroui/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSyncProgress } from "@contexts/SyncProgressContext";
 import {
   requestUploadCancel,
   requestUploadPause,
   syncUploadResume,
 } from "@services/tauri";
+import { formatBytes } from "@utils/format";
 import { formatGameDisplayName } from "@utils/gameImage";
+import { formatEta, formatSpeed } from "@utils/progress";
+import { Clock, HardDrive, Pause, Upload, X, Zap } from "lucide-react";
 
-// Re-exportar para que los consumidores que importan desde layout sigan funcionando
 export type { SyncProgressState } from "@contexts/SyncProgressContext";
 
 /** Barra flotante de progreso: solo se muestra en operaciones "subir/descargar todos" (batch). */
@@ -17,6 +19,15 @@ export function SyncProgressBar() {
   const { syncOperation, progress, pausedUploadInfo, clearPausedUploadInfo } =
     useSyncProgress();
   const [resuming, setResuming] = useState(false);
+  const [speedBps, setSpeedBps] = useState<number | null>(null);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+  const startRef = useRef<number | null>(null);
+  const lastProgressRef = useRef<{
+    loaded: number;
+    t: number;
+    gameId: string;
+    filename: string;
+  } | null>(null);
 
   const onCancelUpload = useCallback(() => {
     requestUploadCancel().catch(() => {});
@@ -42,8 +53,7 @@ export function SyncProgressBar() {
     progress?.filename?.startsWith("backups/") ||
     progress?.filename?.endsWith(".tar");
   const showFloatingBar =
-    progress &&
-    (syncOperation?.mode === "batch" || isPackagedOperation);
+    progress && (syncOperation?.mode === "batch" || isPackagedOperation);
 
   const isIndeterminate =
     progress &&
@@ -55,7 +65,86 @@ export function SyncProgressBar() {
       ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
       : 0;
   const canPause =
-    progress?.type === "upload" && !(isPackagedOperation && progress.total <= 0);
+    progress?.type === "upload" &&
+    !(isPackagedOperation && progress.total <= 0);
+
+  // Calcular velocidad media (bytes/segundo) y ETA aproximada.
+  useEffect(() => {
+    if (!progress) {
+      setSpeedBps(null);
+      setEtaSeconds(null);
+      startRef.current = null;
+      lastProgressRef.current = null;
+      return;
+    }
+
+    // Si cambia de juego o archivo, reiniciar la "sesión" de cálculo.
+    const now = performance.now();
+    const last = lastProgressRef.current;
+    if (
+      !last ||
+      last.gameId !== progress.gameId ||
+      last.filename !== progress.filename ||
+      progress.loaded < last.loaded
+    ) {
+      startRef.current = now;
+      lastProgressRef.current = {
+        loaded: progress.loaded,
+        t: now,
+        gameId: progress.gameId,
+        filename: progress.filename,
+      };
+      setSpeedBps(null);
+      setEtaSeconds(null);
+      return;
+    }
+    if (!startRef.current) {
+      startRef.current = now;
+      lastProgressRef.current = {
+        loaded: progress.loaded,
+        t: now,
+        gameId: progress.gameId,
+        filename: progress.filename,
+      };
+      setSpeedBps(null);
+      setEtaSeconds(null);
+      return;
+    }
+
+    const lastPoint = lastProgressRef.current;
+    if (!lastPoint || progress.loaded <= lastPoint.loaded) {
+      return;
+    }
+
+    const dtMs = now - startRef.current;
+    if (dtMs <= 0) return;
+
+    // Usar ventana deslizante simple: desde el inicio de la sesión,
+    // pero ignorar los primeros 2s para ETA (warmup).
+    const bytesDelta = progress.loaded - 0;
+    const bps = bytesDelta / (dtMs / 1000);
+    setSpeedBps(bps);
+
+    const elapsedSec = dtMs / 1000;
+    if (progress.total > 0 && bps > 0 && elapsedSec >= 2) {
+      const remaining = progress.total - progress.loaded;
+      let eta = remaining / bps;
+      // Cap de ETA visible para evitar valores absurdos.
+      if (eta > 2 * 60 * 60) {
+        eta = 2 * 60 * 60;
+      }
+      setEtaSeconds(eta);
+    } else {
+      setEtaSeconds(null);
+    }
+
+    lastProgressRef.current = {
+      loaded: progress.loaded,
+      t: now,
+      gameId: progress.gameId,
+      filename: progress.filename,
+    };
+  }, [progress?.loaded, progress?.total, progress?.gameId, progress?.type]);
 
   return (
     <AnimatePresence>
@@ -91,23 +180,29 @@ export function SyncProgressBar() {
               {progress.filename}
             </p>
             {progress.type === "upload" && (
-              <span className="flex shrink-0 gap-2">
+              <span className="flex shrink-0 gap-1">
                 {canPause ? (
+                  <Tooltip content="Pausar subida" placement="top">
+                    <button
+                      type="button"
+                      onClick={onPauseUpload}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200"
+                      aria-label="Pausar subida"
+                    >
+                      <Pause size={14} />
+                    </button>
+                  </Tooltip>
+                ) : null}
+                <Tooltip content="Cancelar subida" placement="top">
                   <button
                     type="button"
-                    onClick={onPauseUpload}
-                    className="text-xs font-medium text-foreground hover:underline"
+                    onClick={onCancelUpload}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10"
+                    aria-label="Cancelar subida"
                   >
-                    Pausar
+                    <X size={14} />
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={onCancelUpload}
-                  className="text-xs font-medium text-danger hover:underline"
-                >
-                  Cancelar
-                </button>
+                </Tooltip>
               </span>
             )}
           </div>
@@ -135,6 +230,55 @@ export function SyncProgressBar() {
               />
             </div>
           )}
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-default-500">
+            <span className="inline-flex items-center gap-1.5">
+              {progress.type === "upload" ? (
+                <Upload
+                  size={12}
+                  className="shrink-0 text-primary"
+                  aria-hidden
+                />
+              ) : (
+                <HardDrive
+                  size={12}
+                  className="shrink-0 text-primary"
+                  aria-hidden
+                />
+              )}
+              <span>
+                {progress.type === "upload" ? "Enviados" : "En disco"}:{" "}
+                <span className="tabular-nums">
+                  {formatBytes(progress.loaded)}
+                  {progress.total > 0
+                    ? ` / ${formatBytes(progress.total)}`
+                    : ""}
+                </span>
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Zap
+                size={12}
+                className="shrink-0 text-default-400"
+                aria-hidden
+              />
+              <span>
+                Velocidad{isIndeterminate ? " (aprox.)" : ""}:{" "}
+                <span className="tabular-nums">{formatSpeed(speedBps)}</span>
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock
+                size={12}
+                className="shrink-0 text-default-400"
+                aria-hidden
+              />
+              {!isIndeterminate && progress.total > 0 ? (
+                <span className="tabular-nums">{formatEta(etaSeconds)}</span>
+              ) : (
+                <span>—</span>
+              )}
+            </span>
+          </div>
         </motion.div>
       )}
 

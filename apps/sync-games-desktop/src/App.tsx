@@ -19,7 +19,12 @@ import {
   syncUploadGame,
 } from "@services/tauri";
 import { toastError, toastSuccess, toastSyncResult } from "@utils/toast";
-import { notifySyncComplete, notifySyncError } from "@utils/notification";
+import {
+  notifyFullBackupError,
+  notifySyncComplete,
+  notifySyncError,
+  notifyUploadError,
+} from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 
 import "./App.css";
@@ -88,14 +93,16 @@ function UnsyncedSavesModalWithProgress() {
         toastSyncResult(result, formatGameDisplayName(gameId));
         await refetchUnsynced();
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         toastSyncResult(
           {
             okCount: 0,
             errCount: 1,
-            errors: [e instanceof Error ? e.message : String(e)],
+            errors: [msg],
           },
           formatGameDisplayName(gameId)
         );
+        notifyUploadError(formatGameDisplayName(gameId), msg).catch(() => {});
       } finally {
         setLoadingGameId(null);
         setSyncOperation(null);
@@ -116,9 +123,10 @@ function UnsyncedSavesModalWithProgress() {
         );
         await refetchUnsynced();
       } catch (e) {
-        toastError(
-          "Error al empaquetar y subir",
-          e instanceof Error ? e.message : String(e)
+        const msg = e instanceof Error ? e.message : String(e);
+        toastError("Error al empaquetar y subir", msg);
+        notifyFullBackupError(formatGameDisplayName(gameId), msg).catch(
+          () => {}
         );
       } finally {
         setLoadingGameId(null);

@@ -20,9 +20,9 @@ export function NotificationsCard({
           </h2>
         </div>
         <p className="text-sm text-default-500">
-          La app muestra notificaciones cuando sube guardados automáticamente
-          (por ejemplo con la app minimizada en la bandeja). Usa el botón para
-          comprobar que tienes permisos.
+          Si la app no está visible (minimizada u otra ventana delante), se
+          mostrará una notificación al terminar una subida, descarga o backup
+          completo, o si ocurre un error. Usa el botón para comprobar permisos.
         </p>
         <Button
           size="sm"

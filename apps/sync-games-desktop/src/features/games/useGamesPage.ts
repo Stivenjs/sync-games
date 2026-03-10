@@ -18,6 +18,13 @@ import {
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
 import {
+  notifyBatchDownloadDone,
+  notifyBatchUploadDone,
+  notifyDownloadError,
+  notifyFullBackupError,
+  notifyUploadError,
+} from "@utils/notification";
+import {
   toastDownloadResult,
   toastError,
   toastSuccess,
@@ -340,9 +347,10 @@ export function useGamesPage() {
       queryClient.invalidateQueries({ queryKey: ["cloud-backups", game.id] });
       queryClient.invalidateQueries({ queryKey: ["cloud-backup-counts"] });
     } catch (e) {
-      toastError(
-        "Error al empaquetar y subir",
-        e instanceof Error ? e.message : String(e)
+      const msg = e instanceof Error ? e.message : String(e);
+      toastError("Error al empaquetar y subir", msg);
+      notifyFullBackupError(formatGameDisplayName(game.id), msg).catch(
+        () => {}
       );
     } finally {
       dispatch({ type: "SET_FULL_BACKUP_UPLOADING", gameId: null });
@@ -365,16 +373,18 @@ export function useGamesPage() {
         toastSyncResult(result, formatGameDisplayName(game.id));
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         const errResult = {
           okCount: 0,
           errCount: 1,
-          errors: [e instanceof Error ? e.message : String(e)],
+          errors: [msg],
         };
         dispatch({
           type: "SET_OPERATION_RESULT",
           value: { type: "sync", gameId: game.id, result: errResult },
         });
         toastSyncResult(errResult, formatGameDisplayName(game.id));
+        notifyUploadError(formatGameDisplayName(game.id), msg).catch(() => {});
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
       } finally {
         dispatch({ type: "SET_SYNCING", value: null });
@@ -388,6 +398,11 @@ export function useGamesPage() {
         await executeDownload(game);
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        notifyDownloadError(formatGameDisplayName(game.id), msg).catch(
+          () => {}
+        );
+        setSyncOperation(null);
         dispatch({ type: "SET_DOWNLOADING", value: null });
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
       }
@@ -404,16 +419,18 @@ export function useGamesPage() {
       });
       toastDownloadResult(result, formatGameDisplayName(game.id));
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       const errResult = {
         okCount: 0,
         errCount: 1,
-        errors: [e instanceof Error ? e.message : String(e)],
+        errors: [msg],
       };
       dispatch({
         type: "SET_OPERATION_RESULT",
         value: { type: "download", gameId: game.id, result: errResult },
       });
       toastDownloadResult(errResult, formatGameDisplayName(game.id));
+      notifyDownloadError(formatGameDisplayName(game.id), msg).catch(() => {});
     } finally {
       dispatch({ type: "SET_DOWNLOADING", value: null });
       refetchLastSync?.();
@@ -469,9 +486,10 @@ export function useGamesPage() {
     dispatch({ type: "SET_SYNCING", value: "all" });
     setSyncOperation({ type: "upload", mode: "batch", gameId: null });
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
+    let totalResult = { okCount: 0, errCount: 0, errors: [] as string[] };
     try {
       const results = await syncUploadAllGames();
-      const totalResult = {
+      totalResult = {
         okCount: results.reduce((s, r) => s + r.result.okCount, 0),
         errCount: results.reduce((s, r) => s + r.result.errCount, 0),
         errors: results.flatMap((r) => r.result.errors),
@@ -482,7 +500,7 @@ export function useGamesPage() {
       });
       toastSyncResult(totalResult);
     } catch (e) {
-      const totalResult = {
+      totalResult = {
         okCount: 0,
         errCount: 1,
         errors: [e instanceof Error ? e.message : String(e)],
@@ -493,6 +511,10 @@ export function useGamesPage() {
       });
       toastSyncResult(totalResult);
     } finally {
+      setSyncOperation(null);
+      notifyBatchUploadDone(totalResult.okCount, totalResult.errCount).catch(
+        () => {}
+      );
       dispatch({ type: "SET_SYNCING", value: null });
       refetchLastSync?.();
       queryClient.invalidateQueries({ queryKey: ["game-stats"] });
@@ -529,9 +551,10 @@ export function useGamesPage() {
   const executeDownloadAll = async () => {
     if (!config?.games?.length) return;
     setSyncOperation({ type: "download", mode: "batch", gameId: null });
+    let totalResult = { okCount: 0, errCount: 0, errors: [] as string[] };
     try {
       const results = await syncDownloadAllGames();
-      const totalResult = {
+      totalResult = {
         okCount: results.reduce((s, r) => s + r.result.okCount, 0),
         errCount: results.reduce((s, r) => s + r.result.errCount, 0),
         errors: results.flatMap((r) => r.result.errors),
@@ -542,7 +565,7 @@ export function useGamesPage() {
       });
       toastDownloadResult(totalResult);
     } catch (e) {
-      const totalResult = {
+      totalResult = {
         okCount: 0,
         errCount: 1,
         errors: [e instanceof Error ? e.message : String(e)],
@@ -553,6 +576,10 @@ export function useGamesPage() {
       });
       toastDownloadResult(totalResult);
     } finally {
+      setSyncOperation(null);
+      notifyBatchDownloadDone(totalResult.okCount, totalResult.errCount).catch(
+        () => {}
+      );
       dispatch({ type: "SET_DOWNLOADING", value: null });
       refetchLastSync?.();
       queryClient.invalidateQueries({ queryKey: ["game-stats"] });

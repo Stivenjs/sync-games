@@ -9,7 +9,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const tauriConf = JSON.parse(
-  readFileSync(resolve(import.meta.dir, "../src-tauri/tauri.conf.json"), "utf-8")
+  readFileSync(
+    resolve(import.meta.dir, "../src-tauri/tauri.conf.json"),
+    "utf-8"
+  )
 );
 const VERSION = tauriConf.version;
 const endpoints = tauriConf.plugins?.updater?.endpoints?.[0] ?? "";

@@ -262,13 +262,11 @@ async fn put_part(
 /// - genera TAR por canal
 /// - hace multipart sin guardar .tar en disco
 ///
-/// Progreso:
-/// - emite `sync-upload-progress` con `total = 0` (desconocido) y `loaded` acumulado.
-/// - La UI debe tratarlo como indeterminado / sin porcentaje.
 pub(crate) async fn upload_tar_stream_multipart(
     mut rx: tokio::sync::mpsc::Receiver<TarStreamMsg>,
     game_id: &str,
     relative_filename: &str,
+    estimated_total: u64,
     api_base: &str,
     user_id: &str,
     api_key: &str,
@@ -304,7 +302,7 @@ pub(crate) async fn upload_tar_stream_multipart(
             game_id: game_id.to_string(),
             filename: format!("{} (stream)", relative_filename),
             loaded: 0,
-            total: 0,
+            total: estimated_total,
         },
     );
 
@@ -358,7 +356,7 @@ pub(crate) async fn upload_tar_stream_multipart(
                                 game_id: game_id.to_string(),
                                 filename: format!("{} (stream)", relative_filename),
                                 loaded,
-                                total: 0,
+                                total: estimated_total,
                             },
                         );
                         part_number += 1;
@@ -402,7 +400,7 @@ pub(crate) async fn upload_tar_stream_multipart(
                 game_id: game_id.to_string(),
                 filename: format!("{} (stream)", relative_filename),
                 loaded,
-                total: 0,
+                total: estimated_total,
             },
         );
     }
@@ -432,6 +430,7 @@ pub(crate) async fn upload_tar_stream_multipart_dry_run(
     mut rx: tokio::sync::mpsc::Receiver<TarStreamMsg>,
     game_id: &str,
     relative_filename: &str,
+    estimated_total: u64,
     app: tauri::AppHandle,
     cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
@@ -448,7 +447,7 @@ pub(crate) async fn upload_tar_stream_multipart_dry_run(
             game_id: game_id.to_string(),
             filename: format!("{} (stream dry-run)", relative_filename),
             loaded: 0,
-            total: 0,
+            total: estimated_total,
         },
     );
 
@@ -477,7 +476,7 @@ pub(crate) async fn upload_tar_stream_multipart_dry_run(
                         game_id: game_id.to_string(),
                         filename: format!("{} (stream dry-run)", relative_filename),
                         loaded,
-                        total: 0,
+                        total: estimated_total,
                     },
                 );
             }

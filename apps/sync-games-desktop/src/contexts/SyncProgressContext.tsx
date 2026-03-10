@@ -9,6 +9,12 @@ import {
 } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getPausedUploadInfo } from "@services/tauri";
+import { formatGameDisplayName } from "@utils/gameImage";
+import {
+  notifyDownloadDone,
+  notifyFullBackupDone,
+  notifyUploadDone,
+} from "@utils/notification";
 
 export interface SyncProgressState {
   type: "upload" | "download";
@@ -114,9 +120,13 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       });
     });
     const unsubUploadDone = listen("sync-upload-done", () => {
-      if (syncOperationRef.current?.mode === "batch") return;
+      const op = syncOperationRef.current;
+      if (op?.mode === "batch") return;
       setProgress((prev) => (prev?.type === "upload" ? null : prev));
       setSyncOperationState(null);
+      if (op?.mode === "single" && op?.gameId) {
+        notifyUploadDone(formatGameDisplayName(op.gameId)).catch(() => {});
+      }
     });
     const unsubUploadPaused = listen<{ gameId: string; filename: string }>(
       "sync-upload-paused",
@@ -130,12 +140,20 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
       }
     );
     const unsubDownloadDone = listen("sync-download-done", () => {
+      const op = syncOperationRef.current;
       setProgress((prev) => (prev?.type === "download" ? null : prev));
       setSyncOperationState(null);
+      if (op?.mode === "single" && op?.gameId) {
+        notifyDownloadDone(formatGameDisplayName(op.gameId)).catch(() => {});
+      }
     });
     const unsubFullBackupDone = listen("full-backup-done", () => {
+      const op = syncOperationRef.current;
       setProgress((prev) => (prev?.type === "upload" ? null : prev));
       setSyncOperationState(null);
+      if (op?.mode === "single" && op?.gameId) {
+        notifyFullBackupDone(formatGameDisplayName(op.gameId)).catch(() => {});
+      }
     });
     return () => {
       unsubUpload.then((f) => f());

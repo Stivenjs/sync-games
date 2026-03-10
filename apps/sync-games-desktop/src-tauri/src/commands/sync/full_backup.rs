@@ -141,14 +141,41 @@ pub async fn create_and_upload_full_backup(
         .iter()
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
-
+    let raw_path = game.paths.first().map(|s| s.as_str()).unwrap_or("");
     let source_dir =
-        super::path_utils::expand_path(game.paths.first().map(|s| s.as_str()).unwrap_or(""))
-            .ok_or("No se pudo expandir la ruta del juego")?;
-    let source_dir = PathBuf::from(source_dir);
+        super::path_utils::expand_path(raw_path).ok_or("No se pudo expandir la ruta del juego")?;
+    let source_dir = PathBuf::from(&source_dir);
     if !source_dir.exists() || !source_dir.is_dir() {
         return Err("La carpeta del juego no existe".to_string());
     }
+
+    // Estimamos el tamaño total del juego en disco para poder calcular ETA real
+    // tanto en backups empaquetados clásicos como en streaming.
+    let source_dir_for_size = PathBuf::from(&source_dir);
+    let estimated_total = tokio::task::spawn_blocking(move || -> u64 {
+        fn dir_size(path: &std::path::Path) -> u64 {
+            let mut total = 0u64;
+            let meta = match std::fs::metadata(path) {
+                Ok(m) => m,
+                Err(_) => return 0,
+            };
+            if meta.is_file() {
+                return meta.len();
+            }
+            let read_dir = match std::fs::read_dir(path) {
+                Ok(rd) => rd,
+                Err(_) => return 0,
+            };
+            for entry in read_dir.flatten() {
+                let p = entry.path();
+                total += dir_size(&p);
+            }
+            total
+        }
+        dir_size(&source_dir_for_size)
+    })
+    .await
+    .unwrap_or(0);
 
     let temp_dir = std::env::temp_dir();
     let filename = format!("{}.tar", chrono::Utc::now().format("%Y-%m-%d_%H-%M-%S"));
@@ -181,6 +208,7 @@ pub async fn create_and_upload_full_backup(
             rx,
             &game_id,
             &relative_filename,
+            estimated_total,
             app.clone(),
             Some(tray_state.0.clone()),
         )
@@ -193,6 +221,7 @@ pub async fn create_and_upload_full_backup(
             rx,
             &game_id,
             &relative_filename,
+            estimated_total,
             api_base,
             user_id,
             api_key,

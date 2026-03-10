@@ -1,7 +1,10 @@
+import { Tooltip } from "@heroui/react";
 import { motion } from "framer-motion";
+import { HardDrive, Pause, Upload, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { SyncProgressState } from "@components/layout";
 import { requestUploadCancel, requestUploadPause } from "@services/tauri";
+import { formatBytes } from "@utils/format";
 
 export interface GameCardSyncProgressProps {
   /** Progreso de subida o descarga del juego. Círculo en esquina; detalles al pasar el cursor. */
@@ -147,22 +150,44 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
           <p className="mt-0.5 text-[10px] tabular-nums text-default-500">
             {isIndeterminate ? "—" : `${percent}%`}
           </p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] tabular-nums text-default-500">
+            {progress.type === "upload" ? (
+              <Upload size={10} className="shrink-0 text-primary" aria-hidden />
+            ) : (
+              <HardDrive
+                size={10}
+                className="shrink-0 text-primary"
+                aria-hidden
+              />
+            )}
+            <span>
+              {progress.type === "upload" ? "Enviados" : "En disco"}:{" "}
+              {formatBytes(progress.loaded)}
+              {progress.total > 0 ? ` / ${formatBytes(progress.total)}` : ""}
+            </span>
+          </p>
           {progress.type === "upload" && !isIndeterminate && (
-            <div className="mt-1.5 flex gap-2">
-              <button
-                type="button"
-                onClick={onPauseUpload}
-                className="text-[10px] font-medium text-foreground hover:underline"
-              >
-                Pausar
-              </button>
-              <button
-                type="button"
-                onClick={onCancelUpload}
-                className="text-[10px] font-medium text-danger hover:underline"
-              >
-                Cancelar
-              </button>
+            <div className="mt-1.5 flex shrink-0 gap-1">
+              <Tooltip content="Pausar subida" placement="top">
+                <button
+                  type="button"
+                  onClick={onPauseUpload}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200"
+                  aria-label="Pausar subida"
+                >
+                  <Pause size={12} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Cancelar subida" placement="top">
+                <button
+                  type="button"
+                  onClick={onCancelUpload}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10"
+                  aria-label="Cancelar subida"
+                >
+                  <X size={12} />
+                </button>
+              </Tooltip>
             </div>
           )}
         </div>
