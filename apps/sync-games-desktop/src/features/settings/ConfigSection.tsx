@@ -14,6 +14,7 @@ interface ConfigSectionProps {
   onExport: () => void | Promise<void>;
   onImportMerge: () => void | Promise<void>;
   onImportReplace: () => void | Promise<void>;
+  onPullFriendConfig: () => void | Promise<void>;
   onBackupToCloud: () => void | Promise<void>;
   onRestoreFromCloud: () => void | Promise<void>;
 }
@@ -30,6 +31,7 @@ export function ConfigSection({
   onExport,
   onImportMerge,
   onImportReplace,
+  onPullFriendConfig,
   onBackupToCloud,
   onRestoreFromCloud,
 }: ConfigSectionProps) {
@@ -151,6 +153,14 @@ export function ConfigSection({
               isLoading={importing}
             >
               Importar (reemplazar)
+            </Button>
+            <Button
+              size="sm"
+              variant="flat"
+              color="secondary"
+              onPress={onPullFriendConfig}
+            >
+              Importar de usuario
             </Button>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { NotificationsCard } from "@features/settings/NotificationsCard";
 import { ReleaseNotesCard } from "@features/settings/ReleaseNotesCard";
 import { ReleaseNotesDialog } from "@features/settings/ReleaseNotesDialog";
 import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
+import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
 
@@ -29,6 +30,9 @@ export function SettingsPage() {
     createUserId,
     creatingConfig,
     createConfigError,
+    pullFriendConfigModalOpen,
+    pullFriendUserId,
+    pullingFriendConfig,
     backingUpConfig,
     restoringConfig,
     restoreConfirmOpen,
@@ -39,6 +43,7 @@ export function SettingsPage() {
     performRestoreConfigFromCloud,
     handleTestNotification,
     handleCreateConfigFile,
+    handlePullFriendConfig,
     handleAutostartChange,
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
@@ -48,6 +53,8 @@ export function SettingsPage() {
     setCreateUserId,
     setCreateConfigModalOpen,
     setRestoreConfirmOpen,
+    setPullFriendConfigModalOpen,
+    setPullFriendUserId,
   } = useSettingsPage();
 
   return (
@@ -69,6 +76,7 @@ export function SettingsPage() {
         userId={config?.userId}
         s3TransferEndpointType={s3TransferEndpointType}
         onCreateConfig={openCreateConfigModal}
+        onPullFriendConfig={() => setPullFriendConfigModalOpen(true)}
         onExport={handleExportConfig}
         onImportMerge={() => handleImportConfig("merge")}
         onImportReplace={() => handleImportConfig("replace")}
@@ -120,6 +128,14 @@ export function SettingsPage() {
           await performRestoreConfigFromCloud();
           setRestoreConfirmOpen(false);
         }}
+      />
+      <PullFriendConfigModal
+        isOpen={pullFriendConfigModalOpen}
+        userId={pullFriendUserId}
+        pulling={pullingFriendConfig}
+        onChangeUserId={setPullFriendUserId}
+        onClose={() => setPullFriendConfigModalOpen(false)}
+        onSubmit={handlePullFriendConfig}
       />
       <ReleaseNotesDialog
         isOpen={releaseNotesOpen}

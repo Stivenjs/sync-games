@@ -84,6 +84,7 @@ pub fn run() {
             commands::open_save_folder,
             commands::export_config_to_file,
             commands::import_config_from_file,
+            commands::import_friend_config,
             commands::backup_config_to_cloud,
             commands::restore_config_from_cloud,
             commands::sync::api::sync_list_remote_saves_for_user,

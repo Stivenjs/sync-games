@@ -13,6 +13,7 @@ import {
   checkForUpdatesWithPrompt,
   setFullBackupStreaming,
   setFullBackupStreamingDryRun,
+  importFriendConfig,
 } from "@services/tauri";
 import { useConfig } from "@hooks/useConfig";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,9 +26,12 @@ type SettingsPageState = {
   testingNotification: boolean;
   exporting: boolean;
   importing: boolean;
-  checkingUpdate: boolean;
+   checkingUpdate: boolean;
   configPath: string;
   createConfigModalOpen: boolean;
+  pullFriendConfigModalOpen: boolean;
+  pullFriendUserId: string;
+  pullingFriendConfig: boolean;
   createApiBaseUrl: string;
   createApiKey: string;
   createUserId: string;
@@ -53,6 +57,9 @@ type SettingsPageAction =
       apiKey?: string;
       userId?: string;
     }
+  | { type: "SET_PULL_FRIEND_MODAL"; open: boolean }
+  | { type: "SET_PULL_FRIEND_USER_ID"; payload: string }
+  | { type: "SET_PULLING_FRIEND_CONFIG"; payload: boolean }
   | {
       type: "SET_CREATE_FORM_FROM_CONFIG";
       apiBaseUrl: string;
@@ -77,6 +84,9 @@ const initialState: SettingsPageState = {
   checkingUpdate: false,
   configPath: "",
   createConfigModalOpen: false,
+  pullFriendConfigModalOpen: false,
+  pullFriendUserId: "",
+  pullingFriendConfig: false,
   createApiBaseUrl: "",
   createApiKey: "",
   createUserId: "",
@@ -106,6 +116,12 @@ function settingsPageReducer(
       return { ...state, checkingUpdate: action.payload };
     case "SET_CONFIG_PATH":
       return { ...state, configPath: action.payload };
+    case "SET_PULL_FRIEND_MODAL":
+      return { ...state, pullFriendConfigModalOpen: action.open };
+    case "SET_PULL_FRIEND_USER_ID":
+      return { ...state, pullFriendUserId: action.payload };
+    case "SET_PULLING_FRIEND_CONFIG":
+      return { ...state, pullingFriendConfig: action.payload };
     case "SET_CREATE_MODAL":
       return {
         ...state,
@@ -273,6 +289,34 @@ export function useSettingsPage() {
     }
   };
 
+  const handlePullFriendConfig = async () => {
+    if (!state.pullFriendUserId.trim()) {
+      toastError("Error", "Ingresa un User ID válido.");
+      return;
+    }
+    dispatch({ type: "SET_PULLING_FRIEND_CONFIG", payload: true });
+    try {
+
+      await importFriendConfig(state.pullFriendUserId);
+      
+      toastSuccess(
+        "Configuración importada",
+        `Se ha importado la configuración de ${state.pullFriendUserId} correctamente.`
+      );
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (e) {
+      toastError(
+        "Error al importar",
+        e instanceof Error ? e.message : String(e)
+      );
+    } finally {
+      dispatch({ type: "SET_PULLING_FRIEND_CONFIG", payload: false });
+    }
+  };
+
   const handleTestNotification = async () => {
     dispatch({ type: "SET_TESTING_NOTIFICATION", payload: true });
     try {
@@ -400,6 +444,7 @@ export function useSettingsPage() {
     performRestoreConfigFromCloud,
     handleTestNotification,
     handleCreateConfigFile,
+    handlePullFriendConfig,
     handleAutostartChange,
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
@@ -414,5 +459,9 @@ export function useSettingsPage() {
       dispatch({ type: "SET_CREATE_MODAL", open }),
     setRestoreConfirmOpen: (v: boolean) =>
       dispatch({ type: "SET_RESTORE_CONFIRM_OPEN", payload: v }),
+    setPullFriendConfigModalOpen: (open: boolean) =>
+      dispatch({ type: "SET_PULL_FRIEND_MODAL", open }),
+    setPullFriendUserId: (id: string) =>
+      dispatch({ type: "SET_PULL_FRIEND_USER_ID", payload: id }),
   };
 }
