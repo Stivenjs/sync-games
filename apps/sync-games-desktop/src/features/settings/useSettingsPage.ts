@@ -298,7 +298,6 @@ export function useSettingsPage() {
       );
       toastSuccess("Archivo de configuración creado", path);
       dispatch({ type: "SET_CREATE_MODAL", open: false });
-      scheduleConfigBackupToCloud();
       refetchConfig?.();
       queryClient.invalidateQueries({ queryKey: ["config"] });
       const newPath = await getConfigPath();
