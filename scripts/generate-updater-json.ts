@@ -8,9 +8,6 @@
  *
  * Espera la estructura:
  *   desktop-windows/nsis/*.exe.sig
- *   desktop-linux/appimage/*.AppImage.sig
- *   desktop-macos-arm64/macos/*.sig
- *   desktop-macos-x64/macos/*.sig
  */
 
 import { readdirSync, readFileSync, existsSync } from "fs";
@@ -28,9 +25,6 @@ const cwd = process.cwd();
 
 const ARTIFACT_PLATFORM: Record<string, string> = {
   "desktop-windows": "windows-x86_64",
-  "desktop-linux": "linux-x86_64",
-  "desktop-macos-arm64": "darwin-aarch64",
-  "desktop-macos-x64": "darwin-x86_64",
 };
 
 function findFirstSig(
