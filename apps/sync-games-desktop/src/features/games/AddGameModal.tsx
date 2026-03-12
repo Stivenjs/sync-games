@@ -199,7 +199,11 @@ export function AddGameModal({
             <Input
               label="URL de la imagen o imagen local"
               placeholder="Pega una URL de imagen o selecciona un archivo"
-              value={imageUrl.startsWith("data:") ? "(imagen local seleccionada)" : imageUrl}
+              value={
+                imageUrl.startsWith("data:")
+                  ? "(imagen local seleccionada)"
+                  : imageUrl
+              }
               onValueChange={(v) => {
                 if (v !== "(imagen local seleccionada)") setImageUrl(v);
               }}

@@ -664,3 +664,24 @@ export async function previewDownload(
 ): Promise<PreviewDownload> {
   return invoke<PreviewDownload>("preview_download", { gameId });
 }
+
+/** Inicia la descarga de un torrent */
+export async function startTorrentDownload(
+  magnet: string,
+  savePath: string
+): Promise<void> {
+  await invoke("start_torrent_download", { magnet, savePath });
+}
+
+/** Inicia la descarga de un torrent a partir de un archivo .torrent */
+export async function startTorrentFileDownload(
+  file: string,
+  savePath: string
+): Promise<void> {
+  await invoke("start_torrent_file_download", { file, savePath });
+}
+
+/** Cancela la descarga de un torrent */
+export async function cancelTorrent(infoHash: string): Promise<void> {
+  await invoke("cancel_torrent", { infoHash });
+}
