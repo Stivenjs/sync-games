@@ -1,9 +1,12 @@
 use serde::Deserialize;
 use std::sync::OnceLock;
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
+
 pub struct ConfigPaths {
     pub windows: WindowsPaths,
+    pub unix: UnixPaths,
 }
 
 #[derive(Deserialize, Debug)]
@@ -11,6 +14,12 @@ pub struct WindowsPaths {
     pub default_steam_path: String,
     pub base_scan_templates: Vec<PathEntry>,
     pub crack_save_locations: Vec<PathEntry>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+pub struct UnixPaths {
+    pub base_scan_templates: Vec<PathEntry>,
 }
 
 #[derive(Deserialize, Debug)]
