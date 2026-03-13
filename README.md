@@ -6,7 +6,7 @@ Servidor de guardado en la nube para juegos (S3 + Lambda) y app de escritorio pa
 
 La infraestructura backend y la configuración completa del proyecto se explican en la guía de despliegue disponible en:
 
-[./doc/DEPLOYMENT.MD](./doc/DEPLOYMENT.MD)
+[guía de despliegue](./doc/DEPLOYMENT.md)
 
 Esta guía cubre la preparación del entorno, generación de API keys, configuración del archivo `.env`, despliegue en AWS (dev y live), configuración de la aplicación de escritorio y verificación del sistema.
 
