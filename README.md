@@ -2,6 +2,14 @@
 
 Servidor de guardado en la nube para juegos (S3 + Lambda) y app de escritorio para sincronizar guardados. Clean Architecture en backend y CLI.
 
+## Guía de despliegue
+
+La infraestructura backend y la configuración completa del proyecto se explican en la guía de despliegue disponible en:
+
+[https://github.com/Stivenjs/savecloud/tree/main/doc](./doc/DEPLOYMENT.md)
+
+Esta guía cubre la preparación del entorno, generación de API keys, configuración del archivo `.env`, despliegue en AWS (dev y live), configuración de la aplicación de escritorio y verificación del sistema.
+
 ## Contenido del repositorio
 
 - **Backend (API + CLI):** raíz del repo — Fastify, TypeScript, despliegue en AWS Lambda + API Gateway, almacenamiento en S3.
