@@ -151,3 +151,80 @@ userId/gameId/<archivo>
 ```
 
 Si desplegaste en AWS (`bun run deploy:dev`), usa en la configuración la URL del API Gateway (por ejemplo `https://xxxx.execute-api.us-east-2.amazonaws.com`).
+
+## Arquitectura del sistema
+
+```
+Desktop App (Tauri + React)
+          │
+          │ HTTPS
+          ▼
+      API Gateway
+          │
+          ▼
+      AWS Lambda
+          │
+          ▼
+        Amazon S3
+          │
+          ▼
+     CloudFront (solo en live)
+```
+
+La aplicación de escritorio solicita **URLs firmadas** al backend. Luego sube y descarga archivos **directamente desde S3**, evitando que Lambda procese los archivos y reduciendo costos y latencia.
+
+## Comandos rápidos
+
+Comandos más comunes durante desarrollo:
+
+```bash
+# instalar dependencias
+bun install
+
+# ejecutar API local
+bun run dev
+
+# desplegar entorno de desarrollo
+bun run deploy:dev
+
+# desplegar entorno de producción
+bun run deploy:live
+
+# ejecutar app de escritorio
+bun run desktop
+```
+
+## Troubleshooting
+
+### Error de autenticación en la API
+
+Verifica que el header `x-api-key` coincida con la variable `API_KEY` configurada en el backend.
+
+### Archivos no aparecen en S3
+
+Comprueba:
+
+- que `BUCKET_NAME` esté configurado correctamente
+- que el usuario tenga permisos `s3:PutObject`
+- que el `userId` usado por el cliente sea correcto
+
+### Fallos en subida multipart
+
+Si una subida grande falla:
+
+- revisa el archivo `sync-debug.log`
+- cancela la subida en la app
+- vuelve a iniciar el proceso
+
+### Problemas con CloudFront
+
+Si los archivos no se descargan correctamente en `live`:
+
+- espera unos minutos a que la distribución se propague
+- invalida la cache de CloudFront si cambiaste objetos existentes
+
+---
+
+## Licencia
+
+Este proyecto está licenciado bajo **MIT**.
