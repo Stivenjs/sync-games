@@ -2,55 +2,87 @@
  * Genera latest.json para GitHub Releases.
  * Ejecutar después de `tauri build` con firma.
  *
- * Uso: bun run scripts/generate-latest-json.ts
+ * Uso:
+ * bun run scripts/generate-latest-json.ts
  */
 
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { existsSync } from "fs";
+import { resolve, join, basename } from "path";
+import { Glob } from "bun";
 
-const tauriConf = JSON.parse(
-  readFileSync(
-    resolve(import.meta.dir, "../src-tauri/tauri.conf.json"),
-    "utf-8"
-  )
-);
+const baseDir = resolve(import.meta.dir, "..");
+const bundleDir = join(baseDir, "src-tauri/target/release/bundle");
+
+const tauriConf = await Bun.file(
+  join(baseDir, "src-tauri/tauri.conf.json")
+).json();
 const VERSION = tauriConf.version;
+
 const endpoints = tauriConf.plugins?.updater?.endpoints?.[0] ?? "";
-const match = endpoints.match(/github\.com\/([^/]+)\/([^/]+)\//);
-const GITHUB_USER = match?.[1] ?? "Stivenjs";
-const REPO = match?.[2] ?? "savecloud";
+const [, GITHUB_USER = "Stivenjs", REPO = "savecloud"] =
+  endpoints.match(/github\.com\/([^/]+)\/([^/]+)\//) ?? [];
 
-const bundleDir = resolve(
-  import.meta.dir,
-  "../src-tauri/target/release/bundle/nsis"
-);
-
-const sigPath = resolve(bundleDir, `SaveCloud_${VERSION}_x64-setup.exe.sig`);
-
-let sigContent: string;
-try {
-  sigContent = readFileSync(sigPath, "utf-8").trim();
-} catch (e) {
-  console.error(
-    "No se encontró el archivo .sig. ¿Hiciste `tauri build` con TAURI_SIGNING_PRIVATE_KEY_PATH?"
-  );
-  console.error("Ruta buscada:", sigPath);
+if (!existsSync(bundleDir)) {
+  console.error("No se encontró la carpeta bundle. ¿Ejecutaste `tauri build`?");
   process.exit(1);
 }
 
-const latest = {
-  version: VERSION,
-  notes: "",
-  pub_date: new Date().toISOString(),
-  platforms: {
-    "windows-x86_64": {
-      signature: sigContent,
-      url: `https://github.com/${GITHUB_USER}/${REPO}/releases/download/v${VERSION}/SaveCloud_${VERSION}_x64-setup.exe`,
-    },
-  },
+const sigFiles = Array.from(
+  new Glob("**/*.sig").scanSync({ cwd: bundleDir, absolute: true })
+);
+
+if (!sigFiles.length) {
+  console.error(
+    "No se encontraron archivos .sig. ¿Hiciste `tauri build` con firma?"
+  );
+  process.exit(1);
+}
+
+const platforms: Record<string, { signature: string; url: string }> = {};
+
+const extMap: Record<string, string[]> = {
+  ".exe": ["windows-x86_64"],
+  ".AppImage": ["linux-x86_64"],
+  ".deb": ["linux-x86_64"],
+  ".rpm": ["linux-x86_64"],
+  ".app.tar.gz": ["darwin-x86_64", "darwin-aarch64"],
 };
 
-const outputPath = resolve(import.meta.dir, "../latest.json");
-await Bun.write(outputPath, JSON.stringify(latest, null, 2));
+for (const sigPath of sigFiles) {
+  const installerName = basename(sigPath, ".sig");
+  const ext = Object.keys(extMap).find((e) => installerName.endsWith(e));
+
+  if (ext) {
+    const signature = (await Bun.file(sigPath).text()).trim();
+    const url = `https://github.com/${GITHUB_USER}/${REPO}/releases/download/v${VERSION}/${installerName}`;
+
+    extMap[ext].forEach((target) => {
+      platforms[target] = { signature, url };
+    });
+  }
+}
+
+if (!Object.keys(platforms).length) {
+  console.error("No se pudieron detectar plataformas válidas.");
+  process.exit(1);
+}
+
+const outputPath = join(baseDir, "latest.json");
+
+await Bun.write(
+  outputPath,
+  JSON.stringify(
+    {
+      version: VERSION,
+      notes: "",
+      pub_date: new Date().toISOString(),
+      platforms,
+    },
+    null,
+    2
+  )
+);
+
 console.log("latest.json generado en:", outputPath);
+console.log("Plataformas detectadas:", Object.keys(platforms).join(", "));
 console.log("Súbelo como asset en tu release de GitHub.");

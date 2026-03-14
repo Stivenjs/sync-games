@@ -7,8 +7,9 @@
  * VERSION=0.1.7 GITHUB_REPOSITORY=Stivenjs/savecloud bun run scripts/generate-updater-json.ts
  */
 
-import { readdirSync, readFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
+import { resolve, basename } from "path";
+import { mkdir } from "fs/promises";
+import { Glob } from "bun";
 
 const raw =
   process.env.VERSION ||
@@ -26,40 +27,30 @@ const ARTIFACT_PLATFORM: Record<string, string[]> = {
   "desktop-macos-universal": ["darwin-x86_64", "darwin-aarch64"],
 };
 
-function findFirstSig(
-  dir: string
-): { sigPath: string; installerName: string } | null {
-  if (!existsSync(dir)) return null;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      const found = findFirstSig(full);
-      if (found) return found;
-    } else if (entry.name.endsWith(".sig")) {
-      return { sigPath: full, installerName: entry.name.slice(0, -4) };
-    }
-  }
-  return null;
-}
-
 const platforms: Record<string, { signature: string; url: string }> = {};
+const glob = new Glob("**/*.sig");
 
 for (const [artifact, tauriPlatforms] of Object.entries(ARTIFACT_PLATFORM)) {
   const artifactDir = resolve(cwd, artifact);
-  const found = findFirstSig(artifactDir);
-  if (found) {
-    const sigContent = readFileSync(found.sigPath, "utf-8").trim();
-    const url = `${BASE_URL}/${found.installerName}`;
 
-    for (const platform of tauriPlatforms) {
-      platforms[platform] = { signature: sigContent, url };
-    }
+  const [sigPath] = Array.from(
+    glob.scanSync({ cwd: artifactDir, absolute: true })
+  );
+
+  if (sigPath) {
+    const signature = (await Bun.file(sigPath).text()).trim();
+    const installerName = basename(sigPath, ".sig");
+    const url = `${BASE_URL}/${installerName}`;
+
+    tauriPlatforms.forEach((platform) => {
+      platforms[platform] = { signature, url };
+    });
   } else {
     console.warn(`No se encontró firma (.sig) para el artifact: ${artifact}`);
   }
 }
 
-if (Object.keys(platforms).length === 0) {
+if (!Object.keys(platforms).length) {
   console.error(
     "No se encontraron archivos .sig. ¿Los artifacts de desktop tienen createUpdaterArtifacts?"
   );
@@ -67,21 +58,23 @@ if (Object.keys(platforms).length === 0) {
 }
 
 let notes = process.env.RELEASE_NOTES?.trim() ?? "";
-const notesFile = resolve(cwd, "RELEASE_NOTES.md");
-if (!notes && existsSync(notesFile)) {
-  notes = readFileSync(notesFile, "utf-8").trim();
+const notesFile = Bun.file(resolve(cwd, "RELEASE_NOTES.md"));
+
+if (!notes && (await notesFile.exists())) {
+  notes = (await notesFile.text()).trim();
 }
 
-const latest = {
-  version: VERSION,
-  notes: notes || "",
-  pub_date: new Date().toISOString(),
-  platforms,
-};
-
 const outputPath = resolve(cwd, "release/latest.json");
-const { mkdir } = await import("fs/promises");
 await mkdir(resolve(cwd, "release"), { recursive: true });
-await Bun.write(outputPath, JSON.stringify(latest, null, 2));
+
+await Bun.write(
+  outputPath,
+  JSON.stringify(
+    { version: VERSION, notes, pub_date: new Date().toISOString(), platforms },
+    null,
+    2
+  )
+);
+
 console.log("latest.json generado:", outputPath);
 console.log("Plataformas incluidas:", Object.keys(platforms).join(", "));
