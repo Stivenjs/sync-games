@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Hls from "hls.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
@@ -64,11 +58,7 @@ export interface GameCardHoverCardProps {
  * Envuelve la tarjeta de juego y muestra un popover al hacer hover
  * con más información e imágenes (estilo Steam).
  */
-export function GameCardHoverCard({
-  children,
-  mediaUrls,
-  videoUrl,
-}: GameCardHoverCardProps) {
+export function GameCardHoverCard({ children, mediaUrls, videoUrl }: GameCardHoverCardProps) {
   const [showHovercard, setShowHovercard] = useState(false);
   const [isVideoMode, setIsVideoMode] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -79,9 +69,7 @@ export function GameCardHoverCard({
   const [failedUrls, setFailedUrls] = useState<Set<string>>(new Set());
   const hoverOpenRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const nextSlideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const nextSlideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAdvanceRef = useRef(false);
   const preloadImgRef = useRef<HTMLImageElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -94,9 +82,7 @@ export function GameCardHoverCard({
   const hasCarousel = validUrls.length > 1;
   const safeIndex = validUrls.length ? currentIndex % validUrls.length : 0;
   const currentUrl = validUrls[safeIndex];
-  const nextUrl = hasCarousel
-    ? validUrls[(safeIndex + 1) % validUrls.length]
-    : null;
+  const nextUrl = hasCarousel ? validUrls[(safeIndex + 1) % validUrls.length] : null;
 
   useEffect(() => {
     setCurrentImageLoaded(false);
@@ -166,8 +152,7 @@ export function GameCardHoverCard({
   }, [showHovercard, nextUrl, validUrls.length]);
 
   useEffect(() => {
-    if (!showHovercard || !hasCarousel || !currentImageLoaded || isVideoMode)
-      return;
+    if (!showHovercard || !hasCarousel || !currentImageLoaded || isVideoMode) return;
     nextSlideTimeoutRef.current = setTimeout(() => {
       nextSlideTimeoutRef.current = null;
       if (nextImageReady) {
@@ -182,14 +167,7 @@ export function GameCardHoverCard({
         nextSlideTimeoutRef.current = null;
       }
     };
-  }, [
-    showHovercard,
-    hasCarousel,
-    currentImageLoaded,
-    nextImageReady,
-    validUrls.length,
-    isVideoMode,
-  ]);
+  }, [showHovercard, hasCarousel, currentImageLoaded, nextImageReady, validUrls.length, isVideoMode]);
 
   const toggleVideoMode = useCallback(() => {
     if (isVideoMode) {
@@ -239,30 +217,22 @@ export function GameCardHoverCard({
         showArrow
         offset={8}
         classNames={{
-          content:
-            "max-w-[20rem] w-[20rem] p-0 overflow-hidden rounded-xl shadow-lg border border-default-200/80",
-        }}
-      >
+          content: "max-w-[20rem] w-[20rem] p-0 overflow-hidden rounded-xl shadow-lg border border-default-200/80",
+        }}>
         <PopoverTrigger>
-          <div
-            className="outline-none"
-            onMouseEnter={openHovercard}
-            onMouseLeave={closeHovercard}
-          >
+          <div className="outline-none" onMouseEnter={openHovercard} onMouseLeave={closeHovercard}>
             {children}
           </div>
         </PopoverTrigger>
         <PopoverContent
           onMouseEnter={openHovercard}
           onMouseLeave={closeHovercard}
-          className="p-0 overflow-hidden rounded-xl border-0 shadow-lg bg-transparent"
-        >
+          className="p-0 overflow-hidden rounded-xl border-0 shadow-lg bg-transparent">
           <motion.div
             className="relative w-full h-44 overflow-hidden rounded-xl bg-default-200"
             variants={contentVariants}
             initial="hidden"
-            animate="visible"
-          >
+            animate="visible">
             {isVideoMode && hasVideo ? (
               <video
                 ref={videoRef}
@@ -301,51 +271,36 @@ export function GameCardHoverCard({
                       variant="flat"
                       className="min-w-8 w-8 h-8 rounded-lg bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
                       aria-label="Ver vídeo en grande"
-                      onPress={() => setShowVideoModal(true)}
-                    >
+                      onPress={() => setShowVideoModal(true)}>
                       <Maximize2 size={16} strokeWidth={2} />
                     </Button>
                     <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    className="min-w-8 w-8 h-8 rounded-lg bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
-                    aria-label={isMuted ? "Activar sonido" : "Silenciar"}
-                    onPress={() => setIsMuted((m) => !m)}
-                  >
-                    {isMuted ? (
-                      <VolumeX size={16} strokeWidth={2} />
-                    ) : (
-                      <Volume2 size={16} strokeWidth={2} />
-                    )}
-                  </Button>
-                </>
-              )}
-              <Button
-                isIconOnly
-                size="sm"
-                variant="flat"
-                className="min-w-8 w-8 h-8 rounded-lg bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
-                aria-label={isVideoMode ? "Ver imágenes" : "Reproducir vídeo"}
-                onPress={toggleVideoMode}
-              >
-                {isVideoMode ? (
-                  <ImageIcon size={16} strokeWidth={2} />
-                ) : (
-                  <Video size={16} strokeWidth={2} />
+                      isIconOnly
+                      size="sm"
+                      variant="flat"
+                      className="min-w-8 w-8 h-8 rounded-lg bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+                      aria-label={isMuted ? "Activar sonido" : "Silenciar"}
+                      onPress={() => setIsMuted((m) => !m)}>
+                      {isMuted ? <VolumeX size={16} strokeWidth={2} /> : <Volume2 size={16} strokeWidth={2} />}
+                    </Button>
+                  </>
                 )}
-              </Button>
-            </div>
-          )}
-        </motion.div>
-      </PopoverContent>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="flat"
+                  className="min-w-8 w-8 h-8 rounded-lg bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+                  aria-label={isVideoMode ? "Ver imágenes" : "Reproducir vídeo"}
+                  onPress={toggleVideoMode}>
+                  {isVideoMode ? <ImageIcon size={16} strokeWidth={2} /> : <Video size={16} strokeWidth={2} />}
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        </PopoverContent>
       </Popover>
       {hasVideo && videoUrl && (
-        <GameVideoModal
-          isOpen={showVideoModal}
-          onClose={() => setShowVideoModal(false)}
-          videoUrl={videoUrl}
-        />
+        <GameVideoModal isOpen={showVideoModal} onClose={() => setShowVideoModal(false)} videoUrl={videoUrl} />
       )}
     </>
   );

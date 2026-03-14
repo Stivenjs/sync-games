@@ -1,14 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Textarea,
-} from "@heroui/react";
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea } from "@heroui/react";
 import { FolderOpen } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { ConfiguredGame } from "@app-types/config";
@@ -22,12 +13,7 @@ interface FriendGameTemplateModalProps {
   onCreated?: () => void;
 }
 
-export function FriendGameTemplateModal({
-  isOpen,
-  game,
-  onClose,
-  onCreated,
-}: FriendGameTemplateModalProps) {
+export function FriendGameTemplateModal({ isOpen, game, onClose, onCreated }: FriendGameTemplateModalProps) {
   const [gameId, setGameId] = useState("");
   const [path, setPath] = useState("");
   const [editionLabel, setEditionLabel] = useState("");
@@ -64,32 +50,17 @@ export function FriendGameTemplateModal({
     const trimmedId = gameId.trim();
     const trimmedPath = path.trim();
     if (!trimmedId || !trimmedPath) {
-      toastError(
-        "Faltan datos",
-        "Necesitas indicar al menos el identificador y una ruta local."
-      );
+      toastError("Faltan datos", "Necesitas indicar al menos el identificador y una ruta local.");
       return;
     }
     setSaving(true);
     try {
-      await addGame(
-        trimmedId,
-        trimmedPath,
-        editionLabel,
-        sourceUrl,
-        steamAppId
-      );
-      toastSuccess(
-        "Juego creado desde plantilla",
-        `Se añadió ${trimmedId} usando la configuración del amigo.`
-      );
+      await addGame(trimmedId, trimmedPath, editionLabel, sourceUrl, steamAppId);
+      toastSuccess("Juego creado desde plantilla", `Se añadió ${trimmedId} usando la configuración del amigo.`);
       onCreated?.();
       onClose();
     } catch (e) {
-      toastError(
-        "No se pudo crear el juego",
-        e instanceof Error ? e.message : "Ocurrió un error inesperado"
-      );
+      toastError("No se pudo crear el juego", e instanceof Error ? e.message : "Ocurrió un error inesperado");
     } finally {
       setSaving(false);
     }
@@ -102,17 +73,15 @@ export function FriendGameTemplateModal({
         if (!open) onClose();
       }}
       placement="center"
-      size="lg"
-    >
+      size="lg">
       <ModalContent>
         <ModalHeader>Usar configuración de amigo como plantilla</ModalHeader>
         <ModalBody className="gap-4">
           {game ? (
             <>
               <p className="text-sm text-default-500">
-                Crea un juego en tu configuración copiando los metadatos del
-                juego de tu amigo. Solo necesitas ajustar la ruta local donde
-                están tus guardados.
+                Crea un juego en tu configuración copiando los metadatos del juego de tu amigo. Solo necesitas ajustar
+                la ruta local donde están tus guardados.
               </p>
               <Input
                 label="Identificador del juego en tu config"
@@ -132,8 +101,7 @@ export function FriendGameTemplateModal({
                     type="button"
                     onClick={handleBrowsePath}
                     className="flex items-center justify-center text-default-400 hover:text-default-700"
-                    aria-label="Buscar carpeta"
-                  >
+                    aria-label="Buscar carpeta">
                     <FolderOpen size={16} />
                   </button>
                 }
@@ -165,28 +133,18 @@ export function FriendGameTemplateModal({
                 readOnly
                 variant="bordered"
                 minRows={2}
-                value={
-                  `Juego del amigo: ${game.id}\n` +
-                  `Rutas originales: ${game.paths.join(", ")}`
-                }
+                value={`Juego del amigo: ${game.id}\n` + `Rutas originales: ${game.paths.join(", ")}`}
               />
             </>
           ) : (
-            <p className="text-sm text-default-500">
-              No hay juego seleccionado.
-            </p>
+            <p className="text-sm text-default-500">No hay juego seleccionado.</p>
           )}
         </ModalBody>
         <ModalFooter>
           <Button variant="flat" onPress={onClose}>
             Cancelar
           </Button>
-          <Button
-            color="primary"
-            onPress={handleSubmit}
-            isLoading={saving}
-            isDisabled={!game}
-          >
+          <Button color="primary" onPress={handleSubmit} isLoading={saving} isDisabled={!game}>
             Crear juego en mi config
           </Button>
         </ModalFooter>

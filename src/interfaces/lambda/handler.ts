@@ -28,14 +28,8 @@ async function getProxy() {
  * Handler de Lambda: delega en Fastify vía @fastify/aws-lambda.
  * La app se reutiliza entre invocaciones (cache) para reducir cold starts.
  */
-export async function handler(
-  event: unknown,
-  context: unknown
-): Promise<unknown> {
+export async function handler(event: unknown, context: unknown): Promise<unknown> {
   const proxy = await getProxy();
-  const invoke = proxy as (
-    event: unknown,
-    context: unknown
-  ) => Promise<unknown>;
+  const invoke = proxy as (event: unknown, context: unknown) => Promise<unknown>;
   return invoke(event, context);
 }

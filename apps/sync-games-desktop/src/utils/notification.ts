@@ -1,9 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 /** Título de las notificaciones (cambiar aquí para todas). */
 export const NOTIFICATION_TITLE = "SaveCloud";
@@ -32,10 +28,7 @@ async function ensurePermission(): Promise<boolean> {
  * Así las notificaciones se muestran cuando el usuario no está mirando la app.
  */
 export async function isAppInBackground(): Promise<boolean> {
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
     return true;
   }
   try {
@@ -48,9 +41,7 @@ export async function isAppInBackground(): Promise<boolean> {
 }
 
 /** Solo envía notificación si tenemos permiso y la app está en segundo plano. */
-async function maybeNotify(
-  build: () => { title: string; body: string }
-): Promise<void> {
+async function maybeNotify(build: () => { title: string; body: string }): Promise<void> {
   if (!(await isAppInBackground())) return;
   if (!(await ensurePermission())) return;
   const { title, body } = build();
@@ -90,10 +81,7 @@ export async function notifyFullBackupDone(gameName: string): Promise<void> {
 /**
  * Notificación cuando falla una subida.
  */
-export async function notifyUploadError(
-  gameName: string,
-  error: string
-): Promise<void> {
+export async function notifyUploadError(gameName: string, error: string): Promise<void> {
   await maybeNotify(() => ({
     title: NOTIFICATION_TITLE_ERROR,
     body: `${gameName}: error al subir — ${error}`,
@@ -103,10 +91,7 @@ export async function notifyUploadError(
 /**
  * Notificación cuando falla una descarga.
  */
-export async function notifyDownloadError(
-  gameName: string,
-  error: string
-): Promise<void> {
+export async function notifyDownloadError(gameName: string, error: string): Promise<void> {
   await maybeNotify(() => ({
     title: NOTIFICATION_TITLE_ERROR,
     body: `${gameName}: error al descargar — ${error}`,
@@ -116,10 +101,7 @@ export async function notifyDownloadError(
 /**
  * Notificación cuando falla un backup completo.
  */
-export async function notifyFullBackupError(
-  gameName: string,
-  error: string
-): Promise<void> {
+export async function notifyFullBackupError(gameName: string, error: string): Promise<void> {
   await maybeNotify(() => ({
     title: NOTIFICATION_TITLE_ERROR,
     body: `${gameName}: error al empaquetar/subir — ${error}`,
@@ -129,10 +111,7 @@ export async function notifyFullBackupError(
 /**
  * Notificación al terminar "subir todos" (batch).
  */
-export async function notifyBatchUploadDone(
-  okCount: number,
-  errCount: number
-): Promise<void> {
+export async function notifyBatchUploadDone(okCount: number, errCount: number): Promise<void> {
   await maybeNotify(() => {
     if (errCount === 0) {
       return {
@@ -156,10 +135,7 @@ export async function notifyBatchUploadDone(
 /**
  * Notificación al terminar "descargar todos" (batch).
  */
-export async function notifyBatchDownloadDone(
-  okCount: number,
-  errCount: number
-): Promise<void> {
+export async function notifyBatchDownloadDone(okCount: number, errCount: number): Promise<void> {
   await maybeNotify(() => {
     if (errCount === 0) {
       return {
@@ -183,11 +159,7 @@ export async function notifyBatchDownloadDone(
 /**
  * Muestra una notificación de sistema para sync automático (solo si app en segundo plano).
  */
-export async function notifySyncComplete(
-  gameName: string,
-  okCount: number,
-  errCount: number
-): Promise<void> {
+export async function notifySyncComplete(gameName: string, okCount: number, errCount: number): Promise<void> {
   await maybeNotify(() => {
     if (errCount === 0) {
       return {
@@ -224,10 +196,7 @@ export async function notifyTest(): Promise<boolean> {
 /**
  * Notificación cuando hay error en la subida automática (solo si app en segundo plano).
  */
-export async function notifySyncError(
-  gameName: string,
-  error: string
-): Promise<void> {
+export async function notifySyncError(gameName: string, error: string): Promise<void> {
   await maybeNotify(() => ({
     title: NOTIFICATION_TITLE_ERROR,
     body: `${gameName}: ${error}`,

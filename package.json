@@ -1,6 +1,6 @@
 {
   "name": "sync-games",
-  "version": "1.5.5",
+  "version": "1.6.5",
   "private": true,
   "bin": {
     "sync-games": "./src/cli/index.ts"
@@ -21,7 +21,15 @@
     "desktop:dev": "bun run --cwd apps/sync-games-desktop dev",
     "desktop:build": "bun run --cwd apps/sync-games-desktop tauri build",
     "cargo:check": "bun run --cwd apps/sync-games-desktop/src-tauri cargo check",
-    "cargo:clean": "bun run --cwd apps/sync-games-desktop/src-tauri cargo clean"
+    "cargo:clean": "bun run --cwd apps/sync-games-desktop/src-tauri cargo clean",
+    "sync-version": "bun run scripts/sync-version.ts",
+    "format": "bunx prettier . --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "lint-staged": {
+      "*.{js,jsx,ts,tsx,json,css,scss,md}": [
+        "bunx prettier . --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+      ]
+    },
+    "prepare": "husky"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
@@ -39,6 +47,8 @@
     "@types/bun": "latest",
     "@types/node": "^22.0.0",
     "esbuild": "^0.24.0",
+    "husky": "^9.1.7",
+    "prettier": "3.8.1",
     "serverless": "^4.0.0",
     "typescript": "^5.6.0"
   }

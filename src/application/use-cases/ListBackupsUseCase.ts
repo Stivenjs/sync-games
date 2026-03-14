@@ -18,10 +18,7 @@ export class ListBackupsUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: ListBackupsInput): Promise<ListBackupsOutput> {
-    const backups = await this.saveRepository.listBackups(
-      input.userId,
-      input.gameId
-    );
+    const backups = await this.saveRepository.listBackups(input.userId, input.gameId);
     return { backups };
   }
 }

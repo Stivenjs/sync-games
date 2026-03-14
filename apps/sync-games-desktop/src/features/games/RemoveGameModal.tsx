@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { Trash2 } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 
@@ -17,12 +10,7 @@ interface RemoveGameModalProps {
   onConfirm: (gameId: string) => Promise<void>;
 }
 
-export function RemoveGameModal({
-  isOpen,
-  onClose,
-  game,
-  onConfirm,
-}: RemoveGameModalProps) {
+export function RemoveGameModal({ isOpen, onClose, game, onConfirm }: RemoveGameModalProps) {
   const [loading, setLoading] = useState(false);
 
   const handleConfirm = async () => {
@@ -42,8 +30,7 @@ export function RemoveGameModal({
 
   if (!game) return null;
 
-  const pathsInfo =
-    game.paths.length > 1 ? ` y sus ${game.paths.length} rutas` : "";
+  const pathsInfo = game.paths.length > 1 ? ` y sus ${game.paths.length} rutas` : "";
 
   return (
     <Modal isOpen={isOpen} onOpenChange={handleOpenChange} placement="center">
@@ -57,20 +44,14 @@ export function RemoveGameModal({
             ¿Eliminar &quot;{game.id}&quot;{pathsInfo}?
           </p>
           <p className="text-sm text-default-400">
-            Se quitará de la app y sus guardados se borrarán de la nube. Esta
-            acción no se puede deshacer.
+            Se quitará de la app y sus guardados se borrarán de la nube. Esta acción no se puede deshacer.
           </p>
         </ModalBody>
         <ModalFooter>
           <Button variant="flat" onPress={onClose}>
             Cancelar
           </Button>
-          <Button
-            color="danger"
-            onPress={handleConfirm}
-            isLoading={loading}
-            startContent={<Trash2 size={18} />}
-          >
+          <Button color="danger" onPress={handleConfirm} isLoading={loading} startContent={<Trash2 size={18} />}>
             Eliminar
           </Button>
         </ModalFooter>

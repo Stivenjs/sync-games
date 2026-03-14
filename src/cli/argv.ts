@@ -7,15 +7,10 @@ import { KNOWN_COMMANDS } from "@cli/constants";
  */
 export function getCliArgs(): string[] {
   const first = process.argv[1];
-  const isUserCommand =
-    typeof first === "string" &&
-    KNOWN_COMMANDS.includes(first as (typeof KNOWN_COMMANDS)[number]);
+  const isUserCommand = typeof first === "string" && KNOWN_COMMANDS.includes(first as (typeof KNOWN_COMMANDS)[number]);
   const raw = isUserCommand ? process.argv.slice(1) : process.argv.slice(2);
   const exePath = process.argv[0] ?? process.execPath ?? "";
   const isExePath = (arg: string) =>
-    arg === exePath ||
-    arg === process.execPath ||
-    arg.endsWith("sync-games.exe") ||
-    arg.endsWith("sync-games");
+    arg === exePath || arg === process.execPath || arg.endsWith("sync-games.exe") || arg.endsWith("sync-games");
   return raw.filter((arg) => !isExePath(arg));
 }

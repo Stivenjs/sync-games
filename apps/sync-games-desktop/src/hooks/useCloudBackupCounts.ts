@@ -9,10 +9,7 @@ const CLOUD_BACKUP_COUNTS_QUERY_KEY = ["cloud-backup-counts"] as const;
  * Una sola petición batch para todos los gameIds.
  */
 export function useCloudBackupCounts(gameIds: string[], enabled: boolean) {
-  const sortedKey = useMemo(
-    () => [...gameIds].filter(Boolean).sort().join(","),
-    [gameIds]
-  );
+  const sortedKey = useMemo(() => [...gameIds].filter(Boolean).sort().join(","), [gameIds]);
 
   const { data: backupsByGameId, isLoading } = useQuery({
     queryKey: [...CLOUD_BACKUP_COUNTS_QUERY_KEY, sortedKey],

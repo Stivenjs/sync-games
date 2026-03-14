@@ -52,11 +52,7 @@ export class S3SaveRepository implements SaveRepository {
     return `${normalizedBase}/${encodedKey}`;
   }
 
-  async getUploadUrl(
-    userId: string,
-    gameId: string,
-    filename: string
-  ): Promise<string> {
+  async getUploadUrl(userId: string, gameId: string, filename: string): Promise<string> {
     const key = `${userId}/${gameId}/${filename}`;
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -73,8 +69,7 @@ export class S3SaveRepository implements SaveRepository {
     key: string,
     range?: { start: number; end: number }
   ): Promise<string> {
-    const cloudFrontUrl =
-      range == null ? S3SaveRepository.buildCloudFrontUrl(key) : null;
+    const cloudFrontUrl = range == null ? S3SaveRepository.buildCloudFrontUrl(key) : null;
     if (cloudFrontUrl) {
       return cloudFrontUrl;
     }
@@ -90,10 +85,7 @@ export class S3SaveRepository implements SaveRepository {
     });
   }
 
-  async getUploadUrls(
-    userId: string,
-    items: UploadUrlItem[]
-  ): Promise<UploadUrlResult[]> {
+  async getUploadUrls(userId: string, items: UploadUrlItem[]): Promise<UploadUrlResult[]> {
     if (items.length === 0) return [];
     if (!this.bucketName || !this.bucketName.trim()) {
       throw new Error("BUCKET_NAME no está configurado en el servidor");
@@ -113,10 +105,7 @@ export class S3SaveRepository implements SaveRepository {
     return results;
   }
 
-  async getDownloadUrls(
-    userId: string,
-    items: DownloadUrlItem[]
-  ): Promise<DownloadUrlResult[]> {
+  async getDownloadUrls(userId: string, items: DownloadUrlItem[]): Promise<DownloadUrlResult[]> {
     if (items.length === 0) return [];
     const results = await Promise.all(
       items.map(async ({ gameId, key }) => {
@@ -137,11 +126,7 @@ export class S3SaveRepository implements SaveRepository {
     return results;
   }
 
-  async createMultipartUpload(
-    userId: string,
-    gameId: string,
-    filename: string
-  ): Promise<CreateMultipartUploadResult> {
+  async createMultipartUpload(userId: string, gameId: string, filename: string): Promise<CreateMultipartUploadResult> {
     const key = `${userId}/${gameId}/${filename}`;
     const command = new CreateMultipartUploadCommand({
       Bucket: this.bucketName,
@@ -160,19 +145,11 @@ export class S3SaveRepository implements SaveRepository {
   ): Promise<CreateMultipartUploadResult & { partUrls: UploadPartUrl[] }> {
     const result = await this.createMultipartUpload(userId, gameId, filename);
     const partNumbers = Array.from({ length: partCount }, (_, i) => i + 1);
-    const partUrls = await this.getUploadPartUrls(
-      result.key,
-      result.uploadId,
-      partNumbers
-    );
+    const partUrls = await this.getUploadPartUrls(result.key, result.uploadId, partNumbers);
     return { ...result, partUrls };
   }
 
-  async getUploadPartUrls(
-    key: string,
-    uploadId: string,
-    partNumbers: number[]
-  ): Promise<UploadPartUrl[]> {
+  async getUploadPartUrls(key: string, uploadId: string, partNumbers: number[]): Promise<UploadPartUrl[]> {
     const options = { expiresIn: PRESIGN_EXPIRES_IN_SECONDS };
     const partUrls = await Promise.all(
       partNumbers.map(async (partNumber) => {
@@ -189,11 +166,7 @@ export class S3SaveRepository implements SaveRepository {
     return partUrls;
   }
 
-  async completeMultipartUpload(
-    key: string,
-    uploadId: string,
-    parts: CompletedPart[]
-  ): Promise<void> {
+  async completeMultipartUpload(key: string, uploadId: string, parts: CompletedPart[]): Promise<void> {
     const command = new CompleteMultipartUploadCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -219,8 +192,7 @@ export class S3SaveRepository implements SaveRepository {
 
   async listByUser(userId: string): Promise<GameSave[]> {
     const prefix = `${userId}/`;
-    const allContents: { Key: string; LastModified?: Date; Size?: number }[] =
-      [];
+    const allContents: { Key: string; LastModified?: Date; Size?: number }[] = [];
     let continuationToken: string | undefined;
 
     do {
@@ -231,13 +203,10 @@ export class S3SaveRepository implements SaveRepository {
       });
       const response = await this.s3.send(command);
       const contents = (response.Contents ?? []).filter(
-        (obj): obj is { Key: string; LastModified?: Date; Size?: number } =>
-          !!obj.Key
+        (obj): obj is { Key: string; LastModified?: Date; Size?: number } => !!obj.Key
       );
       allContents.push(...contents);
-      continuationToken = response.IsTruncated
-        ? response.NextContinuationToken
-        : undefined;
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
     } while (continuationToken);
 
     const saves: GameSave[] = allContents.map((obj) => ({
@@ -252,8 +221,7 @@ export class S3SaveRepository implements SaveRepository {
 
   async listBackups(userId: string, gameId: string): Promise<BackupMetadata[]> {
     const prefix = `${userId}/${gameId}/backups/`;
-    const allContents: { Key: string; LastModified?: Date; Size?: number }[] =
-      [];
+    const allContents: { Key: string; LastModified?: Date; Size?: number }[] = [];
     let continuationToken: string | undefined;
     do {
       const response = await this.s3.send(
@@ -264,13 +232,10 @@ export class S3SaveRepository implements SaveRepository {
         })
       );
       const contents = (response.Contents ?? []).filter(
-        (obj): obj is { Key: string; LastModified?: Date; Size?: number } =>
-          !!obj.Key
+        (obj): obj is { Key: string; LastModified?: Date; Size?: number } => !!obj.Key
       );
       allContents.push(...contents);
-      continuationToken = response.IsTruncated
-        ? response.NextContinuationToken
-        : undefined;
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
     } while (continuationToken);
 
     return allContents.map((obj) => ({
@@ -285,22 +250,14 @@ export class S3SaveRepository implements SaveRepository {
     return `${userId}/${gameId}/backups/`;
   }
 
-  private static assertValidBackupKey(
-    userId: string,
-    gameId: string,
-    key: string
-  ): void {
+  private static assertValidBackupKey(userId: string, gameId: string, key: string): void {
     const prefix = S3SaveRepository.backupKeyPrefix(userId, gameId);
     if (!key.startsWith(prefix) || key.includes("..")) {
       throw new Error("Invalid key: must be a backup of this user and game");
     }
   }
 
-  async deleteBackup(
-    userId: string,
-    gameId: string,
-    key: string
-  ): Promise<void> {
+  async deleteBackup(userId: string, gameId: string, key: string): Promise<void> {
     S3SaveRepository.assertValidBackupKey(userId, gameId, key);
     await this.s3.send(
       new DeleteObjectCommand({
@@ -310,23 +267,11 @@ export class S3SaveRepository implements SaveRepository {
     );
   }
 
-  async renameBackup(
-    userId: string,
-    gameId: string,
-    oldKey: string,
-    newFilename: string
-  ): Promise<void> {
+  async renameBackup(userId: string, gameId: string, oldKey: string, newFilename: string): Promise<void> {
     S3SaveRepository.assertValidBackupKey(userId, gameId, oldKey);
     const prefix = S3SaveRepository.backupKeyPrefix(userId, gameId);
-    if (
-      !newFilename ||
-      newFilename.includes("/") ||
-      newFilename.includes("..") ||
-      !newFilename.endsWith(".tar")
-    ) {
-      throw new Error(
-        "newFilename must be a .tar filename without path (e.g. mi-backup.tar)"
-      );
+    if (!newFilename || newFilename.includes("/") || newFilename.includes("..") || !newFilename.endsWith(".tar")) {
+      throw new Error("newFilename must be a .tar filename without path (e.g. mi-backup.tar)");
     }
     const newKey = `${prefix}${newFilename}`;
     if (newKey === oldKey) return;
@@ -358,26 +303,18 @@ export class S3SaveRepository implements SaveRepository {
       );
       const contents = list.Contents ?? [];
       if (contents.length === 0) break;
-      const keys = contents
-        .filter((c): c is { Key: string } => !!c.Key)
-        .map((c) => ({ Key: c.Key! }));
+      const keys = contents.filter((c): c is { Key: string } => !!c.Key).map((c) => ({ Key: c.Key! }));
       await this.s3.send(
         new DeleteObjectsCommand({
           Bucket: this.bucketName,
           Delete: { Objects: keys, Quiet: true },
         })
       );
-      continuationToken = list.IsTruncated
-        ? list.NextContinuationToken
-        : undefined;
+      continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
     } while (continuationToken);
   }
 
-  async renameGame(
-    userId: string,
-    oldGameId: string,
-    newGameId: string
-  ): Promise<void> {
+  async renameGame(userId: string, oldGameId: string, newGameId: string): Promise<void> {
     if (oldGameId === newGameId) return;
     const prefix = `${userId}/${oldGameId}/`;
     const keysToDelete: { Key: string }[] = [];
@@ -404,9 +341,7 @@ export class S3SaveRepository implements SaveRepository {
         );
         keysToDelete.push({ Key: obj.Key });
       }
-      continuationToken = list.IsTruncated
-        ? list.NextContinuationToken
-        : undefined;
+      continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
     } while (continuationToken);
 
     for (let i = 0; i < keysToDelete.length; i += 1000) {

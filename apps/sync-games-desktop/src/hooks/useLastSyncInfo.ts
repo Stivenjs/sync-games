@@ -15,9 +15,7 @@ export interface CloudGameSummary {
   totalSize: number;
 }
 
-function computeLastSync(
-  saves: { gameId: string; lastModified: string }[]
-): LastSyncInfo {
+function computeLastSync(saves: { gameId: string; lastModified: string }[]): LastSyncInfo {
   if (saves.length === 0) {
     return { lastSyncAt: null, lastSyncGameId: null };
   }
@@ -45,23 +43,16 @@ function computeCloudGames(saves: { gameId: string; size?: number }[]): {
       size: existing.size + (s.size ?? 0),
     });
   }
-  const cloudGames: CloudGameSummary[] = [...byGame.entries()].map(
-    ([gameId, { count, size }]) => ({
-      gameId,
-      fileCount: count,
-      totalSize: size,
-    })
-  );
+  const cloudGames: CloudGameSummary[] = [...byGame.entries()].map(([gameId, { count, size }]) => ({
+    gameId,
+    fileCount: count,
+    totalSize: size,
+  }));
   const totalSize = cloudGames.reduce((sum, g) => sum + g.totalSize, 0);
   return { cloudGames, totalSize };
 }
 
-export type ConnectionStatus =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "error"
-  | "retrying";
+export type ConnectionStatus = "idle" | "connecting" | "connected" | "error" | "retrying";
 
 /**
  * Hook que obtiene la última sincronización y los juegos en la nube.
@@ -81,8 +72,7 @@ export function useLastSyncInfo(enabled: boolean) {
       return { ...lastSync, cloudGames, totalCloudSize: totalSize };
     },
     enabled,
-    refetchInterval: (query) =>
-      query.state.status === "error" ? 30_000 : false,
+    refetchInterval: (query) => (query.state.status === "error" ? 30_000 : false),
   });
 
   const connectionStatus: ConnectionStatus = !enabled

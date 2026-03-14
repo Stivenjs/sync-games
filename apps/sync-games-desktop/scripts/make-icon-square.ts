@@ -15,9 +15,7 @@ const { width = 0, height = 0, channels } = info;
 
 /** Es blanco según umbral */
 const isWhite = (i: number) =>
-  data[i] >= WHITE_THRESHOLD &&
-  data[i + 1] >= WHITE_THRESHOLD &&
-  data[i + 2] >= WHITE_THRESHOLD;
+  data[i] >= WHITE_THRESHOLD && data[i + 1] >= WHITE_THRESHOLD && data[i + 2] >= WHITE_THRESHOLD;
 
 // Flood fill desde los bordes: solo quitamos blanco conectado al fondo
 const isBg = new Uint8Array((width * height) / 8 + 1); // bitmap
@@ -25,20 +23,17 @@ const setBg = (x: number, y: number) => {
   const p = y * width + x;
   isBg[p >> 3] |= 1 << (p & 7);
 };
-const getBg = (x: number, y: number) =>
-  !!(isBg[(y * width + x) >> 3] & (1 << ((y * width + x) & 7)));
+const getBg = (x: number, y: number) => !!(isBg[(y * width + x) >> 3] & (1 << ((y * width + x) & 7)));
 
 const queue: [number, number][] = [];
 // Semillas: píxeles blancos en los 4 bordes
 for (let x = 0; x < width; x++) {
   if (isWhite(idx(x, 0, width, channels))) queue.push([x, 0]);
-  if (height > 1 && isWhite(idx(x, height - 1, width, channels)))
-    queue.push([x, height - 1]);
+  if (height > 1 && isWhite(idx(x, height - 1, width, channels))) queue.push([x, height - 1]);
 }
 for (let y = 1; y < height - 1; y++) {
   if (isWhite(idx(0, y, width, channels))) queue.push([0, y]);
-  if (width > 1 && isWhite(idx(width - 1, y, width, channels)))
-    queue.push([width - 1, y]);
+  if (width > 1 && isWhite(idx(width - 1, y, width, channels))) queue.push([width - 1, y]);
 }
 
 const dx = [0, 1, 0, -1];
@@ -55,8 +50,7 @@ while (queue.length) {
 
 // Aplicar transparencia solo al fondo detectado
 for (let y = 0; y < height; y++)
-  for (let x = 0; x < width; x++)
-    if (getBg(x, y)) data[idx(x, y, width, channels) + 3] = 0;
+  for (let x = 0; x < width; x++) if (getBg(x, y)) data[idx(x, y, width, channels) + 3] = 0;
 
 const noBg = await sharp(data, {
   raw: { width, height, channels },
@@ -80,6 +74,4 @@ await sharp({
   .png()
   .toFile(output);
 
-console.log(
-  `Creado icon-square.png ${size}x${size} (fondo blanco → transparente)`
-);
+console.log(`Creado icon-square.png ${size}x${size} (fondo blanco → transparente)`);

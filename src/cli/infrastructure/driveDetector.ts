@@ -60,21 +60,10 @@ function detectUnixMounts(): DetectedDrive[] {
       timeout: 5000,
     });
     const lines = raw.split(/\r?\n/).slice(1);
-    const excluded = [
-      "/snap",
-      "/boot",
-      "/sys",
-      "/proc",
-      "/dev",
-      "/run",
-    ];
+    const excluded = ["/snap", "/boot", "/sys", "/proc", "/dev", "/run"];
     return lines
       .map((l) => l.trim())
-      .filter(
-        (l) =>
-          l.startsWith("/") &&
-          !excluded.some((p) => l.startsWith(p))
-      )
+      .filter((l) => l.startsWith("/") && !excluded.some((p) => l.startsWith(p)))
       .map((mount) => ({ letter: mount, path: mount }));
   } catch {
     return [{ letter: "/", path: "/" }];

@@ -49,7 +49,6 @@ Edita `src-tauri/tauri.conf.json` y reemplaza:
 
 - **pubkey**: El contenido completo del archivo `savecloud.key.pub` (todo en una línea)
 - **endpoints**: La URL de tu JSON de actualización. Opciones comunes:
-
   - **GitHub Releases**: `https://github.com/USUARIO/REPO/releases/latest/download/latest.json`
   - **CrabNebula Cloud**: Obtén la URL desde [crabnebula.cloud](https://crabnebula.cloud/)
 

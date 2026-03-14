@@ -11,16 +11,17 @@ const STEAM_APP_ID_QUERY_KEY = ["steam-app-id", "batch"] as const;
  * Usa una sola operación batch en el backend (varias búsquedas en paralelo).
  * TanStack Query cachea el resultado por la lista de juegos a buscar.
  */
-export function useResolvedSteamAppIds(
-  games: readonly ConfiguredGame[]
-): Record<string, string | null | undefined> {
-  const gamesToSearch = useMemo(
-    () => games.filter((g) => needsSteamSearch(g)),
-    [games]
-  );
+export function useResolvedSteamAppIds(games: readonly ConfiguredGame[]): Record<string, string | null | undefined> {
+  const gamesToSearch = useMemo(() => games.filter((g) => needsSteamSearch(g)), [games]);
 
   const queryKey = useMemo(
-    () => [...STEAM_APP_ID_QUERY_KEY, gamesToSearch.map((g) => g.id).sort().join(",")],
+    () => [
+      ...STEAM_APP_ID_QUERY_KEY,
+      gamesToSearch
+        .map((g) => g.id)
+        .sort()
+        .join(","),
+    ],
     [gamesToSearch]
   );
 

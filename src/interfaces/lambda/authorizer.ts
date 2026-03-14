@@ -11,7 +11,7 @@ function getHeader(headers: Record<string, string | string[] | undefined>, name:
   for (const [k, v] of Object.entries(headers ?? {})) {
     if (k.toLowerCase() === lower) {
       const val = v;
-      return Array.isArray(val) ? val[0] ?? "" : (val ?? "");
+      return Array.isArray(val) ? (val[0] ?? "") : (val ?? "");
     }
   }
   return "";

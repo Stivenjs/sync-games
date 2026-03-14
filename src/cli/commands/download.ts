@@ -14,11 +14,7 @@ interface RemoteSave {
   size?: number;
 }
 
-async function fetchRemoteSaves(
-  apiBaseUrl: string,
-  userId: string,
-  apiKey: string
-): Promise<RemoteSave[]> {
+async function fetchRemoteSaves(apiBaseUrl: string, userId: string, apiKey: string): Promise<RemoteSave[]> {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(`${base}/saves`, {
     headers: { "x-user-id": userId, "x-api-key": apiKey },
@@ -69,10 +65,7 @@ async function fetchDownloadUrl(
   return downloadUrl;
 }
 
-async function downloadFileFromUrl(
-  url: string,
-  destPath: string
-): Promise<void> {
+async function downloadFileFromUrl(url: string, destPath: string): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`S3 GET: ${res.status}`);
@@ -88,9 +81,7 @@ async function downloadFileFromUrl(
 export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   const config = await deps.getConfigUseCase.execute();
   if (!config.apiBaseUrl?.trim() || !config.userId?.trim()) {
-    console.error(
-      "Configura apiBaseUrl y userId en el config. Usa el comando «config» para ver la ruta del archivo."
-    );
+    console.error("Configura apiBaseUrl y userId en el config. Usa el comando «config» para ver la ruta del archivo.");
     return;
   }
 
@@ -112,9 +103,7 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   const gameChoices = [...byGame.entries()].map(([gameId, saves]) => {
     const totalSize = saves.reduce((sum, s) => sum + (s.size ?? 0), 0);
     return {
-      name: `${gameId}  (${saves.length} archivo${
-        saves.length > 1 ? "s" : ""
-      }, ${formatSize(totalSize)})`,
+      name: `${gameId}  (${saves.length} archivo${saves.length > 1 ? "s" : ""}, ${formatSize(totalSize)})`,
       value: gameId,
     };
   });
@@ -128,25 +117,17 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   if (selectedGameId === CANCEL) return;
 
   const saves = byGame.get(selectedGameId)!;
-  const game = config.games.find(
-    (g) => g.id.toLowerCase() === selectedGameId.toLowerCase()
-  );
+  const game = config.games.find((g) => g.id.toLowerCase() === selectedGameId.toLowerCase());
 
   if (!game) {
-    console.error(
-      `\nEl juego "${selectedGameId}" no está configurado localmente.`
-    );
-    console.error(
-      "Añádelo primero con «Añadir un juego» para definir sus rutas.\n"
-    );
+    console.error(`\nEl juego "${selectedGameId}" no está configurado localmente.`);
+    console.error("Añádelo primero con «Añadir un juego» para definir sus rutas.\n");
     return;
   }
 
   const destBase = resolve(expandPath(game.paths[0]));
 
-  console.log(
-    `\n${figures.squareSmallFilled} ${saves.length} archivo(s) de "${selectedGameId}" en la nube:`
-  );
+  console.log(`\n${figures.squareSmallFilled} ${saves.length} archivo(s) de "${selectedGameId}" en la nube:`);
   for (const s of saves) {
     const sizeStr = s.size ? ` (${formatSize(s.size)})` : "";
     console.log(`  • ${s.filename}${sizeStr}`);
@@ -159,20 +140,10 @@ export async function runDownloadInteractive(deps: CliDeps): Promise<void> {
   });
   if (!sure) return;
 
-  await doDownload(
-    config.apiBaseUrl!,
-    config.userId!,
-    config.apiKey ?? "",
-    selectedGameId,
-    saves,
-    destBase
-  );
+  await doDownload(config.apiBaseUrl!, config.userId!, config.apiKey ?? "", selectedGameId, saves, destBase);
 }
 
-export async function runDownloadFromArgs(
-  deps: CliDeps,
-  args: string[]
-): Promise<void> {
+export async function runDownloadFromArgs(deps: CliDeps, args: string[]): Promise<void> {
   const config = await deps.getConfigUseCase.execute();
   if (!config.apiBaseUrl?.trim() || !config.userId?.trim()) {
     console.error("Configura apiBaseUrl y userId en el config.");
@@ -192,9 +163,7 @@ export async function runDownloadFromArgs(
     });
   }
 
-  const game = config.games.find(
-    (g) => g.id.toLowerCase() === gameId!.toLowerCase()
-  );
+  const game = config.games.find((g) => g.id.toLowerCase() === gameId!.toLowerCase());
   if (!game) {
     console.error(`Juego no configurado: ${gameId}`);
     throw new Error("Game not found");
@@ -202,9 +171,7 @@ export async function runDownloadFromArgs(
 
   console.log(`\n${figures.arrowDown} Consultando guardados en la nube...\n`);
   const allSaves = await fetchRemoteSaves(config.apiBaseUrl!, config.userId!, config.apiKey ?? "");
-  const saves = allSaves.filter(
-    (s) => s.gameId.toLowerCase() === gameId!.toLowerCase()
-  );
+  const saves = allSaves.filter((s) => s.gameId.toLowerCase() === gameId!.toLowerCase());
 
   if (saves.length === 0) {
     console.log(`No hay guardados de "${gameId}" en la nube.\n`);
@@ -212,14 +179,7 @@ export async function runDownloadFromArgs(
   }
 
   const destBase = resolve(expandPath(game.paths[0]));
-  await doDownload(
-    config.apiBaseUrl!,
-    config.userId!,
-    config.apiKey ?? "",
-    gameId!,
-    saves,
-    destBase
-  );
+  await doDownload(config.apiBaseUrl!, config.userId!, config.apiKey ?? "", gameId!, saves, destBase);
 }
 
 async function doDownload(
@@ -243,12 +203,7 @@ async function doDownload(
       console.log(` ${figures.tick}`, save.filename);
       ok++;
     } catch (e) {
-      console.error(
-        ` ${figures.cross}`,
-        save.filename,
-        "-",
-        e instanceof Error ? e.message : e
-      );
+      console.error(` ${figures.cross}`, save.filename, "-", e instanceof Error ? e.message : e);
       err++;
     }
   }

@@ -10,9 +10,7 @@ export function useGameStats(enabled: boolean) {
     enabled,
   });
 
-  const statsByGameId = new Map(
-    (query.data ?? []).map((s) => [s.gameId, s])
-  );
+  const statsByGameId = new Map((query.data ?? []).map((s) => [s.gameId, s]));
 
   return {
     statsByGameId,

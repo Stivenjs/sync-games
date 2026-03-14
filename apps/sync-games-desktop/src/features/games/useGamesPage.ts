@@ -24,12 +24,7 @@ import {
   notifyFullBackupError,
   notifyUploadError,
 } from "@utils/notification";
-import {
-  toastDownloadResult,
-  toastError,
-  toastSuccess,
-  toastSyncResult,
-} from "@utils/toast";
+import { toastDownloadResult, toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
@@ -126,10 +121,7 @@ const initialState: GamesPageState = {
   refreshing: false,
 };
 
-function gamesPageReducer(
-  state: GamesPageState,
-  action: GamesPageAction
-): GamesPageState {
+function gamesPageReducer(state: GamesPageState, action: GamesPageAction): GamesPageState {
   switch (action.type) {
     case "SET_SEARCH":
       return { ...state, searchTerm: action.payload };
@@ -206,11 +198,7 @@ export function useGamesPage() {
   } = state;
 
   const { config, loading, error, refetch } = useConfig();
-  const hasSyncConfig = !!(
-    config?.apiBaseUrl?.trim() &&
-    config?.userId?.trim() &&
-    config?.apiKey?.trim()
-  );
+  const hasSyncConfig = !!(config?.apiBaseUrl?.trim() && config?.userId?.trim() && config?.apiKey?.trim());
   const {
     lastSyncAt,
     lastSyncGameId,
@@ -252,10 +240,7 @@ export function useGamesPage() {
     handleRefresh();
   };
 
-  const handleRetryOperationError = (
-    gameId: string,
-    opType: "sync" | "download"
-  ) => {
+  const handleRetryOperationError = (gameId: string, opType: "sync" | "download") => {
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
     const game = config?.games?.find((g) => g.id === gameId);
     if (game) {
@@ -267,25 +252,18 @@ export function useGamesPage() {
     }
   };
 
-  const setSearchTerm = (v: string) =>
-    dispatch({ type: "SET_SEARCH", payload: v });
-  const setOriginFilter = (v: OriginFilter) =>
-    dispatch({ type: "SET_ORIGIN_FILTER", payload: v });
-  const setAddModalOpen = (open: boolean) =>
-    dispatch({ type: "SET_ADD_MODAL", open });
-  const setScanModalOpen = (open: boolean) =>
-    dispatch({ type: "SET_SCAN_MODAL", open });
+  const setSearchTerm = (v: string) => dispatch({ type: "SET_SEARCH", payload: v });
+  const setOriginFilter = (v: OriginFilter) => dispatch({ type: "SET_ORIGIN_FILTER", payload: v });
+  const setAddModalOpen = (open: boolean) => dispatch({ type: "SET_ADD_MODAL", open });
+  const setScanModalOpen = (open: boolean) => dispatch({ type: "SET_SCAN_MODAL", open });
   const setAddModalInitial = (initial: { path: string; suggestedId: string }) =>
     dispatch({ type: "SET_ADD_MODAL", open: true, initial });
-  const setConfigureFromCloudGameId = (gameId: string | null) =>
-    dispatch({ type: "SET_CONFIGURE_FROM_CLOUD", gameId });
-  const setGameToRemove = (game: ConfiguredGame | null) =>
-    dispatch({ type: "SET_GAME_TO_REMOVE", game });
+  const setConfigureFromCloudGameId = (gameId: string | null) => dispatch({ type: "SET_CONFIGURE_FROM_CLOUD", gameId });
+  const setGameToRemove = (game: ConfiguredGame | null) => dispatch({ type: "SET_GAME_TO_REMOVE", game });
 
   const handleScanSelect = async (paths: string[], suggestedId: string) => {
     const idToUse = configureFromCloudGameId ?? suggestedId;
-    if (configureFromCloudGameId)
-      dispatch({ type: "SET_CONFIGURE_FROM_CLOUD", gameId: null });
+    if (configureFromCloudGameId) dispatch({ type: "SET_CONFIGURE_FROM_CLOUD", gameId: null });
     if (paths.length > 1) {
       for (const path of paths) {
         await addGame(idToUse, path);
@@ -317,10 +295,7 @@ export function useGamesPage() {
       try {
         await deleteGameFromCloud(gameId);
       } catch (e) {
-        toastError(
-          "No se pudieron borrar los guardados en la nube",
-          e instanceof Error ? e.message : String(e)
-        );
+        toastError("No se pudieron borrar los guardados en la nube", e instanceof Error ? e.message : String(e));
       }
       await removeGame(gameId);
       scheduleConfigBackupToCloud();
@@ -353,9 +328,7 @@ export function useGamesPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toastError("Error al empaquetar y subir", msg);
-      notifyFullBackupError(formatGameDisplayName(game.id), msg).catch(
-        () => {}
-      );
+      notifyFullBackupError(formatGameDisplayName(game.id), msg).catch(() => {});
     } finally {
       dispatch({ type: "SET_FULL_BACKUP_UPLOADING", gameId: null });
     }
@@ -403,9 +376,7 @@ export function useGamesPage() {
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        notifyDownloadError(formatGameDisplayName(game.id), msg).catch(
-          () => {}
-        );
+        notifyDownloadError(formatGameDisplayName(game.id), msg).catch(() => {});
         setSyncOperation(null);
         dispatch({ type: "SET_DOWNLOADING", value: null });
         dispatch({ type: "SET_SYNC_PREVIEW", game: null, previewType: null });
@@ -516,9 +487,7 @@ export function useGamesPage() {
       toastSyncResult(totalResult);
     } finally {
       setSyncOperation(null);
-      notifyBatchUploadDone(totalResult.okCount, totalResult.errCount).catch(
-        () => {}
-      );
+      notifyBatchUploadDone(totalResult.okCount, totalResult.errCount).catch(() => {});
       dispatch({ type: "SET_SYNCING", value: null });
       refetchLastSync?.();
       queryClient.invalidateQueries({ queryKey: ["game-stats"] });
@@ -527,8 +496,7 @@ export function useGamesPage() {
 
   const openSyncAllConfirm = () => {
     const count = config?.games?.length ?? 0;
-    if (count > 0)
-      dispatch({ type: "SET_BULK_CONFIRM", value: { type: "sync", count } });
+    if (count > 0) dispatch({ type: "SET_BULK_CONFIRM", value: { type: "sync", count } });
   };
 
   const openDownloadAllConfirm = () => {
@@ -581,9 +549,7 @@ export function useGamesPage() {
       toastDownloadResult(totalResult);
     } finally {
       setSyncOperation(null);
-      notifyBatchDownloadDone(totalResult.okCount, totalResult.errCount).catch(
-        () => {}
-      );
+      notifyBatchDownloadDone(totalResult.okCount, totalResult.errCount).catch(() => {});
       dispatch({ type: "SET_DOWNLOADING", value: null });
       refetchLastSync?.();
       queryClient.invalidateQueries({ queryKey: ["game-stats"] });
@@ -595,16 +561,13 @@ export function useGamesPage() {
     dispatch({ type: "SET_DOWNLOADING", value: "all" });
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
     try {
-      const batchResults = await syncCheckDownloadConflictsBatch(
-        config.games.map((g) => g.id)
-      );
-      const gamesWithConflicts: { gameId: string; conflictCount: number }[] =
-        batchResults
-          .filter((r) => r.conflicts.length > 0)
-          .map((r) => ({
-            gameId: r.gameId,
-            conflictCount: r.conflicts.length,
-          }));
+      const batchResults = await syncCheckDownloadConflictsBatch(config.games.map((g) => g.id));
+      const gamesWithConflicts: { gameId: string; conflictCount: number }[] = batchResults
+        .filter((r) => r.conflicts.length > 0)
+        .map((r) => ({
+          gameId: r.gameId,
+          conflictCount: r.conflicts.length,
+        }));
       if (gamesWithConflicts.length > 0) {
         dispatch({
           type: "SET_DOWNLOAD_ALL_CONFLICTS",
@@ -662,27 +625,20 @@ export function useGamesPage() {
     try {
       await openSaveFolder(game.id);
     } catch (e) {
-      toastError(
-        "No se pudo abrir",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("No se pudo abrir", e instanceof Error ? e.message : String(e));
     }
   };
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
-  const filteredGames = filterGames(
-    config?.games ?? [],
-    debouncedSearchTerm,
-    originFilter
-  );
+  const filteredGames = filterGames(config?.games ?? [], debouncedSearchTerm, originFilter);
   const hasConfiguredGames = (config?.games?.length ?? 0) > 0;
   const hasCloudGames = cloudGames.length > 0;
   const emptyFilterMessage =
     hasConfiguredGames && (debouncedSearchTerm !== "" || originFilter !== "all")
       ? "No se encontraron juegos con los filtros aplicados."
       : !hasConfiguredGames && hasCloudGames
-      ? "No hay juegos configurados, pero tienes guardados en la nube. Añade de nuevo cada juego con el mismo identificador y la ruta local para poder descargar sus backups."
-      : undefined;
+        ? "No hay juegos configurados, pero tienes guardados en la nube. Añade de nuevo cada juego con el mismo identificador y la ruta local para poder descargar sus backups."
+        : undefined;
 
   return {
     config,

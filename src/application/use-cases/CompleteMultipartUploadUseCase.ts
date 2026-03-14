@@ -15,10 +15,6 @@ export class CompleteMultipartUploadUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: CompleteMultipartUploadInput): Promise<void> {
-    await this.saveRepository.completeMultipartUpload(
-      input.key,
-      input.uploadId,
-      input.parts
-    );
+    await this.saveRepository.completeMultipartUpload(input.key, input.uploadId, input.parts);
   }
 }

@@ -29,9 +29,7 @@ export interface AppDependencies {
  * Crea y configura la aplicación Fastify con las rutas y casos de uso.
  * Inyección de dependencias en el punto de entrada (composition root).
  */
-export async function buildApp(
-  deps: AppDependencies
-): Promise<FastifyInstance> {
+export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   await app.register(cors, { origin: true });
@@ -53,33 +51,18 @@ export async function buildApp(
   const getUploadUrlUseCase = new GetUploadUrlUseCase(deps.saveRepository);
   const getUploadUrlsUseCase = new GetUploadUrlsUseCase(deps.saveRepository);
   const getDownloadUrlUseCase = new GetDownloadUrlUseCase(deps.saveRepository);
-  const getDownloadUrlsUseCase = new GetDownloadUrlsUseCase(
-    deps.saveRepository
-  );
-  const deleteGameFromCloudUseCase = new DeleteGameFromCloudUseCase(
-    deps.saveRepository
-  );
-  const renameGameInCloudUseCase = new RenameGameInCloudUseCase(
-    deps.saveRepository
-  );
+  const getDownloadUrlsUseCase = new GetDownloadUrlsUseCase(deps.saveRepository);
+  const deleteGameFromCloudUseCase = new DeleteGameFromCloudUseCase(deps.saveRepository);
+  const renameGameInCloudUseCase = new RenameGameInCloudUseCase(deps.saveRepository);
   const listSavesUseCase = new ListSavesUseCase(deps.saveRepository);
   const listBackupsUseCase = new ListBackupsUseCase(deps.saveRepository);
   const deleteBackupUseCase = new DeleteBackupUseCase(deps.saveRepository);
   const renameBackupUseCase = new RenameBackupUseCase(deps.saveRepository);
-  const createMultipartUploadUseCase = new CreateMultipartUploadUseCase(
-    deps.saveRepository
-  );
-  const createMultipartUploadWithPartUrlsUseCase =
-    new CreateMultipartUploadWithPartUrlsUseCase(deps.saveRepository);
-  const getUploadPartUrlsUseCase = new GetUploadPartUrlsUseCase(
-    deps.saveRepository
-  );
-  const completeMultipartUploadUseCase = new CompleteMultipartUploadUseCase(
-    deps.saveRepository
-  );
-  const abortMultipartUploadUseCase = new AbortMultipartUploadUseCase(
-    deps.saveRepository
-  );
+  const createMultipartUploadUseCase = new CreateMultipartUploadUseCase(deps.saveRepository);
+  const createMultipartUploadWithPartUrlsUseCase = new CreateMultipartUploadWithPartUrlsUseCase(deps.saveRepository);
+  const getUploadPartUrlsUseCase = new GetUploadPartUrlsUseCase(deps.saveRepository);
+  const completeMultipartUploadUseCase = new CompleteMultipartUploadUseCase(deps.saveRepository);
+  const abortMultipartUploadUseCase = new AbortMultipartUploadUseCase(deps.saveRepository);
 
   await registerSavesRoutes(app, {
     getUploadUrlUseCase,

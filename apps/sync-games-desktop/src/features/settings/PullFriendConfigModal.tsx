@@ -1,12 +1,4 @@
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Input,
-} from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from "@heroui/react";
 import { User } from "lucide-react";
 
 interface PullFriendConfigModalProps {
@@ -31,19 +23,17 @@ export function PullFriendConfigModal({
       isOpen={isOpen}
       onOpenChange={(open) => !open && onClose()}
       isDismissable={!pulling}
-      hideCloseButton={pulling}
-    >
+      hideCloseButton={pulling}>
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
-          Importar configuración de un amigo
-        </ModalHeader>
+        <ModalHeader className="flex flex-col gap-1">Importar configuración de un amigo</ModalHeader>
         <ModalBody>
           <p className="text-sm text-default-500">
-            Ingresa el <strong>User ID</strong> para descargar su
-            configuración completa desde la nube de SaveCloud.
+            Ingresa el <strong>User ID</strong> para descargar su configuración completa desde la nube de SaveCloud.
           </p>
           <p className="text-xs text-warning">
-            Nota: Al hacer esto, <strong>su configuración reemplazará la tuya por completo</strong> localmente, incluyendo tu propia API Key, User ID y URL del servidor. Esto es útil si estás intentando recuperar tu cuenta en un PC nuevo.
+            Nota: Al hacer esto, <strong>su configuración reemplazará la tuya por completo</strong> localmente,
+            incluyendo tu propia API Key, User ID y URL del servidor. Esto es útil si estás intentando recuperar tu
+            cuenta en un PC nuevo.
           </p>
           <Input
             label="User ID"
@@ -59,12 +49,7 @@ export function PullFriendConfigModal({
           <Button variant="flat" onPress={onClose} isDisabled={pulling}>
             Cancelar
           </Button>
-          <Button
-            color="primary"
-            onPress={onSubmit}
-            isLoading={pulling}
-            isDisabled={!userId.trim()}
-          >
+          <Button color="primary" onPress={onSubmit} isLoading={pulling} isDisabled={!userId.trim()}>
             Importar configuración
           </Button>
         </ModalFooter>

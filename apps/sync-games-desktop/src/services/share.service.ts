@@ -32,24 +32,17 @@ export async function createShareLink(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(
-      (err as { message?: string }).message ?? "No se pudo crear el link"
-    );
+    throw new Error((err as { message?: string }).message ?? "No se pudo crear el link");
   }
   return res.json() as Promise<CreateShareResult>;
 }
 
-export async function resolveShareToken(
-  apiBaseUrl: string,
-  token: string
-): Promise<ResolveShareResult> {
+export async function resolveShareToken(apiBaseUrl: string, token: string): Promise<ResolveShareResult> {
   const base = apiBaseUrl.replace(/\/$/, "");
   const res = await fetch(`${base}/share/${encodeURIComponent(token)}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(
-      (err as { message?: string }).message ?? "Link inválido o expirado"
-    );
+    throw new Error((err as { message?: string }).message ?? "Link inválido o expirado");
   }
   return res.json() as Promise<ResolveShareResult>;
 }

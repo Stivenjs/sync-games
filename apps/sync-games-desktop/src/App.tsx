@@ -21,12 +21,7 @@ import {
   syncUploadGame,
   syncUploadAllGames,
 } from "@services/tauri";
-import {
-  toastDownloadResult,
-  toastError,
-  toastSuccess,
-  toastSyncResult,
-} from "@utils/toast";
+import { toastDownloadResult, toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import {
   notifyBatchDownloadDone,
   notifyBatchUploadDone,
@@ -101,9 +96,7 @@ function TrayActionsListener() {
         toastSyncResult(totalResult);
       } finally {
         setSyncOperation(null);
-        notifyBatchUploadDone(totalResult.okCount, totalResult.errCount).catch(
-          () => {}
-        );
+        notifyBatchUploadDone(totalResult.okCount, totalResult.errCount).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ["game-stats"] });
       }
     });
@@ -128,10 +121,7 @@ function TrayActionsListener() {
         toastDownloadResult(totalResult);
       } finally {
         setSyncOperation(null);
-        notifyBatchDownloadDone(
-          totalResult.okCount,
-          totalResult.errCount
-        ).catch(() => {});
+        notifyBatchDownloadDone(totalResult.okCount, totalResult.errCount).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ["game-stats"] });
       }
     });
@@ -146,10 +136,7 @@ function TrayActionsListener() {
       }
       const firstGameId = config?.games?.[0]?.id;
       if (!firstGameId) {
-        toastError(
-          "Sin juegos",
-          "Añade al menos un juego para hacer backup desde la bandeja."
-        );
+        toastError("Sin juegos", "Añade al menos un juego para hacer backup desde la bandeja.");
         return;
       }
       setSyncOperation({ type: "upload", mode: "single", gameId: firstGameId });
@@ -157,19 +144,13 @@ function TrayActionsListener() {
         await createAndUploadFullBackup(firstGameId);
         toastSuccess(
           "Backup completo subido",
-          `${formatGameDisplayName(
-            firstGameId
-          )}: empaquetado subido desde la bandeja.`
+          `${formatGameDisplayName(firstGameId)}: empaquetado subido desde la bandeja.`
         );
-        notifyFullBackupDone(formatGameDisplayName(firstGameId)).catch(
-          () => {}
-        );
+        notifyFullBackupDone(formatGameDisplayName(firstGameId)).catch(() => {});
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         toastError("Error al empaquetar y subir", msg);
-        notifyFullBackupError(formatGameDisplayName(firstGameId), msg).catch(
-          () => {}
-        );
+        notifyFullBackupError(formatGameDisplayName(firstGameId), msg).catch(() => {});
       } finally {
         setSyncOperation(null);
         queryClient.invalidateQueries({ queryKey: ["game-stats"] });
@@ -192,14 +173,8 @@ function TrayActionsListener() {
 
 function UnsyncedSavesModalWithProgress() {
   const { setSyncOperation } = useSyncProgress();
-  const {
-    unsyncedGameIds,
-    showUnsyncedModal,
-    closeModal,
-    uploadAll,
-    isUploading,
-    refetchUnsynced,
-  } = useUnsyncedSaves();
+  const { unsyncedGameIds, showUnsyncedModal, closeModal, uploadAll, isUploading, refetchUnsynced } =
+    useUnsyncedSaves();
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null);
 
   const handleUploadAll = useCallback(async () => {
@@ -244,17 +219,12 @@ function UnsyncedSavesModalWithProgress() {
       setSyncOperation({ type: "upload", mode: "single", gameId });
       try {
         await createAndUploadFullBackup(gameId);
-        toastSuccess(
-          "Backup completo subido",
-          `${formatGameDisplayName(gameId)}: empaquetado subido a la nube.`
-        );
+        toastSuccess("Backup completo subido", `${formatGameDisplayName(gameId)}: empaquetado subido a la nube.`);
         await refetchUnsynced();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         toastError("Error al empaquetar y subir", msg);
-        notifyFullBackupError(formatGameDisplayName(gameId), msg).catch(
-          () => {}
-        );
+        notifyFullBackupError(formatGameDisplayName(gameId), msg).catch(() => {});
       } finally {
         setLoadingGameId(null);
         setSyncOperation(null);
@@ -282,9 +252,12 @@ function App() {
 
   // Respaldo periódico del config a la nube (cada 5 min) para mantenerlo actualizado
   useEffect(() => {
-    const interval = setInterval(() => {
-      backupConfigToCloud().catch(() => {});
-    }, 5 * 60 * 1000);
+    const interval = setInterval(
+      () => {
+        backupConfigToCloud().catch(() => {});
+      },
+      5 * 60 * 1000
+    );
     return () => clearInterval(interval);
   }, []);
 
@@ -293,11 +266,7 @@ function App() {
     if (!import.meta.env.PROD) return;
     const preventContextMenu = (e: MouseEvent) => e.preventDefault();
     const preventRefresh = (e: KeyboardEvent) => {
-      if (
-        e.key === "F5" ||
-        (e.ctrlKey && e.key.toLowerCase() === "r") ||
-        (e.metaKey && e.key.toLowerCase() === "r")
-      ) {
+      if (e.key === "F5" || (e.ctrlKey && e.key.toLowerCase() === "r") || (e.metaKey && e.key.toLowerCase() === "r")) {
         e.preventDefault();
       }
     };
@@ -338,17 +307,11 @@ function App() {
       );
       notifySyncComplete(gameName, ev.payload.okCount, ev.payload.errCount);
     });
-    const unsubErr = listen<{ gameId: string; error: string }>(
-      "auto-sync-error",
-      (ev) => {
-        const gameName = formatGameDisplayName(ev.payload.gameId);
-        toastSyncResult(
-          { okCount: 0, errCount: 1, errors: [ev.payload.error] },
-          gameName
-        );
-        notifySyncError(gameName, ev.payload.error);
-      }
-    );
+    const unsubErr = listen<{ gameId: string; error: string }>("auto-sync-error", (ev) => {
+      const gameName = formatGameDisplayName(ev.payload.gameId);
+      toastSyncResult({ okCount: 0, errCount: 1, errors: [ev.payload.error] }, gameName);
+      notifySyncError(gameName, ev.payload.error);
+    });
     return () => {
       unsubDone.then((f) => f());
       unsubErr.then((f) => f());
@@ -359,11 +322,7 @@ function App() {
     <SyncProgressProvider>
       <TrayActionsListener />
       <UnsyncedSavesModalWithProgress />
-      <AppLayout
-        navItems={NAV_ITEMS}
-        activeNavId={activeNavId}
-        onNavSelect={setActiveNavId}
-      >
+      <AppLayout navItems={NAV_ITEMS} activeNavId={activeNavId} onNavSelect={setActiveNavId}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={activeNavId}
@@ -371,8 +330,7 @@ function App() {
             animate={pageTransition.animate}
             exit={pageTransition.exit}
             transition={pageTransition.transition}
-            className="min-h-[50vh]"
-          >
+            className="min-h-[50vh]">
             <PageContent activeId={activeNavId} />
           </motion.div>
         </AnimatePresence>

@@ -34,10 +34,7 @@ export function HistoryPage() {
   });
 
   const allEntries = [...(data ?? [])].reverse();
-  const entries =
-    filter === "all"
-      ? allEntries
-      : allEntries.filter((e) => e.kind === filter);
+  const entries = filter === "all" ? allEntries : allEntries.filter((e) => e.kind === filter);
 
   return (
     <div className="space-y-6">
@@ -52,8 +49,7 @@ export function HistoryPage() {
         <Tabs
           selectedKey={filter}
           onSelectionChange={(k) => setFilter((k as HistoryFilter) ?? "all")}
-          variant="underlined"
-        >
+          variant="underlined">
           <Tab key="all" title="Todos" />
           <Tab key="upload" title="Subidas" />
           <Tab key="download" title="Descargas" />
@@ -72,8 +68,7 @@ export function HistoryPage() {
         <Card>
           <CardBody>
             <p className="text-sm text-danger">
-              No se pudo cargar el historial:{" "}
-              {error instanceof Error ? error.message : "Error desconocido"}
+              No se pudo cargar el historial: {error instanceof Error ? error.message : "Error desconocido"}
             </p>
           </CardBody>
         </Card>
@@ -84,8 +79,8 @@ export function HistoryPage() {
           <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
             <History size={40} className="text-default-400" />
             <p className="text-default-500">
-              Aún no hay operaciones registradas. Cuando subas, descargues o
-              copies guardados desde amigos, aparecerán aquí.
+              Aún no hay operaciones registradas. Cuando subas, descargues o copies guardados desde amigos, aparecerán
+              aquí.
             </p>
           </CardBody>
         </Card>
@@ -98,16 +93,12 @@ export function HistoryPage() {
               <CardBody className="flex flex-col gap-1 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{formatKind(entry.kind)}</span>
-                  <span className="text-xs text-default-500">
-                    {formatTimestamp(entry.timestamp)}
-                  </span>
+                  <span className="text-xs text-default-500">{formatTimestamp(entry.timestamp)}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-default-500">
                   <span>
                     {formatGameDisplayName(entry.gameId)}
-                    <span className="ml-1 font-mono text-default-400">
-                      ({entry.gameId})
-                    </span>
+                    <span className="ml-1 font-mono text-default-400">({entry.gameId})</span>
                   </span>
                   <span>
                     Archivos: {entry.fileCount} ok / {entry.errCount} error

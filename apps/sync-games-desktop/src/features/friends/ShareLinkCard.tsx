@@ -21,15 +21,11 @@ export function ShareLinkCard({
       <CardBody className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Link2 size={20} className="text-primary" />
-          <h2 className="text-base font-semibold text-foreground">
-            Importar desde link compartido
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">Importar desde link compartido</h2>
         </div>
         <p className="text-sm text-default-600">
-          Si alguien te envió un <strong>link para compartir</strong> (desde el
-          menú ⋮ del juego → &quot;Compartir por link&quot;), pégalo aquí.
-          Verás qué archivos se copiarán y podrás confirmar antes de importar a
-          tu nube.
+          Si alguien te envió un <strong>link para compartir</strong> (desde el menú ⋮ del juego → &quot;Compartir por
+          link&quot;), pégalo aquí. Verás qué archivos se copiarán y podrás confirmar antes de importar a tu nube.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <Input
@@ -40,13 +36,7 @@ export function ShareLinkCard({
             variant="bordered"
             className="sm:max-w-md"
           />
-          <Button
-            variant="flat"
-            color="primary"
-            onPress={onImportPress}
-            isLoading={loading}
-            isDisabled={disabled}
-          >
+          <Button variant="flat" color="primary" onPress={onImportPress} isLoading={loading} isDisabled={disabled}>
             Ver archivos e importar
           </Button>
         </div>

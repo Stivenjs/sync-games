@@ -26,7 +26,7 @@ type SettingsPageState = {
   testingNotification: boolean;
   exporting: boolean;
   importing: boolean;
-   checkingUpdate: boolean;
+  checkingUpdate: boolean;
   configPath: string;
   createConfigModalOpen: boolean;
   pullFriendConfigModalOpen: boolean;
@@ -97,10 +97,7 @@ const initialState: SettingsPageState = {
   restoreConfirmOpen: false,
 };
 
-function settingsPageReducer(
-  state: SettingsPageState,
-  action: SettingsPageAction
-): SettingsPageState {
+function settingsPageReducer(state: SettingsPageState, action: SettingsPageAction): SettingsPageState {
   switch (action.type) {
     case "SET_AUTOSTART":
       return { ...state, autostart: action.payload };
@@ -173,9 +170,7 @@ export function useSettingsPage() {
   }, []);
 
   useEffect(() => {
-    getConfigPath().then((path) =>
-      dispatch({ type: "SET_CONFIG_PATH", payload: path })
-    );
+    getConfigPath().then((path) => dispatch({ type: "SET_CONFIG_PATH", payload: path }));
   }, []);
 
   useEffect(() => {
@@ -187,12 +182,7 @@ export function useSettingsPage() {
         userId: config.userId ?? "",
       });
     }
-  }, [
-    state.createConfigModalOpen,
-    config?.apiBaseUrl,
-    config?.apiKey,
-    config?.userId,
-  ]);
+  }, [state.createConfigModalOpen, config?.apiBaseUrl, config?.apiKey, config?.userId]);
 
   const handleExportConfig = async () => {
     dispatch({ type: "SET_EXPORTING", payload: true });
@@ -207,10 +197,7 @@ export function useSettingsPage() {
         toastSuccess("Configuración exportada", path);
       }
     } catch (e) {
-      toastError(
-        "Error al exportar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al exportar", e instanceof Error ? e.message : String(e));
     } finally {
       dispatch({ type: "SET_EXPORTING", payload: false });
     }
@@ -227,17 +214,11 @@ export function useSettingsPage() {
       });
       if (path && typeof path === "string") {
         await importConfigFromFile(path, mode);
-        toastSuccess(
-          "Configuración importada",
-          mode === "merge" ? "Juegos fusionados" : "Configuración reemplazada"
-        );
+        toastSuccess("Configuración importada", mode === "merge" ? "Juegos fusionados" : "Configuración reemplazada");
         window.location.reload();
       }
     } catch (e) {
-      toastError(
-        "Error al importar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al importar", e instanceof Error ? e.message : String(e));
     } finally {
       dispatch({ type: "SET_IMPORTING", payload: false });
     }
@@ -256,15 +237,9 @@ export function useSettingsPage() {
     dispatch({ type: "SET_BACKING_UP_CONFIG", payload: true });
     try {
       await backupConfigToCloud();
-      toastSuccess(
-        "Configuración respaldada",
-        "Se subió config.json a la nube para este usuario."
-      );
+      toastSuccess("Configuración respaldada", "Se subió config.json a la nube para este usuario.");
     } catch (e) {
-      toastError(
-        "Error al respaldar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al respaldar", e instanceof Error ? e.message : String(e));
     } finally {
       dispatch({ type: "SET_BACKING_UP_CONFIG", payload: false });
     }
@@ -274,16 +249,10 @@ export function useSettingsPage() {
     dispatch({ type: "SET_RESTORING_CONFIG", payload: true });
     try {
       await restoreConfigFromCloud();
-      toastSuccess(
-        "Configuración restaurada",
-        "Se aplicó la configuración desde la nube."
-      );
+      toastSuccess("Configuración restaurada", "Se aplicó la configuración desde la nube.");
       window.location.reload();
     } catch (e) {
-      toastError(
-        "Error al restaurar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al restaurar", e instanceof Error ? e.message : String(e));
     } finally {
       dispatch({ type: "SET_RESTORING_CONFIG", payload: false });
     }
@@ -296,22 +265,18 @@ export function useSettingsPage() {
     }
     dispatch({ type: "SET_PULLING_FRIEND_CONFIG", payload: true });
     try {
-
       await importFriendConfig(state.pullFriendUserId);
-      
+
       toastSuccess(
         "Configuración importada",
         `Se ha importado la configuración de ${state.pullFriendUserId} correctamente.`
       );
-      
+
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (e) {
-      toastError(
-        "Error al importar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al importar", e instanceof Error ? e.message : String(e));
     } finally {
       dispatch({ type: "SET_PULLING_FRIEND_CONFIG", payload: false });
     }
@@ -322,9 +287,7 @@ export function useSettingsPage() {
     try {
       const ok = await notifyTest();
       if (!ok) {
-        alert(
-          "Los permisos para notificaciones no están concedidos. Revisa la configuración del sistema."
-        );
+        alert("Los permisos para notificaciones no están concedidos. Revisa la configuración del sistema.");
       }
     } finally {
       dispatch({ type: "SET_TESTING_NOTIFICATION", payload: false });
@@ -335,11 +298,7 @@ export function useSettingsPage() {
     dispatch({ type: "SET_CREATING_CONFIG", payload: true });
     dispatch({ type: "SET_CREATE_CONFIG_ERROR", payload: null });
     try {
-      const path = await createConfigFile(
-        state.createApiBaseUrl,
-        state.createApiKey,
-        state.createUserId
-      );
+      const path = await createConfigFile(state.createApiBaseUrl, state.createApiKey, state.createUserId);
       dispatch({ type: "SET_CREATE_MODAL", open: false });
       refetchConfig?.();
       queryClient.invalidateQueries({ queryKey: ["config"] });
@@ -383,15 +342,10 @@ export function useSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["config"] });
       toastSuccess(
         "Configuración guardada",
-        enabled
-          ? "Backup completo en streaming activado."
-          : "Backup completo en streaming desactivado."
+        enabled ? "Backup completo en streaming activado." : "Backup completo en streaming desactivado."
       );
     } catch (e) {
-      toastError(
-        "Error al guardar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al guardar", e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -408,10 +362,7 @@ export function useSettingsPage() {
           : "Modo prueba de backup streaming desactivado."
       );
     } catch (e) {
-      toastError(
-        "Error al guardar",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al guardar", e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -420,9 +371,9 @@ export function useSettingsPage() {
     dispatch({ type: "SET_CREATE_MODAL", open: true });
   };
 
-  const [s3TransferEndpointType, setS3TransferEndpointType] = useState<
-    "accelerated" | "standard" | "unknown" | null
-  >(null);
+  const [s3TransferEndpointType, setS3TransferEndpointType] = useState<"accelerated" | "standard" | "unknown" | null>(
+    null
+  );
   useEffect(() => {
     if (!config?.apiBaseUrl?.trim() || !config?.userId?.trim()) {
       setS3TransferEndpointType(null);
@@ -449,19 +400,12 @@ export function useSettingsPage() {
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
     openCreateConfigModal,
-    setCreateApiBaseUrl: (v: string) =>
-      dispatch({ type: "SET_CREATE_API_BASE_URL", payload: v }),
-    setCreateApiKey: (v: string) =>
-      dispatch({ type: "SET_CREATE_API_KEY", payload: v }),
-    setCreateUserId: (v: string) =>
-      dispatch({ type: "SET_CREATE_USER_ID", payload: v }),
-    setCreateConfigModalOpen: (open: boolean) =>
-      dispatch({ type: "SET_CREATE_MODAL", open }),
-    setRestoreConfirmOpen: (v: boolean) =>
-      dispatch({ type: "SET_RESTORE_CONFIRM_OPEN", payload: v }),
-    setPullFriendConfigModalOpen: (open: boolean) =>
-      dispatch({ type: "SET_PULL_FRIEND_MODAL", open }),
-    setPullFriendUserId: (id: string) =>
-      dispatch({ type: "SET_PULL_FRIEND_USER_ID", payload: id }),
+    setCreateApiBaseUrl: (v: string) => dispatch({ type: "SET_CREATE_API_BASE_URL", payload: v }),
+    setCreateApiKey: (v: string) => dispatch({ type: "SET_CREATE_API_KEY", payload: v }),
+    setCreateUserId: (v: string) => dispatch({ type: "SET_CREATE_USER_ID", payload: v }),
+    setCreateConfigModalOpen: (open: boolean) => dispatch({ type: "SET_CREATE_MODAL", open }),
+    setRestoreConfirmOpen: (v: boolean) => dispatch({ type: "SET_RESTORE_CONFIRM_OPEN", payload: v }),
+    setPullFriendConfigModalOpen: (open: boolean) => dispatch({ type: "SET_PULL_FRIEND_MODAL", open }),
+    setPullFriendUserId: (id: string) => dispatch({ type: "SET_PULL_FRIEND_USER_ID", payload: id }),
   };
 }

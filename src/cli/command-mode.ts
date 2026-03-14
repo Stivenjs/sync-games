@@ -29,11 +29,7 @@ Ejemplos:
  * Ejecuta el comando y devuelve el código de salida (0 = ok, 1 = error).
  * No llama a process.exit para que el índice pueda esperar Enter en Windows.
  */
-export async function runCommandMode(
-  deps: CliDeps,
-  command: string,
-  args: string[]
-): Promise<number> {
+export async function runCommandMode(deps: CliDeps, command: string, args: string[]): Promise<number> {
   if (command === "--help" || command === "-h") {
     showHelp();
     return 0;

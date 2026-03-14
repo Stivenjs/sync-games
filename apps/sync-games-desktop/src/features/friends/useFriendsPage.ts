@@ -11,10 +11,7 @@ import {
   syncListRemoteSaves,
   syncListRemoteSavesForUser,
 } from "@services/tauri";
-import {
-  extractShareTokenFromUrl,
-  resolveShareToken,
-} from "@services/share.service";
+import { extractShareTokenFromUrl, resolveShareToken } from "@services/share.service";
 import { toastError, toastInfo, toastSyncResult } from "@utils/toast";
 import { useConfig } from "@hooks/useConfig";
 import { useQueryClient } from "@tanstack/react-query";
@@ -75,7 +72,10 @@ type FriendsPageAction =
   | { type: "SET_SHARE_LINK_LOADING"; payload: boolean }
   | { type: "SET_SHARE_LINK_CONFIRM_LOADING"; payload: boolean }
   | { type: "SET_SHARE_LINK_PREVIEW"; payload: ShareLinkPreview | null }
-  | { type: "SET_COPY_CONFIRM_PREVIEW"; payload: CopyFriendSavesPreview | null };
+  | {
+      type: "SET_COPY_CONFIRM_PREVIEW";
+      payload: CopyFriendSavesPreview | null;
+    };
 
 const initialState: FriendsPageState = {
   friendIdInput: "",
@@ -95,10 +95,7 @@ const initialState: FriendsPageState = {
   copyConfirmPreview: null,
 };
 
-function friendsPageReducer(
-  state: FriendsPageState,
-  action: FriendsPageAction
-): FriendsPageState {
+function friendsPageReducer(state: FriendsPageState, action: FriendsPageAction): FriendsPageState {
   switch (action.type) {
     case "SET_FRIEND_ID_INPUT":
       return { ...state, friendIdInput: action.payload };
@@ -150,11 +147,11 @@ export function useFriendsPage() {
     templateOpen,
     addFriendGamesOpen,
     shareLinkInput,
-  shareLinkLoading,
-  shareLinkConfirmLoading,
-  shareLinkPreview,
-  copyConfirmPreview,
-} = state;
+    shareLinkLoading,
+    shareLinkConfirmLoading,
+    shareLinkPreview,
+    copyConfirmPreview,
+  } = state;
 
   const { config: ourConfig } = useConfig();
 
@@ -208,19 +205,13 @@ export function useFriendsPage() {
     dispatch({ type: "SET_LOADING", payload: true });
     dispatch({ type: "SET_ERROR", payload: null });
     try {
-      const [cfg, saves] = await Promise.all([
-        getFriendConfig(id),
-        syncListRemoteSavesForUser(id),
-      ]);
+      const [cfg, saves] = await Promise.all([getFriendConfig(id), syncListRemoteSavesForUser(id)]);
       dispatch({ type: "SET_FRIEND_DATA", config: cfg, saves });
     } catch (e) {
       dispatch({ type: "SET_FRIEND_DATA", config: null, saves: [] });
       dispatch({
         type: "SET_ERROR",
-        payload:
-          e instanceof Error
-            ? e.message
-            : "No se pudo cargar el perfil del amigo.",
+        payload: e instanceof Error ? e.message : "No se pudo cargar el perfil del amigo.",
       });
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
@@ -230,18 +221,12 @@ export function useFriendsPage() {
   const handleImportFromShareLink = async () => {
     const token = extractShareTokenFromUrl(shareLinkInput);
     if (!token) {
-      toastError(
-        "Link inválido",
-        "Pega la URL completa del link compartido o solo el código."
-      );
+      toastError("Link inválido", "Pega la URL completa del link compartido o solo el código.");
       return;
     }
     const base = ourConfig?.apiBaseUrl?.trim();
     if (!base) {
-      toastError(
-        "Falta configuración",
-        "Configura la URL de la API en Configuración."
-      );
+      toastError("Falta configuración", "Configura la URL de la API en Configuración.");
       return;
     }
     dispatch({ type: "SET_SHARE_LINK_LOADING", payload: true });
@@ -252,12 +237,8 @@ export function useFriendsPage() {
         getFriendConfig(userId).catch(() => null),
         syncListRemoteSavesForUser(userId),
       ]);
-      const gameSaves = saves.filter(
-        (s) => s.gameId.toLowerCase() === gameId.toLowerCase()
-      );
-      const friendGame = friendCfg?.games?.find(
-        (g) => g.id.toLowerCase() === gameId.toLowerCase()
-      );
+      const gameSaves = saves.filter((s) => s.gameId.toLowerCase() === gameId.toLowerCase());
+      const friendGame = friendCfg?.games?.find((g) => g.id.toLowerCase() === gameId.toLowerCase());
       dispatch({
         type: "SET_SHARE_LINK_PREVIEW",
         payload: {
@@ -269,10 +250,7 @@ export function useFriendsPage() {
         },
       });
     } catch (e) {
-      toastError(
-        "No se pudo cargar el link",
-        e instanceof Error ? e.message : "Link inválido o expirado"
-      );
+      toastError("No se pudo cargar el link", e instanceof Error ? e.message : "Link inválido o expirado");
     } finally {
       dispatch({ type: "SET_SHARE_LINK_LOADING", payload: false });
     }
@@ -308,10 +286,7 @@ export function useFriendsPage() {
       queryClient.invalidateQueries({ queryKey: ["last-sync-info"] });
       queryClient.invalidateQueries({ queryKey: ["config"] });
     } catch (e) {
-      toastError(
-        "No se pudo importar",
-        e instanceof Error ? e.message : "Error inesperado"
-      );
+      toastError("No se pudo importar", e instanceof Error ? e.message : "Error inesperado");
     } finally {
       dispatch({ type: "SET_SHARE_LINK_CONFIRM_LOADING", payload: false });
     }
@@ -320,10 +295,7 @@ export function useFriendsPage() {
   const handleCopySaves = async (gameId: string) => {
     const friendId = friendIdInput.trim();
     if (!friendId) {
-      toastError(
-        "Falta el userId del amigo",
-        "Escribe el userId y carga el perfil primero."
-      );
+      toastError("Falta el userId del amigo", "Escribe el userId y carga el perfil primero.");
       return;
     }
 
@@ -346,37 +318,22 @@ export function useFriendsPage() {
       }
     }
 
-    const friendGameSaves = friendSaves.filter(
-      (s) => s.gameId.toLowerCase() === gameId.toLowerCase()
-    );
+    const friendGameSaves = friendSaves.filter((s) => s.gameId.toLowerCase() === gameId.toLowerCase());
     if (friendGameSaves.length === 0) {
-      toastInfo(
-        "Sin guardados de amigo",
-        "Tu amigo no tiene guardados para este juego."
-      );
+      toastInfo("Sin guardados de amigo", "Tu amigo no tiene guardados para este juego.");
       return;
     }
 
-    const myGameSaves = (myAllSaves ?? []).filter(
-      (s) => s.gameId.toLowerCase() === gameId.toLowerCase()
-    );
+    const myGameSaves = (myAllSaves ?? []).filter((s) => s.gameId.toLowerCase() === gameId.toLowerCase());
     const myFilenames = new Set(myGameSaves.map((s) => s.filename));
-    const newFiles = friendGameSaves.filter(
-      (s) => !myFilenames.has(s.filename)
-    );
-    const conflictFiles = friendGameSaves.filter((s) =>
-      myFilenames.has(s.filename)
-    );
+    const newFiles = friendGameSaves.filter((s) => !myFilenames.has(s.filename));
+    const conflictFiles = friendGameSaves.filter((s) => myFilenames.has(s.filename));
 
     type Strategy = "overwrite" | "rename";
-    const strategy: Strategy =
-      conflictFiles.length > 0 ? "rename" : "overwrite";
+    const strategy: Strategy = conflictFiles.length > 0 ? "rename" : "overwrite";
 
     const plan: CopyFriendFilePlan[] = [];
-    const usedNames = new Set<string>([
-      ...myFilenames,
-      ...friendGameSaves.map((s) => s.filename),
-    ]);
+    const usedNames = new Set<string>([...myFilenames, ...friendGameSaves.map((s) => s.filename)]);
 
     const makeUniqueName = (base: string): string => {
       if (!usedNames.has(base)) {
@@ -423,17 +380,11 @@ export function useFriendsPage() {
     }
 
     if (plan.length === 0) {
-      toastInfo(
-        "Nada que copiar",
-        "Todos los archivos del amigo ya existen en tu nube."
-      );
+      toastInfo("Nada que copiar", "Todos los archivos del amigo ya existen en tu nube.");
       return;
     }
 
-    const gameDisplayName =
-      friendConfig?.games?.find(
-        (g) => g.id.toLowerCase() === gameId.toLowerCase()
-      )?.id ?? gameId;
+    const gameDisplayName = friendConfig?.games?.find((g) => g.id.toLowerCase() === gameId.toLowerCase())?.id ?? gameId;
     dispatch({
       type: "SET_COPY_CONFIRM_PREVIEW",
       payload: {
@@ -466,27 +417,19 @@ export function useFriendsPage() {
       toastSyncResult(result, `${gameId}${suffix}`);
       queryClient.invalidateQueries({ queryKey: ["last-sync-info"] });
     } catch (e) {
-      toastError(
-        "No se pudieron copiar los guardados",
-        e instanceof Error ? e.message : "Ocurrió un error inesperado"
-      );
+      toastError("No se pudieron copiar los guardados", e instanceof Error ? e.message : "Ocurrió un error inesperado");
     } finally {
       dispatch({ type: "SET_COPYING_GAME_ID", payload: null });
     }
   };
 
-  const setFriendIdInput = (v: string) =>
-    dispatch({ type: "SET_FRIEND_ID_INPUT", payload: v });
+  const setFriendIdInput = (v: string) => dispatch({ type: "SET_FRIEND_ID_INPUT", payload: v });
   const setTemplateGame = (game: ConfiguredGame | null) =>
     dispatch({ type: "SET_TEMPLATE", game, open: game !== null });
-  const setTemplateOpen = (open: boolean) =>
-    dispatch({ type: "SET_TEMPLATE", game: templateGame, open });
-  const setAddFriendGamesOpen = (v: boolean) =>
-    dispatch({ type: "SET_ADD_FRIEND_GAMES_OPEN", payload: v });
-  const setShareLinkInput = (v: string) =>
-    dispatch({ type: "SET_SHARE_LINK_INPUT", payload: v });
-  const setShareLinkPreview = (v: ShareLinkPreview | null) =>
-    dispatch({ type: "SET_SHARE_LINK_PREVIEW", payload: v });
+  const setTemplateOpen = (open: boolean) => dispatch({ type: "SET_TEMPLATE", game: templateGame, open });
+  const setAddFriendGamesOpen = (v: boolean) => dispatch({ type: "SET_ADD_FRIEND_GAMES_OPEN", payload: v });
+  const setShareLinkInput = (v: string) => dispatch({ type: "SET_SHARE_LINK_INPUT", payload: v });
+  const setShareLinkPreview = (v: ShareLinkPreview | null) => dispatch({ type: "SET_SHARE_LINK_PREVIEW", payload: v });
   const setCopyConfirmPreview = (v: CopyFriendSavesPreview | null) =>
     dispatch({ type: "SET_COPY_CONFIRM_PREVIEW", payload: v });
 
@@ -519,7 +462,6 @@ export function useFriendsPage() {
     handleImportFromShareLink,
     handleConfirmShareLinkImport,
     handleCopySaves,
-    invalidateConfig: () =>
-      queryClient.invalidateQueries({ queryKey: ["config"] }),
+    invalidateConfig: () => queryClient.invalidateQueries({ queryKey: ["config"] }),
   };
 }

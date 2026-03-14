@@ -21,12 +21,7 @@ const menuItemsFromNav = (navItems: NavItem[]) =>
     link: "#",
   }));
 
-export function AppLayout({
-  navItems,
-  activeNavId: _activeNavId,
-  onNavSelect,
-  children,
-}: AppLayoutProps) {
+export function AppLayout({ navItems, activeNavId: _activeNavId, onNavSelect, children }: AppLayoutProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -34,9 +29,7 @@ export function AppLayout({
 
   return (
     <div className="relative min-h-screen">
-      <main className="min-h-screen overflow-auto pt-16 px-6 pb-6">
-        {children}
-      </main>
+      <main className="min-h-screen overflow-auto pt-16 px-6 pb-6">{children}</main>
       <StaggeredMenu
         isFixed
         position="left"
@@ -61,8 +54,7 @@ export function AppLayout({
               size="lg"
               className="text-foreground"
               aria-label={isDark ? "Modo claro" : "Modo oscuro"}
-              onPress={() => setTheme(isDark ? "light" : "dark")}
-            >
+              onPress={() => setTheme(isDark ? "light" : "dark")}>
               {isDark ? <Sun size={22} /> : <Moon size={22} />}
             </Button>
           ) : null

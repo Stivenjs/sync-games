@@ -35,9 +35,7 @@ export async function checkForUpdatesSilent(): Promise<UpdateCheckResult> {
  * y ofrece descargar e instalar.
  * @param silentWhenUpToDate - Si true, no muestra toast cuando no hay actualización (útil al iniciar la app).
  */
-export async function checkForUpdatesWithPrompt(
-  silentWhenUpToDate = false
-): Promise<void> {
+export async function checkForUpdatesWithPrompt(silentWhenUpToDate = false): Promise<void> {
   try {
     const update = await check();
     if (!update) {

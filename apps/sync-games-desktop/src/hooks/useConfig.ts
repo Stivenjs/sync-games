@@ -20,11 +20,7 @@ export function useConfig() {
   return {
     config: config ?? null,
     loading,
-    error: isError
-      ? error instanceof Error
-        ? error.message
-        : String(error)
-      : null,
+    error: isError ? (error instanceof Error ? error.message : String(error)) : null,
     refetch,
   };
 }

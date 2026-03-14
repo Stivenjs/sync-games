@@ -1,9 +1,4 @@
-import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-} from "@heroui/react";
+import { Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import RELEASE_NOTES_MARKDOWN from "../../../../../RELEASE_NOTES.md?raw";
 
 interface ReleaseNotesDialogProps {
@@ -48,8 +43,7 @@ function parseAndRender(md: string) {
       nodes.push(
         <h2
           key={key++}
-          className="mt-4 border-b border-default-200 pb-1 text-base font-semibold text-foreground first:mt-0"
-        >
+          className="mt-4 border-b border-default-200 pb-1 text-base font-semibold text-foreground first:mt-0">
           {trimmed.slice(3)}
         </h2>
       );
@@ -85,16 +79,11 @@ export function ReleaseNotesDialog({ isOpen, onClose }: ReleaseNotesDialogProps)
       onOpenChange={(open) => !open && onClose()}
       placement="center"
       size="2xl"
-      scrollBehavior="inside"
-    >
+      scrollBehavior="inside">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 text-left">
-          Notas de versión
-        </ModalHeader>
+        <ModalHeader className="flex flex-col gap-1 text-left">Notas de versión</ModalHeader>
         <ModalBody className="max-h-[70vh] overflow-y-auto pb-6">
-          <div className="space-y-1 pr-2">
-            {parseAndRender(RELEASE_NOTES_MARKDOWN)}
-          </div>
+          <div className="space-y-1 pr-2">{parseAndRender(RELEASE_NOTES_MARKDOWN)}</div>
         </ModalBody>
       </ModalContent>
     </Modal>

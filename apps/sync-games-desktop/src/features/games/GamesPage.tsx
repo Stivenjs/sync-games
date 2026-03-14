@@ -96,32 +96,22 @@ export function GamesPage() {
   const { statsByGameId } = useGameStats(!!config?.games?.length);
 
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
-  const [gameToFullBackupConfirm, setGameToFullBackupConfirm] =
-    useState<ConfiguredGame | null>(null);
+  const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
   const handleShare = async (game: ConfiguredGame) => {
     const base = config?.apiBaseUrl?.trim();
     const uid = config?.userId?.trim();
     const key = config?.apiKey?.trim();
     if (!base || !uid || !key) {
-      toastError(
-        "Falta configuración",
-        "Configura API URL, User ID y API Key en Configuración para compartir."
-      );
+      toastError("Falta configuración", "Configura API URL, User ID y API Key en Configuración para compartir.");
       return;
     }
     try {
       const { shareUrl } = await createShareLink(base, uid, key, game.id);
       await navigator.clipboard.writeText(shareUrl);
-      toastSuccess(
-        "Link copiado",
-        "El link para compartir este juego está en el portapapeles. Válido 7 días."
-      );
+      toastSuccess("Link copiado", "El link para compartir este juego está en el portapapeles. Válido 7 días.");
     } catch (e) {
-      toastError(
-        "No se pudo crear el link",
-        e instanceof Error ? e.message : "Error inesperado"
-      );
+      toastError("No se pudo crear el link", e instanceof Error ? e.message : "Error inesperado");
     }
   };
 
@@ -138,11 +128,7 @@ export function GamesPage() {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <p className="text-danger">{error}</p>
-        <Button
-          color="primary"
-          startContent={<RefreshCw size={18} />}
-          onPress={() => refetch?.()}
-        >
+        <Button color="primary" startContent={<RefreshCw size={18} />} onPress={() => refetch?.()}>
           Reintentar
         </Button>
       </div>
@@ -185,9 +171,7 @@ export function GamesPage() {
                   {config.userId}
                 </code>
               ) : (
-                <span className="text-sm text-default-400">
-                  Configura tu User ID en Configuración
-                </span>
+                <span className="text-sm text-default-400">Configura tu User ID en Configuración</span>
               )}
             </div>
             {config?.userId?.trim() && (
@@ -198,15 +182,11 @@ export function GamesPage() {
                 onPress={async () => {
                   try {
                     await navigator.clipboard.writeText(config.userId ?? "");
-                    toastSuccess(
-                      "User ID copiado",
-                      "Puedes compartirlo con tus amigos."
-                    );
+                    toastSuccess("User ID copiado", "Puedes compartirlo con tus amigos.");
                   } catch {
                     // sin clipboard, ignorar
                   }
-                }}
-              >
+                }}>
                 Copiar
               </Button>
             )}
@@ -283,8 +263,7 @@ export function GamesPage() {
             : undefined
         }
         isLoading={
-          (!!syncing && syncing === syncPreviewGame?.id) ||
-          (!!downloading && downloading === syncPreviewGame?.id)
+          (!!syncing && syncing === syncPreviewGame?.id) || (!!downloading && downloading === syncPreviewGame?.id)
         }
       />
       <FullBackupConfirmModal
@@ -331,9 +310,7 @@ export function GamesPage() {
 
       {/* Filtros de la lista */}
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-default-500">
-          Buscar y filtrar
-        </h2>
+        <h2 className="text-sm font-medium text-default-500">Buscar y filtrar</h2>
         <GamesFilters
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -344,9 +321,7 @@ export function GamesPage() {
 
       {/* Lista de juegos */}
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-default-500">
-          Lista de juegos
-        </h2>
+        <h2 className="text-sm font-medium text-default-500">Lista de juegos</h2>
         <GamesList
           games={filteredGames}
           animationKey={`${originFilter}|${debouncedSearchTerm}`}
@@ -364,9 +339,7 @@ export function GamesPage() {
           downloadingId={downloading}
           onOpenFolder={handleOpenFolder}
           onRestoreBackup={handleRestoreBackup}
-          onFullBackupUpload={
-            hasSyncConfig ? setGameToFullBackupConfirm : undefined
-          }
+          onFullBackupUpload={hasSyncConfig ? setGameToFullBackupConfirm : undefined}
           fullBackupUploadingGameId={fullBackupUploadingGameId}
           onEdit={setGameToEdit}
           onShare={hasSyncConfig ? handleShare : undefined}

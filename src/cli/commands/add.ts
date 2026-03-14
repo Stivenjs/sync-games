@@ -7,9 +7,7 @@ import { toGameId } from "@cli/utils";
 const MANUAL_OPTION = "__manual__";
 
 export async function runAddInteractive(deps: CliDeps): Promise<void> {
-  console.log(
-    `\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`
-  );
+  console.log(`\n${figures.arrowRight} Buscando juegos en rutas conocidas...\n`);
   const candidates = await deps.scanForPathCandidatesUseCase.execute();
 
   let selectedPath: string;
@@ -62,9 +60,7 @@ export async function runAddInteractive(deps: CliDeps): Promise<void> {
 }
 
 function buildCandidateChoices(candidates: PathCandidate[]) {
-  const choices: Array<
-    { name: string; value: string } | InstanceType<typeof Separator>
-  > = [];
+  const choices: Array<{ name: string; value: string } | InstanceType<typeof Separator>> = [];
   let currentBase = "";
 
   for (const c of candidates) {
@@ -99,16 +95,11 @@ async function promptManual(): Promise<{ gameId: string; path: string }> {
   return { gameId, path };
 }
 
-export async function runAddFromArgs(
-  deps: CliDeps,
-  args: string[]
-): Promise<void> {
+export async function runAddFromArgs(deps: CliDeps, args: string[]): Promise<void> {
   const gameId = args[1];
   const path = args[2];
   if (!gameId || !path) {
-    console.error(
-      "Uso: sync-games add <game-id> <ruta> [origen/edición] [url-descarga]"
-    );
+    console.error("Uso: sync-games add <game-id> <ruta> [origen/edición] [url-descarga]");
     throw new Error("Arguments are missing");
   }
   const editionLabel = args[3];

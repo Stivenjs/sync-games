@@ -1,16 +1,6 @@
-import {
-  AlertTriangle,
-  Archive,
-  Check,
-  CloudDownload,
-  CloudUpload,
-} from "lucide-react";
+import { AlertTriangle, Archive, Check, CloudDownload, CloudUpload } from "lucide-react";
 
-export type SyncStatusType =
-  | "pending_upload"
-  | "pending_download"
-  | "in_sync"
-  | null;
+export type SyncStatusType = "pending_upload" | "pending_download" | "in_sync" | null;
 
 interface GameCardStatusBarProps {
   /** Juego en ejecución (muestra advertencia). */
@@ -25,11 +15,7 @@ interface GameCardStatusBarProps {
  * Barra de estado compacta para la tarjeta de juego.
  * Se muestra en el footer para no tapar la portada; una sola línea con iconos y texto breve.
  */
-export function GameCardStatusBar({
-  isGameRunning,
-  syncStatus,
-  cloudBackupCount = 0,
-}: GameCardStatusBarProps) {
+export function GameCardStatusBar({ isGameRunning, syncStatus, cloudBackupCount = 0 }: GameCardStatusBarProps) {
   const parts: { icon: React.ReactNode; text: string; title: string }[] = [];
 
   if (isGameRunning) {
@@ -63,11 +49,8 @@ export function GameCardStatusBar({
   if (cloudBackupCount > 0) {
     parts.push({
       icon: <Archive size={12} className="shrink-0" />,
-      text: `${cloudBackupCount} empaquetado${
-        cloudBackupCount !== 1 ? "s" : ""
-      }`,
-      title:
-        "Backups completos en la nube. Restaurar desde backup → En la nube.",
+      text: `${cloudBackupCount} empaquetado${cloudBackupCount !== 1 ? "s" : ""}`,
+      title: "Backups completos en la nube. Restaurar desde backup → En la nube.",
     });
   }
 
@@ -76,8 +59,7 @@ export function GameCardStatusBar({
   return (
     <div
       className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[10px] text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-      role="status"
-    >
+      role="status">
       {parts.map((p, i) => (
         <span key={i} className="flex items-center gap-1" title={p.title}>
           {p.icon}

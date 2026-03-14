@@ -13,14 +13,8 @@ export const LARGE_GAME_BLOCK_FILE_COUNT = 200;
 export const LARGE_GAME_BLOCK_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
 
 /** Indica si un juego es demasiado grande para subir archivo a archivo (debe empaquetar). */
-export function isGameTooLargeForSync(
-  fileCount: number,
-  totalBytes: number
-): boolean {
-  return (
-    fileCount >= LARGE_GAME_BLOCK_FILE_COUNT ||
-    totalBytes >= LARGE_GAME_BLOCK_SIZE_BYTES
-  );
+export function isGameTooLargeForSync(fileCount: number, totalBytes: number): boolean {
+  return fileCount >= LARGE_GAME_BLOCK_FILE_COUNT || totalBytes >= LARGE_GAME_BLOCK_SIZE_BYTES;
 }
 
 export interface PackageRecommendation {
@@ -32,10 +26,7 @@ export interface PackageRecommendation {
  * Indica si conviene recomendar empaquetar para una subida, según número de archivos y/o tamaño.
  * Usado en la vista previa de subir un solo juego.
  */
-export function getPackageRecommendation(
-  fileCount: number,
-  totalBytes: number
-): PackageRecommendation {
+export function getPackageRecommendation(fileCount: number, totalBytes: number): PackageRecommendation {
   const overFiles = fileCount >= PACKAGE_RECOMMEND_MIN_FILES;
   const overSize = totalBytes >= PACKAGE_RECOMMEND_MIN_BYTES;
   if (overFiles && overSize) {

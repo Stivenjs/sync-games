@@ -12,10 +12,7 @@ async function fetchAppName(appId: string): Promise<string | null> {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
 
-    const data = (await res.json()) as Record<
-      string,
-      { success: boolean; data?: { name: string } }
-    >;
+    const data = (await res.json()) as Record<string, { success: boolean; data?: { name: string } }>;
     const entry = data[appId];
     if (entry?.success && entry.data?.name) {
       return entry.data.name;
@@ -30,9 +27,7 @@ async function fetchAppName(appId: string): Promise<string | null> {
  * Dado un array de AppIDs, resuelve todos en paralelo y devuelve un mapa id → nombre.
  * Los IDs que no se puedan resolver se omiten del resultado.
  */
-export async function resolveAppNames(
-  appIds: string[]
-): Promise<Map<string, string>> {
+export async function resolveAppNames(appIds: string[]): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const toFetch: string[] = [];
 

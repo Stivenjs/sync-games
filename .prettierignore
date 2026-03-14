@@ -1,0 +1,23 @@
+# Ignore artifacts:
+build
+coverage
+node_modules
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.
+# Ignore files:
+apps/sync-games-desktop/src-tauri/target
+apps/sync-games-desktop/src-tauri/Cargo.lock
+apps/sync-games-desktop/src-tauri/Cargo.toml
+
+.agents
+.vscode
+.github
+.husky
+.prettierignore
+.prettierrc
+.prettierrc.json
+.prettierrc.json
+
+src-tauri

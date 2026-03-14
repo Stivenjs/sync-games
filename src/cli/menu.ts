@@ -103,10 +103,7 @@ export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
         console.log("\nHasta luego.\n");
         return;
       }
-      console.error(
-        "\nError inesperado:",
-        err instanceof Error ? err.message : err
-      );
+      console.error("\nError inesperado:", err instanceof Error ? err.message : err);
       return;
     }
 
@@ -116,11 +113,7 @@ export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
       if (isExitPromptError(err)) {
         console.log(`\n${figures.arrowLeft} Operación cancelada.\n`);
       } else {
-        console.error(
-          `\n${figures.cross} Error:`,
-          err instanceof Error ? err.message : err,
-          "\n"
-        );
+        console.error(`\n${figures.cross} Error:`, err instanceof Error ? err.message : err, "\n");
       }
     }
 

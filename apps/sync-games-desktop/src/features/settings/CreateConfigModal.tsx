@@ -1,12 +1,4 @@
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 
 interface CreateConfigModalProps {
   isOpen: boolean;
@@ -42,16 +34,13 @@ export function CreateConfigModal({
         if (!open) onClose();
       }}
       placement="center"
-      size="lg"
-    >
+      size="lg">
       <ModalContent>
         <ModalHeader>Configurar conexión a la nube</ModalHeader>
         <ModalBody className="gap-4">
           <p className="text-sm text-default-500">
-            Introduce los datos de acceso para conectarte a tu servidor de
-            SaveCloud. Si estás configurando un PC nuevo, elige &quot;Guardar y
-            recuperar de la nube&quot; al terminar para descargar tu
-            configuración respaldada.
+            Introduce los datos de acceso para conectarte a tu servidor de SaveCloud. Si estás configurando un PC nuevo,
+            elige &quot;Guardar y recuperar de la nube&quot; al terminar para descargar tu configuración respaldada.
           </p>
           <Input
             label="URL de la API (apiBaseUrl)"
@@ -92,4 +81,3 @@ export function CreateConfigModal({
     </Modal>
   );
 }
-

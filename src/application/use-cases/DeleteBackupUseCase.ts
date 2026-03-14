@@ -14,10 +14,6 @@ export class DeleteBackupUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: DeleteBackupInput): Promise<void> {
-    await this.saveRepository.deleteBackup(
-      input.userId,
-      input.gameId,
-      input.key
-    );
+    await this.saveRepository.deleteBackup(input.userId, input.gameId, input.key);
   }
 }

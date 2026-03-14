@@ -39,11 +39,7 @@ export async function runScanPathsInteractive(deps: CliDeps): Promise<void> {
   }
 }
 
-async function addScanPath(
-  deps: CliDeps,
-  config: Config,
-  currentPaths: readonly string[]
-): Promise<void> {
+async function addScanPath(deps: CliDeps, config: Config, currentPaths: readonly string[]): Promise<void> {
   const drives = detectDrives();
 
   if (drives.length === 0) {
@@ -99,11 +95,7 @@ function listScanPaths(currentPaths: readonly string[]): void {
   console.log("");
 }
 
-async function removeScanPath(
-  deps: CliDeps,
-  config: Config,
-  currentPaths: readonly string[]
-): Promise<void> {
+async function removeScanPath(deps: CliDeps, config: Config, currentPaths: readonly string[]): Promise<void> {
   if (currentPaths.length === 0) {
     console.log("\nNo hay rutas personalizadas para eliminar.\n");
     return;

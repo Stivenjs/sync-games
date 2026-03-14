@@ -16,18 +16,9 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      storageKey="sync-games-theme"
-      enableSystem
-    >
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="sync-games-theme" enableSystem>
       <HeroUIProvider>
-        <ToastProvider
-          toastOffset={40}
-          placement="top-right"
-          toastProps={{ timeout: 3000 }}
-        />
+        <ToastProvider toastOffset={40} placement="top-right" toastProps={{ timeout: 3000 }} />
         <QueryClientProvider client={queryClient}>
           <App />
         </QueryClientProvider>

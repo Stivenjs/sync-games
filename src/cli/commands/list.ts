@@ -4,9 +4,7 @@ import type { CliDeps } from "@cli/container";
 export async function runList(deps: CliDeps): Promise<void> {
   const games = await deps.listGamesUseCase.execute();
   if (games.length === 0) {
-    console.log(
-      "No hay juegos configurados. Elige «Añadir un juego» en el menú."
-    );
+    console.log("No hay juegos configurados. Elige «Añadir un juego» en el menú.");
     return;
   }
   console.log(`\n${figures.hamburger} Juegos configurados:\n`);

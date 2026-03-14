@@ -7,9 +7,7 @@ export { expandPath } from "./pathUtils";
 
 function looksLikeSaveFile(name: string): boolean {
   const lower = name.toLowerCase();
-  return ALL_SAVE_EXTENSIONS.some(
-    (ext) => lower.endsWith(ext) || (ext.length > 1 && lower.includes(ext))
-  );
+  return ALL_SAVE_EXTENSIONS.some((ext) => lower.endsWith(ext) || (ext.length > 1 && lower.includes(ext)));
 }
 
 function collectFilesRecursive(
@@ -33,9 +31,7 @@ function collectFilesRecursive(
   }
 }
 
-function dedup(
-  results: { absolute: string; relative: string }[]
-): { absolute: string; relative: string }[] {
+function dedup(results: { absolute: string; relative: string }[]): { absolute: string; relative: string }[] {
   const seen = new Set<string>();
   return results.filter((r) => {
     if (seen.has(r.absolute)) return false;
@@ -71,9 +67,7 @@ function collectFromPaths(
  * Lista archivos que parecen guardados (filtro por extensión).
  * Útil para el scan y detección.
  */
-export function listSaveFilesFromPaths(
-  paths: string[]
-): { absolute: string; relative: string }[] {
+export function listSaveFilesFromPaths(paths: string[]): { absolute: string; relative: string }[] {
   return collectFromPaths(paths, looksLikeSaveFile);
 }
 
@@ -81,8 +75,6 @@ export function listSaveFilesFromPaths(
  * Lista TODOS los archivos en las rutas dadas, sin filtrar por extensión.
  * Útil para upload/download: sube todo lo que el usuario decidió guardar.
  */
-export function listAllFilesFromPaths(
-  paths: string[]
-): { absolute: string; relative: string }[] {
+export function listAllFilesFromPaths(paths: string[]): { absolute: string; relative: string }[] {
   return collectFromPaths(paths);
 }

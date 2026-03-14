@@ -17,13 +17,4 @@ export const KNOWN_COMMANDS = [
 /**
  * Acciones del menú principal interactivo.
  */
-export type MainAction =
-  | "add"
-  | "remove"
-  | "list"
-  | "scan"
-  | "scan-paths"
-  | "upload"
-  | "download"
-  | "config"
-  | "exit";
+export type MainAction = "add" | "remove" | "list" | "scan" | "scan-paths" | "upload" | "download" | "config" | "exit";

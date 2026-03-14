@@ -1,8 +1,4 @@
-import {
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { randomBytes } from "node:crypto";
 
 const PREFIX = "share-tokens/";

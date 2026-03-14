@@ -18,14 +18,8 @@ export interface GetUploadPartUrlsOutput {
 export class GetUploadPartUrlsUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
-  async execute(
-    input: GetUploadPartUrlsInput
-  ): Promise<GetUploadPartUrlsOutput> {
-    const partUrls = await this.saveRepository.getUploadPartUrls(
-      input.key,
-      input.uploadId,
-      input.partNumbers
-    );
+  async execute(input: GetUploadPartUrlsInput): Promise<GetUploadPartUrlsOutput> {
+    const partUrls = await this.saveRepository.getUploadPartUrls(input.key, input.uploadId, input.partNumbers);
     return { partUrls };
   }
 }

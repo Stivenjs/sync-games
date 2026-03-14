@@ -38,11 +38,8 @@ export function Sidebar({ items, activeId, onSelect }: SidebarProps) {
             radius="md"
             color="primary"
             size="sm"
-            aria-label={
-              isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"
-            }
-            onPress={() => setTheme(isDark ? "light" : "dark")}
-          >
+            aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            onPress={() => setTheme(isDark ? "light" : "dark")}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
         )}
@@ -55,8 +52,7 @@ export function Sidebar({ items, activeId, onSelect }: SidebarProps) {
             color={activeId === item.id ? "primary" : "default"}
             className="justify-start"
             startContent={item.icon}
-            onPress={() => onSelect(item.id)}
-          >
+            onPress={() => onSelect(item.id)}>
             {item.label}
           </Button>
         ))}

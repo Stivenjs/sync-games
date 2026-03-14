@@ -27,9 +27,7 @@ export async function searchSteamAppId(query: string): Promise<string | null> {
 }
 
 /** Busca Steam App IDs para varias consultas en una sola operación batch (en paralelo en el backend). */
-export async function searchSteamAppIdsBatch(
-  queries: string[]
-): Promise<(string | null)[]> {
+export async function searchSteamAppIdsBatch(queries: string[]): Promise<(string | null)[]> {
   if (!queries.length) return [];
   const raw = await invoke<(string | null)[]>("search_steam_app_ids_batch", {
     queries,
@@ -49,9 +47,7 @@ export interface SteamAppdetailsMediaResult {
 }
 
 /** Obtiene URLs de medios (portada, capturas, thumbnails de vídeos) desde la Store API para el hovercard. */
-export async function getSteamAppdetailsMedia(
-  appId: string
-): Promise<SteamAppdetailsMediaResult> {
+export async function getSteamAppdetailsMedia(appId: string): Promise<SteamAppdetailsMediaResult> {
   return invoke<SteamAppdetailsMediaResult>("get_steam_appdetails_media", {
     appId,
   });
@@ -63,10 +59,7 @@ export async function getSteamAppdetailsMediaBatch(
 ): Promise<Record<string, SteamAppdetailsMediaResult>> {
   const ids = appIds.filter((id) => id?.trim());
   if (!ids.length) return {};
-  return invoke<Record<string, SteamAppdetailsMediaResult>>(
-    "get_steam_appdetails_media_batch",
-    { appIds: ids }
-  );
+  return invoke<Record<string, SteamAppdetailsMediaResult>>("get_steam_appdetails_media_batch", { appIds: ids });
 }
 
 /** Comprueba si un único juego está en ejecución (para mostrar advertencia) */
@@ -75,9 +68,7 @@ export function checkGameRunning(gameId: string): Promise<boolean> {
 }
 
 /** Comprueba el estado de ejecución de varios juegos en una sola llamada */
-export function checkGamesRunning(
-  gameIds: readonly string[]
-): Promise<Record<string, boolean>> {
+export function checkGamesRunning(gameIds: readonly string[]): Promise<Record<string, boolean>> {
   if (!gameIds.length) return Promise.resolve({});
   return invoke<Record<string, boolean>>("check_games_running", {
     gameIds,
@@ -109,9 +100,7 @@ export interface ManifestSearchResult {
 }
 
 /** Busca juegos en Steam por nombre (sugerencias rápidas) */
-export async function searchSteamGames(
-  query: string
-): Promise<ManifestSearchResult[]> {
+export async function searchSteamGames(query: string): Promise<ManifestSearchResult[]> {
   if (!query.trim()) return [];
   return invoke<ManifestSearchResult[]>("search_steam_games", { query });
 }
@@ -155,9 +144,7 @@ export async function restoreConfigFromCloud(): Promise<void> {
 }
 
 /** Indica si la API devuelve URLs con S3 Transfer Acceleration ("accelerated" | "standard" | "unknown"). */
-export async function getS3TransferEndpointType(): Promise<
-  "accelerated" | "standard" | "unknown"
-> {
+export async function getS3TransferEndpointType(): Promise<"accelerated" | "standard" | "unknown"> {
   const result = await invoke<string>("get_s3_transfer_endpoint_type");
   if (result === "accelerated" || result === "standard") return result;
   return "unknown";
@@ -185,11 +172,7 @@ export async function addGamesFromFriend(
 }
 
 /** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Devuelve la ruta del archivo. */
-export async function createConfigFile(
-  apiBaseUrl: string,
-  apiKey: string,
-  userId: string
-): Promise<string> {
+export async function createConfigFile(apiBaseUrl: string, apiKey: string, userId: string): Promise<string> {
   return invoke<string>("create_config_file", {
     apiBaseUrl: apiBaseUrl.trim() || null,
     apiKey: apiKey.trim() || null,
@@ -203,10 +186,7 @@ export async function importFriendConfig(friendUserId: string): Promise<void> {
 }
 
 /** Importa configuración desde archivo. mode: "merge" | "replace" */
-export async function importConfigFromFile(
-  path: string,
-  mode: "merge" | "replace"
-): Promise<void> {
+export async function importConfigFromFile(path: string, mode: "merge" | "replace"): Promise<void> {
   await invoke("import_config_from_file", { path, mode });
 }
 
@@ -245,10 +225,7 @@ export async function deleteGameFromCloud(gameId: string): Promise<void> {
 }
 
 /** Renombra un juego en la nube (copia a nuevo id y borra el prefijo antiguo) */
-export async function renameGameInCloud(
-  oldGameId: string,
-  newGameId: string
-): Promise<void> {
+export async function renameGameInCloud(oldGameId: string, newGameId: string): Promise<void> {
   await invoke("sync_rename_game_in_cloud", {
     oldGameId,
     newGameId,
@@ -256,10 +233,7 @@ export async function renameGameInCloud(
 }
 
 /** Renombra un juego en la configuración local (cambia su id) */
-export async function renameGame(
-  oldGameId: string,
-  newGameId: string
-): Promise<void> {
+export async function renameGame(oldGameId: string, newGameId: string): Promise<void> {
   await invoke("rename_game", { oldGameId, newGameId });
 }
 
@@ -311,9 +285,7 @@ export interface GameSyncResult {
 
 /** Sube los guardados de todos los juegos a la nube (operación batch). */
 export async function syncUploadAllGames(): Promise<GameSyncResult[]> {
-  const list = await invoke<{ gameId: string; result: SyncResult }[]>(
-    "sync_upload_all_games"
-  );
+  const list = await invoke<{ gameId: string; result: SyncResult }[]>("sync_upload_all_games");
   return list.map(({ gameId, result }) => ({
     gameId,
     result: {
@@ -346,9 +318,7 @@ export function getPausedUploadInfo(): Promise<PausedUploadInfo | null> {
 
 /** Reanuda la subida multipart guardada tras pausar. */
 export function syncUploadResume(): Promise<SyncResult> {
-  return invoke<{ okCount: number; errCount: number; errors: string[] }>(
-    "sync_upload_resume"
-  ).then((r) => ({
+  return invoke<{ okCount: number; errCount: number; errors: string[] }>("sync_upload_resume").then((r) => ({
     okCount: r.okCount,
     errCount: r.errCount,
     errors: r.errors,
@@ -356,10 +326,7 @@ export function syncUploadResume(): Promise<SyncResult> {
 }
 
 /** Copia los guardados de un amigo para un juego concreto a tu cuenta */
-export async function copyFriendSaves(
-  friendUserId: string,
-  gameId: string
-): Promise<SyncResult> {
+export async function copyFriendSaves(friendUserId: string, gameId: string): Promise<SyncResult> {
   const r = await invoke<{
     okCount: number;
     errCount: number;
@@ -412,9 +379,7 @@ export async function syncListRemoteSaves(): Promise<RemoteSaveInfo[]> {
 }
 
 /** Lista todos los guardados en la nube de otro usuario (amigo) */
-export async function syncListRemoteSavesForUser(
-  userId: string
-): Promise<RemoteSaveInfo[]> {
+export async function syncListRemoteSavesForUser(userId: string): Promise<RemoteSaveInfo[]> {
   return invoke<RemoteSaveInfo[]>("sync_list_remote_saves_for_user", {
     userId,
   });
@@ -428,13 +393,8 @@ export interface DownloadConflict {
 }
 
 /** Comprueba si hay conflictos (archivos locales más recientes que en la nube) */
-export async function syncCheckDownloadConflicts(
-  gameId: string
-): Promise<{ conflicts: DownloadConflict[] }> {
-  return invoke<{ conflicts: DownloadConflict[] }>(
-    "sync_check_download_conflicts",
-    { gameId }
-  );
+export async function syncCheckDownloadConflicts(gameId: string): Promise<{ conflicts: DownloadConflict[] }> {
+  return invoke<{ conflicts: DownloadConflict[] }>("sync_check_download_conflicts", { gameId });
 }
 
 /** Comprueba conflictos de descarga para varios juegos en una sola llamada */
@@ -442,10 +402,9 @@ export async function syncCheckDownloadConflictsBatch(
   gameIds: string[]
 ): Promise<{ gameId: string; conflicts: DownloadConflict[] }[]> {
   if (gameIds.length === 0) return [];
-  return invoke<{ gameId: string; conflicts: DownloadConflict[] }[]>(
-    "sync_check_download_conflicts_batch",
-    { gameIds }
-  );
+  return invoke<{ gameId: string; conflicts: DownloadConflict[] }[]>("sync_check_download_conflicts_batch", {
+    gameIds,
+  });
 }
 
 /** Juegos con guardados locales no subidos a la nube */
@@ -487,9 +446,7 @@ export async function syncDownloadGame(gameId: string): Promise<SyncResult> {
 
 /** Descarga los guardados de todos los juegos desde la nube (operación batch). */
 export async function syncDownloadAllGames(): Promise<GameSyncResult[]> {
-  const list = await invoke<{ gameId: string; result: SyncResult }[]>(
-    "sync_download_all_games"
-  );
+  const list = await invoke<{ gameId: string; result: SyncResult }[]>("sync_download_all_games");
   return list.map(({ gameId, result }) => ({
     gameId,
     result: {
@@ -513,10 +470,7 @@ export async function listBackups(gameId: string): Promise<BackupInfo[]> {
 }
 
 /** Restaura un backup local sobre los guardados del juego */
-export async function restoreBackup(
-  gameId: string,
-  backupId: string
-): Promise<SyncResult> {
+export async function restoreBackup(gameId: string, backupId: string): Promise<SyncResult> {
   const r = await invoke<{
     okCount: number;
     errCount: number;
@@ -538,23 +492,17 @@ export interface CloudBackupInfo {
 }
 
 /** Crea un .tar de la carpeta del juego y lo sube a la nube (recomendado para juegos grandes). */
-export async function createAndUploadFullBackup(
-  gameId: string
-): Promise<string> {
+export async function createAndUploadFullBackup(gameId: string): Promise<string> {
   return invoke<string>("create_and_upload_full_backup", { gameId });
 }
 
 /** Lista los backups completos en la nube para un juego. */
-export async function listFullBackups(
-  gameId: string
-): Promise<CloudBackupInfo[]> {
+export async function listFullBackups(gameId: string): Promise<CloudBackupInfo[]> {
   return invoke<CloudBackupInfo[]>("list_full_backups", { gameId });
 }
 
 /** Lista los backups en la nube para varios juegos en una sola invocación. */
-export async function listFullBackupsBatch(
-  gameIds: string[]
-): Promise<Record<string, CloudBackupInfo[]>> {
+export async function listFullBackupsBatch(gameIds: string[]): Promise<Record<string, CloudBackupInfo[]>> {
   const ids = gameIds.filter((id) => id?.trim());
   if (!ids.length) return {};
   return invoke<Record<string, CloudBackupInfo[]>>("list_full_backups_batch", {
@@ -563,10 +511,7 @@ export async function listFullBackupsBatch(
 }
 
 /** Descarga un backup completo por key y lo extrae en la carpeta del juego. */
-export async function downloadAndRestoreFullBackup(
-  gameId: string,
-  backupKey: string
-): Promise<void> {
+export async function downloadAndRestoreFullBackup(gameId: string, backupKey: string): Promise<void> {
   await invoke("download_and_restore_full_backup", {
     gameId,
     backupKey,
@@ -574,19 +519,12 @@ export async function downloadAndRestoreFullBackup(
 }
 
 /** Elimina un backup empaquetado de la nube por key. */
-export async function deleteFullBackup(
-  gameId: string,
-  backupKey: string
-): Promise<void> {
+export async function deleteFullBackup(gameId: string, backupKey: string): Promise<void> {
   await invoke("delete_cloud_backup", { gameId, backupKey });
 }
 
 /** Renombra un backup empaquetado en la nube. newFilename debe ser solo el nombre .tar (ej. "mi-backup.tar"). */
-export async function renameFullBackup(
-  gameId: string,
-  backupKey: string,
-  newFilename: string
-): Promise<void> {
+export async function renameFullBackup(gameId: string, backupKey: string, newFilename: string): Promise<void> {
   await invoke("rename_cloud_backup", {
     gameId,
     backupKey,
@@ -601,9 +539,7 @@ export interface CleanupBackupsResult {
 }
 
 /** Elimina backups antiguos: mantiene solo los últimos N por juego. Devuelve cuántos se borraron. */
-export async function cleanupOldBackups(
-  keepLastN: number
-): Promise<CleanupBackupsResult> {
+export async function cleanupOldBackups(keepLastN: number): Promise<CleanupBackupsResult> {
   return invoke<CleanupBackupsResult>("cleanup_old_backups", {
     keepLastN,
   });
@@ -620,9 +556,7 @@ export async function setFullBackupStreaming(enabled: boolean): Promise<void> {
 }
 
 /** Modo prueba: backup streaming sin subir a la nube. */
-export async function setFullBackupStreamingDryRun(
-  enabled: boolean
-): Promise<void> {
+export async function setFullBackupStreamingDryRun(enabled: boolean): Promise<void> {
   await invoke("set_full_backup_streaming_dry_run", { enabled });
 }
 
@@ -659,25 +593,17 @@ export async function previewUpload(gameId: string): Promise<PreviewUpload> {
 }
 
 /** Previsualiza qué archivos se descargarían */
-export async function previewDownload(
-  gameId: string
-): Promise<PreviewDownload> {
+export async function previewDownload(gameId: string): Promise<PreviewDownload> {
   return invoke<PreviewDownload>("preview_download", { gameId });
 }
 
 /** Inicia la descarga de un torrent */
-export async function startTorrentDownload(
-  magnet: string,
-  savePath: string
-): Promise<void> {
+export async function startTorrentDownload(magnet: string, savePath: string): Promise<void> {
   await invoke("start_torrent_download", { magnet, savePath });
 }
 
 /** Inicia la descarga de un torrent a partir de un archivo .torrent */
-export async function startTorrentFileDownload(
-  file: string,
-  savePath: string
-): Promise<void> {
+export async function startTorrentFileDownload(file: string, savePath: string): Promise<void> {
   await invoke("start_torrent_file_download", { file, savePath });
 }
 

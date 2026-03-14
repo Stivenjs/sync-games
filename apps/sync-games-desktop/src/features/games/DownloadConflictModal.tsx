@@ -1,11 +1,4 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { AlertTriangle, CloudDownload } from "lucide-react";
 import type { DownloadConflict } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
@@ -55,10 +48,9 @@ export function DownloadConflictModal({
         </ModalHeader>
         <ModalBody>
           <p className="text-default-600">
-            {conflicts.length} archivo{conflicts.length !== 1 ? "s" : ""} de{" "}
-            <strong>{gameName}</strong> {conflicts.length === 1 ? "es" : "son"} más
-            reciente{conflicts.length !== 1 ? "s" : ""} que en la nube. Si continúas,
-            se sobrescribirán con las versiones de la nube.
+            {conflicts.length} archivo{conflicts.length !== 1 ? "s" : ""} de <strong>{gameName}</strong>{" "}
+            {conflicts.length === 1 ? "es" : "son"} más reciente{conflicts.length !== 1 ? "s" : ""} que en la nube. Si
+            continúas, se sobrescribirán con las versiones de la nube.
           </p>
           <ul className="max-h-48 space-y-2 overflow-y-auto rounded-lg bg-default-100 p-3">
             {conflicts.slice(0, 10).map((c, i) => (
@@ -69,23 +61,14 @@ export function DownloadConflictModal({
                 </span>
               </li>
             ))}
-            {conflicts.length > 10 && (
-              <li className="text-xs text-default-500">
-                … y {conflicts.length - 10} más
-              </li>
-            )}
+            {conflicts.length > 10 && <li className="text-xs text-default-500">… y {conflicts.length - 10} más</li>}
           </ul>
         </ModalBody>
         <ModalFooter>
           <Button variant="flat" onPress={onClose} isDisabled={isLoading}>
             Cancelar
           </Button>
-          <Button
-            color="warning"
-            onPress={onConfirm}
-            isLoading={isLoading}
-            startContent={<CloudDownload size={18} />}
-          >
+          <Button color="warning" onPress={onConfirm} isLoading={isLoading} startContent={<CloudDownload size={18} />}>
             Sobrescribir igualmente
           </Button>
         </ModalFooter>

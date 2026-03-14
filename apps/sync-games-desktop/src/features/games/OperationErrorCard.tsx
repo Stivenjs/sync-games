@@ -10,18 +10,13 @@ interface OperationErrorCardProps {
   onRetry?: (gameId: string, type: "sync" | "download") => void;
 }
 
-export function OperationErrorCard({
-  operationResult,
-  onDismiss,
-  onRetry,
-}: OperationErrorCardProps) {
+export function OperationErrorCard({ operationResult, onDismiss, onRetry }: OperationErrorCardProps) {
   const { type, gameId, result } = operationResult;
   const hasErrors = result.errors.length > 0;
 
   if (!hasErrors) return null;
 
-  const title =
-    type === "sync" ? "Errores de sincronización" : "Errores de descarga";
+  const title = type === "sync" ? "Errores de sincronización" : "Errores de descarga";
   const canRetry = !!gameId && !!onRetry;
 
   return (
@@ -36,19 +31,12 @@ export function OperationErrorCard({
                 variant="flat"
                 color="primary"
                 startContent={<RefreshCw size={14} />}
-                onPress={() => onRetry(gameId, type)}
-              >
+                onPress={() => onRetry(gameId, type)}>
                 Reintentar
               </Button>
             )}
             {onDismiss && (
-              <Button
-                size="sm"
-                variant="light"
-                isIconOnly
-                aria-label="Cerrar"
-                onPress={onDismiss}
-              >
+              <Button size="sm" variant="light" isIconOnly aria-label="Cerrar" onPress={onDismiss}>
                 <X size={16} />
               </Button>
             )}
@@ -58,9 +46,7 @@ export function OperationErrorCard({
           {result.errors.slice(0, 5).map((err, i) => (
             <li key={i}>{err}</li>
           ))}
-          {result.errors.length > 5 && (
-            <li>… y {result.errors.length - 5} más</li>
-          )}
+          {result.errors.length > 5 && <li>… y {result.errors.length - 5} más</li>}
         </ul>
       </CardBody>
     </Card>

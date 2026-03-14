@@ -2,11 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Spinner, Tooltip } from "@heroui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSyncProgress } from "@contexts/SyncProgressContext";
-import {
-  requestUploadCancel,
-  requestUploadPause,
-  syncUploadResume,
-} from "@services/tauri";
+import { requestUploadCancel, requestUploadPause, syncUploadResume } from "@services/tauri";
 import { formatBytes } from "@utils/format";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatEta, formatSpeed } from "@utils/progress";
@@ -16,8 +12,7 @@ export type { SyncProgressState } from "@contexts/SyncProgressContext";
 
 /** Barra flotante de progreso: solo se muestra en operaciones "subir/descargar todos" (batch). */
 export function SyncProgressBar() {
-  const { syncOperation, progress, pausedUploadInfo, clearPausedUploadInfo } =
-    useSyncProgress();
+  const { syncOperation, progress, pausedUploadInfo, clearPausedUploadInfo } = useSyncProgress();
   const [resuming, setResuming] = useState(false);
   const [speedBps, setSpeedBps] = useState<number | null>(null);
   const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
@@ -52,21 +47,14 @@ export function SyncProgressBar() {
     progress?.filename?.includes("Extrayendo") ||
     progress?.filename?.startsWith("backups/") ||
     progress?.filename?.endsWith(".tar");
-  const showFloatingBar =
-    progress && (syncOperation?.mode === "batch" || isPackagedOperation);
+  const showFloatingBar = progress && (syncOperation?.mode === "batch" || isPackagedOperation);
 
   const isIndeterminate =
     progress &&
-    (progress.filename?.includes("Empaquetando") ||
-      progress.filename?.includes("Extrayendo") ||
-      progress.total <= 0);
+    (progress.filename?.includes("Empaquetando") || progress.filename?.includes("Extrayendo") || progress.total <= 0);
   const value =
-    progress && progress.total > 0
-      ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
-      : 0;
-  const canPause =
-    progress?.type === "upload" &&
-    !(isPackagedOperation && progress.total <= 0);
+    progress && progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0;
+  const canPause = progress?.type === "upload" && !(isPackagedOperation && progress.total <= 0);
 
   // Calcular velocidad media (bytes/segundo) y ETA aproximada.
   useEffect(() => {
@@ -156,29 +144,21 @@ export function SyncProgressBar() {
           exit={{ y: 48, opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed bottom-4 left-6 right-6 z-50 rounded-lg border border-default-200 bg-default-100/95 px-4 py-3 shadow-lg backdrop-blur sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
-          aria-label={
-            progress.type === "upload"
-              ? "Progreso de subida"
-              : "Progreso de descarga"
-          }
+          aria-label={progress.type === "upload" ? "Progreso de subida" : "Progreso de descarga"}
           role="status"
           aria-valuenow={value}
           aria-valuemin={0}
-          aria-valuemax={100}
-        >
+          aria-valuemax={100}>
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-foreground">
-              {progress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
-              {formatGameDisplayName(progress.gameId)}
+              {progress.type === "upload" ? "Subiendo" : "Descargando"}: {formatGameDisplayName(progress.gameId)}
             </span>
             <span className="text-xs text-default-500 tabular-nums">
               {isIndeterminate ? "—" : progress.total > 0 ? `${value}%` : "—"}
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="min-w-0 flex-1 truncate text-xs text-default-500">
-              {progress.filename}
-            </p>
+            <p className="min-w-0 flex-1 truncate text-xs text-default-500">{progress.filename}</p>
             {progress.type === "upload" && (
               <span className="flex shrink-0 gap-1">
                 {canPause ? (
@@ -187,8 +167,7 @@ export function SyncProgressBar() {
                       type="button"
                       onClick={onPauseUpload}
                       className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200"
-                      aria-label="Pausar subida"
-                    >
+                      aria-label="Pausar subida">
                       <Pause size={14} />
                     </button>
                   </Tooltip>
@@ -198,8 +177,7 @@ export function SyncProgressBar() {
                     type="button"
                     onClick={onCancelUpload}
                     className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10"
-                    aria-label="Cancelar subida"
-                  >
+                    aria-label="Cancelar subida">
                     <X size={14} />
                   </button>
                 </Tooltip>
@@ -208,14 +186,9 @@ export function SyncProgressBar() {
           </div>
           {isIndeterminate ? (
             <div className="mt-2 flex items-center gap-2">
-              <Spinner
-                size="sm"
-                color="primary"
-                aria-label="Preparando datos"
-              />
+              <Spinner size="sm" color="primary" aria-label="Preparando datos" />
               <p className="text-xs text-default-500">
-                Preparando datos… esto puede tardar unos minutos en juegos
-                grandes.
+                Preparando datos… esto puede tardar unos minutos en juegos grandes.
               </p>
             </div>
           ) : (
@@ -233,45 +206,27 @@ export function SyncProgressBar() {
           <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-default-500">
             <span className="inline-flex items-center gap-1.5">
               {progress.type === "upload" ? (
-                <Upload
-                  size={12}
-                  className="shrink-0 text-primary"
-                  aria-hidden
-                />
+                <Upload size={12} className="shrink-0 text-primary" aria-hidden />
               ) : (
-                <HardDrive
-                  size={12}
-                  className="shrink-0 text-primary"
-                  aria-hidden
-                />
+                <HardDrive size={12} className="shrink-0 text-primary" aria-hidden />
               )}
               <span>
                 {progress.type === "upload" ? "Enviados" : "En disco"}:{" "}
                 <span className="tabular-nums">
                   {formatBytes(progress.loaded)}
-                  {progress.total > 0
-                    ? ` / ${formatBytes(progress.total)}`
-                    : ""}
+                  {progress.total > 0 ? ` / ${formatBytes(progress.total)}` : ""}
                 </span>
               </span>
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Zap
-                size={12}
-                className="shrink-0 text-default-400"
-                aria-hidden
-              />
+              <Zap size={12} className="shrink-0 text-default-400" aria-hidden />
               <span>
                 Velocidad{isIndeterminate ? " (aprox.)" : ""}:{" "}
                 <span className="tabular-nums">{formatSpeed(speedBps)}</span>
               </span>
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Clock
-                size={12}
-                className="shrink-0 text-default-400"
-                aria-hidden
-              />
+              <Clock size={12} className="shrink-0 text-default-400" aria-hidden />
               {!isIndeterminate && progress.total > 0 ? (
                 <span className="tabular-nums">{formatEta(etaSeconds)}</span>
               ) : (
@@ -290,8 +245,7 @@ export function SyncProgressBar() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 48, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-4 left-6 right-6 z-50 rounded-lg border border-default-200 bg-default-100/95 px-4 py-3 shadow-lg backdrop-blur sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
-        >
+          className="fixed bottom-4 left-6 right-6 z-50 rounded-lg border border-default-200 bg-default-100/95 px-4 py-3 shadow-lg backdrop-blur sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-sm text-foreground">
               Subida pausada: {formatGameDisplayName(pausedUploadInfo.gameId)} —{" "}
@@ -301,8 +255,7 @@ export function SyncProgressBar() {
               type="button"
               onClick={onResumeUpload}
               disabled={resuming}
-              className="shrink-0 text-sm font-medium text-primary hover:underline disabled:opacity-50"
-            >
+              className="shrink-0 text-sm font-medium text-primary hover:underline disabled:opacity-50">
               {resuming ? "Reanudando…" : "Reanudar"}
             </button>
           </div>

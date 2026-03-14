@@ -73,17 +73,11 @@ export function GamesStats({
   const cloudDetailContent = (
     <ul className="space-y-2">
       {cloudGames.map((g) => (
-        <li
-          key={g.gameId}
-          className="flex flex-col gap-1 rounded-lg bg-default-100 px-3 py-2"
-        >
+        <li key={g.gameId} className="flex flex-col gap-1 rounded-lg bg-default-100 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium text-foreground">
-              {formatGameDisplayName(g.gameId)}
-            </span>
+            <span className="truncate text-sm font-medium text-foreground">{formatGameDisplayName(g.gameId)}</span>
             <span className="shrink-0 text-xs text-default-500">
-              {g.fileCount} archivo{g.fileCount !== 1 ? "s" : ""} ·{" "}
-              {formatSize(g.totalSize)}
+              {g.fileCount} archivo{g.fileCount !== 1 ? "s" : ""} · {formatSize(g.totalSize)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2">
@@ -91,12 +85,7 @@ export function GamesStats({
               {g.gameId}
             </Code>
             {onConfigureFromCloud && (
-              <Button
-                size="sm"
-                variant="light"
-                className="h-7 text-xs"
-                onPress={() => onConfigureFromCloud(g.gameId)}
-              >
+              <Button size="sm" variant="light" className="h-7 text-xs" onPress={() => onConfigureFromCloud(g.gameId)}>
                 Configurar juego
               </Button>
             )}
@@ -116,9 +105,7 @@ export function GamesStats({
             </div>
             <div>
               <p className="text-sm text-default-500">Juegos configurados</p>
-              <p className="text-2xl font-semibold text-foreground">
-                {gamesCount}
-              </p>
+              <p className="text-2xl font-semibold text-foreground">{gamesCount}</p>
             </div>
           </CardBody>
         </Card>
@@ -136,16 +123,10 @@ export function GamesStats({
             <div>
               <p className="text-sm text-default-500">Última sincronización</p>
               <p className="text-lg font-medium text-foreground">
-                {lastSyncLoading
-                  ? "Cargando..."
-                  : lastSyncAt
-                  ? formatLastSync(lastSyncAt)
-                  : "Nunca"}
+                {lastSyncLoading ? "Cargando..." : lastSyncAt ? formatLastSync(lastSyncAt) : "Nunca"}
               </p>
               {lastSyncAt && lastSyncGameId && (
-                <p className="text-sm text-default-400">
-                  {formatGameDisplayName(lastSyncGameId)}
-                </p>
+                <p className="text-sm text-default-400">{formatGameDisplayName(lastSyncGameId)}</p>
               )}
             </div>
           </CardBody>
@@ -166,10 +147,10 @@ export function GamesStats({
                   {lastSyncLoading
                     ? "Cargando..."
                     : hasCloudGames
-                    ? `${cloudGames.length} juego${
-                        cloudGames.length !== 1 ? "s" : ""
-                      } · ${formatSize(totalCloudSize)}`
-                    : "Vacío"}
+                      ? `${cloudGames.length} juego${
+                          cloudGames.length !== 1 ? "s" : ""
+                        } · ${formatSize(totalCloudSize)}`
+                      : "Vacío"}
                 </p>
               </div>
               {hasCloudGames &&
@@ -179,32 +160,19 @@ export function GamesStats({
                       type="button"
                       onClick={onOpen}
                       className="flex size-8 shrink-0 items-center justify-center rounded-lg text-default-400 transition-colors hover:bg-default-100 hover:text-foreground"
-                      aria-label="Ver detalle de guardados en la nube"
-                    >
+                      aria-label="Ver detalle de guardados en la nube">
                       <Info size={18} />
                     </button>
-                    <Modal
-                      isOpen={isOpen}
-                      onOpenChange={onOpenChange}
-                      size="3xl"
-                      scrollBehavior="inside"
-                    >
+                    <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="3xl" scrollBehavior="inside">
                       <ModalContent>
                         <ModalHeader>
-                          <p className="text-lg font-medium">
-                            Guardados en la nube ({cloudGames.length} juegos)
-                          </p>
+                          <p className="text-lg font-medium">Guardados en la nube ({cloudGames.length} juegos)</p>
                         </ModalHeader>
                         <ModalBody>
-                          <div className="max-h-[70vh] overflow-y-auto">
-                            {cloudDetailContent}
-                          </div>
+                          <div className="max-h-[70vh] overflow-y-auto">{cloudDetailContent}</div>
                         </ModalBody>
                         <ModalFooter>
-                          <Button
-                            color="primary"
-                            onPress={() => onOpenChange()}
-                          >
+                          <Button color="primary" onPress={() => onOpenChange()}>
                             Cerrar
                           </Button>
                         </ModalFooter>
@@ -217,20 +185,15 @@ export function GamesStats({
                       <button
                         type="button"
                         className="flex size-8 shrink-0 items-center justify-center rounded-lg text-default-400 transition-colors hover:bg-default-100 hover:text-foreground"
-                        aria-label="Ver detalle de guardados en la nube"
-                      >
+                        aria-label="Ver detalle de guardados en la nube">
                         <Info size={18} />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-104 p-0">
                       <div className="border-b border-default-200 px-4 py-3">
-                        <p className="text-sm font-medium text-foreground">
-                          Guardados en la nube
-                        </p>
+                        <p className="text-sm font-medium text-foreground">Guardados en la nube</p>
                       </div>
-                      <div className="max-h-72 overflow-y-auto p-3">
-                        {cloudDetailContent}
-                      </div>
+                      <div className="max-h-72 overflow-y-auto p-3">{cloudDetailContent}</div>
                     </PopoverContent>
                   </Popover>
                 ))}

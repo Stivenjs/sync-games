@@ -1,12 +1,4 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ScrollShadow,
-} from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, ScrollShadow } from "@heroui/react";
 import { CloudDownload, FileText } from "lucide-react";
 import { formatGameDisplayName } from "@utils/gameImage";
 
@@ -58,18 +50,15 @@ export function CopyFriendSavesConfirmModal({
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-default-600">
-            Se copiarán los guardados del juego{" "}
-            <strong className="text-foreground">{displayName}</strong> desde la
-            nube de tu amigo a tu nube. Los archivos quedarán asociados a este
-            juego en tu cuenta.
+            Se copiarán los guardados del juego <strong className="text-foreground">{displayName}</strong> desde la nube
+            de tu amigo a tu nube. Los archivos quedarán asociados a este juego en tu cuenta.
           </p>
           {hasConflicts && (
             <p className="text-sm text-warning-600">
               {conflictCount} archivo{conflictCount !== 1 ? "s" : ""} ya existe
               {conflictCount !== 1 ? "n" : ""} en tu nube y se copiará
               {conflictCount !== 1 ? "n" : ""} con un nombre distinto (ej.{" "}
-              <span className="font-mono text-xs">archivo (amigo 1).sav</span>)
-              para no sobrescribir.
+              <span className="font-mono text-xs">archivo (amigo 1).sav</span>) para no sobrescribir.
             </p>
           )}
           <div className="rounded-lg border border-default-200 bg-default-50 p-3">
@@ -84,18 +73,10 @@ export function CopyFriendSavesConfirmModal({
             <ScrollShadow className="max-h-[40vh]">
               <ul className="space-y-1">
                 {items.map((item, i) => (
-                  <li
-                    key={`${item.filename}-${i}`}
-                    className="flex flex-col gap-0.5 text-sm text-default-700"
-                  >
+                  <li key={`${item.filename}-${i}`} className="flex flex-col gap-0.5 text-sm text-default-700">
                     <span className="flex items-center gap-2">
-                      <FileText
-                        size={14}
-                        className="shrink-0 text-default-400"
-                      />
-                      <span className="truncate font-mono text-xs">
-                        {item.filename}
-                      </span>
+                      <FileText size={14} className="shrink-0 text-default-400" />
+                      <span className="truncate font-mono text-xs">{item.filename}</span>
                     </span>
                     {item.targetFilename !== item.filename && (
                       <span className="ml-6 text-xs text-default-500">
@@ -116,8 +97,7 @@ export function CopyFriendSavesConfirmModal({
             color="primary"
             onPress={handleConfirm}
             isLoading={isLoading}
-            startContent={!isLoading ? <CloudDownload size={18} /> : undefined}
-          >
+            startContent={!isLoading ? <CloudDownload size={18} /> : undefined}>
             Copiar a mi nube
           </Button>
         </ModalFooter>

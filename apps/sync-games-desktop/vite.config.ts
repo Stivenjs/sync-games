@@ -15,9 +15,7 @@ export default defineConfig(async () => ({
   plugins: [
     react({
       babel: {
-        plugins: [
-          ["babel-plugin-react-compiler", ReactCompilerConfig],
-        ],
+        plugins: [["babel-plugin-react-compiler", ReactCompilerConfig]],
       },
     }),
     tailwindcss(),

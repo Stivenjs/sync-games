@@ -12,10 +12,7 @@ const STEAM_CDN_BASE = "https://cdn.cloudflare.steamstatic.com/steam/apps";
  * 4. id numérico puro
  * 5. null → placeholder
  */
-export function getGameImageUrl(
-  game: ConfiguredGame,
-  resolvedSteamAppId?: string | null
-): string | null {
+export function getGameImageUrl(game: ConfiguredGame, resolvedSteamAppId?: string | null): string | null {
   if (game.imageUrl?.trim()) {
     return game.imageUrl.trim();
   }
@@ -34,15 +31,8 @@ export function getGameImageUrl(
 }
 
 /** Devuelve el Steam App ID si existe (config o resuelto o extraído del id). */
-export function getSteamAppId(
-  game: ConfiguredGame,
-  resolvedSteamAppId?: string | null
-): string | null {
-  if (
-    game.imageUrl?.trim() &&
-    !game.steamAppId?.trim() &&
-    !resolvedSteamAppId?.trim()
-  ) {
+export function getSteamAppId(game: ConfiguredGame, resolvedSteamAppId?: string | null): string | null {
+  if (game.imageUrl?.trim() && !game.steamAppId?.trim() && !resolvedSteamAppId?.trim()) {
     return null;
   }
   return (
@@ -57,10 +47,7 @@ export function getSteamAppId(
  * URL de imagen extra para hovercard (library hero de Steam).
  * Muchos juegos tienen esta imagen; si no existe devolverá 404.
  */
-export function getGameLibraryHeroUrl(
-  game: ConfiguredGame,
-  resolvedSteamAppId?: string | null
-): string | null {
+export function getGameLibraryHeroUrl(game: ConfiguredGame, resolvedSteamAppId?: string | null): string | null {
   const appId = getSteamAppId(game, resolvedSteamAppId);
   if (!appId) return null;
   return `${STEAM_CDN_BASE}/${appId}/library_hero.jpg`;
@@ -112,15 +99,7 @@ export function needsSteamSearch(game: ConfiguredGame): boolean {
  * Quita prefijos de cracks (empress-, codex-, fitgirl-, etc.) y sustituye guiones por espacios.
  */
 export function idToSearchQuery(id: string): string {
-  const knownPrefixes = [
-    "empress-",
-    "codex-",
-    "fitgirl-",
-    "dodi-",
-    "scene-",
-    "goldberg-",
-    "steamless-",
-  ];
+  const knownPrefixes = ["empress-", "codex-", "fitgirl-", "dodi-", "scene-", "goldberg-", "steamless-"];
   let cleaned = id.trim();
   for (const prefix of knownPrefixes) {
     if (cleaned.toLowerCase().startsWith(prefix)) {
@@ -152,10 +131,7 @@ export function formatGameDisplayName(id: string): string {
  * Filtra juegos por término de búsqueda (id o nombre formateado).
  * Búsqueda case-insensitive y por coincidencia parcial.
  */
-export function filterGamesBySearch(
-  games: readonly ConfiguredGame[],
-  searchTerm: string
-): ConfiguredGame[] {
+export function filterGamesBySearch(games: readonly ConfiguredGame[], searchTerm: string): ConfiguredGame[] {
   const term = searchTerm.trim().toLowerCase();
   if (!term) return [...games];
   return games.filter((game) => {

@@ -13,28 +13,21 @@ import { Glob } from "bun";
 const baseDir = resolve(import.meta.dir, "..");
 const bundleDir = join(baseDir, "src-tauri/target/release/bundle");
 
-const tauriConf = await Bun.file(
-  join(baseDir, "src-tauri/tauri.conf.json")
-).json();
+const tauriConf = await Bun.file(join(baseDir, "src-tauri/tauri.conf.json")).json();
 const VERSION = tauriConf.version;
 
 const endpoints = tauriConf.plugins?.updater?.endpoints?.[0] ?? "";
-const [, GITHUB_USER = "Stivenjs", REPO = "savecloud"] =
-  endpoints.match(/github\.com\/([^/]+)\/([^/]+)\//) ?? [];
+const [, GITHUB_USER = "Stivenjs", REPO = "savecloud"] = endpoints.match(/github\.com\/([^/]+)\/([^/]+)\//) ?? [];
 
 if (!existsSync(bundleDir)) {
   console.error("No se encontró la carpeta bundle. ¿Ejecutaste `tauri build`?");
   process.exit(1);
 }
 
-const sigFiles = Array.from(
-  new Glob("**/*.sig").scanSync({ cwd: bundleDir, absolute: true })
-);
+const sigFiles = Array.from(new Glob("**/*.sig").scanSync({ cwd: bundleDir, absolute: true }));
 
 if (!sigFiles.length) {
-  console.error(
-    "No se encontraron archivos .sig. ¿Hiciste `tauri build` con firma?"
-  );
+  console.error("No se encontraron archivos .sig. ¿Hiciste `tauri build` con firma?");
   process.exit(1);
 }
 

@@ -1,15 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Spinner,
-} from "@heroui/react";
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { FolderOpen, Plus, Search } from "lucide-react";
 import { scanPathCandidates } from "@services/tauri";
 import type { PathCandidate } from "@services/tauri";
@@ -32,11 +23,8 @@ function CandidateRow({
   resolvedName: string | null | undefined;
   onAdd: () => void;
 }) {
-  const hasAppId =
-    !!candidate.steamAppId ||
-    !!extractAppIdFromFolderName(candidate.folderName ?? "");
-  const displayName =
-    hasAppId && resolvedName ? resolvedName : candidate.folderName;
+  const hasAppId = !!candidate.steamAppId || !!extractAppIdFromFolderName(candidate.folderName ?? "");
+  const displayName = hasAppId && resolvedName ? resolvedName : candidate.folderName;
   const isLoading = hasAppId && resolvedName === undefined;
 
   return (
@@ -44,33 +32,21 @@ function CandidateRow({
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-foreground">
           {displayName}
-          {isLoading && (
-            <Spinner size="sm" className="ml-2 inline-block" color="primary" />
-          )}
+          {isLoading && <Spinner size="sm" className="ml-2 inline-block" color="primary" />}
         </p>
         <p className="truncate text-sm text-default-500" title={candidate.path}>
           {candidate.path}
         </p>
         <p className="text-xs text-default-400">{candidate.basePath}</p>
       </div>
-      <Button
-        size="sm"
-        color="primary"
-        variant="flat"
-        startContent={<Plus size={16} />}
-        onPress={() => onAdd()}
-      >
+      <Button size="sm" color="primary" variant="flat" startContent={<Plus size={16} />} onPress={() => onAdd()}>
         Añadir
       </Button>
     </div>
   );
 }
 
-export function ScanModal({
-  isOpen,
-  onClose,
-  onSelectCandidate,
-}: ScanModalProps) {
+export function ScanModal({ isOpen, onClose, onSelectCandidate }: ScanModalProps) {
   const {
     data: candidates,
     isLoading,
@@ -83,26 +59,16 @@ export function ScanModal({
 
   const resolvedNames = useResolvedCandidateNames(candidates);
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearch = useDebouncedValue(
-    searchQuery.trim().toLowerCase(),
-    300
-  );
+  const debouncedSearch = useDebouncedValue(searchQuery.trim().toLowerCase(), 300);
 
   const filteredCandidates = useMemo(() => {
     if (!candidates?.length) return [];
     if (!debouncedSearch) return candidates;
     return candidates.filter((c) => {
       const resolvedName = resolvedNames[c.path];
-      const hasAppId =
-        !!c.steamAppId || !!extractAppIdFromFolderName(c.folderName ?? "");
-      const displayName =
-        hasAppId && resolvedName ? resolvedName : c.folderName ?? "";
-      const searchIn = [
-        displayName,
-        c.folderName ?? "",
-        c.path,
-        c.basePath ?? "",
-      ].join(" ");
+      const hasAppId = !!c.steamAppId || !!extractAppIdFromFolderName(c.folderName ?? "");
+      const displayName = hasAppId && resolvedName ? resolvedName : (c.folderName ?? "");
+      const searchIn = [displayName, c.folderName ?? "", c.path, c.basePath ?? ""].join(" ");
       return searchIn.toLowerCase().includes(debouncedSearch);
     });
   }, [candidates, debouncedSearch, resolvedNames]);
@@ -111,19 +77,13 @@ export function ScanModal({
     const resolvedName = resolvedNames[candidate.path];
     const baseName = resolvedName?.trim() || candidate.folderName;
     const gameId = toGameId(baseName);
-    const pathsToAdd = candidate.paths?.length
-      ? candidate.paths
-      : [candidate.path];
+    const pathsToAdd = candidate.paths?.length ? candidate.paths : [candidate.path];
     onSelectCandidate(pathsToAdd, gameId);
     onClose();
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={(open) => !open && onClose()}
-      size="2xl"
-    >
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="2xl">
       <ModalContent>
         <ModalHeader className="flex items-center gap-2">
           <FolderOpen size={22} />
@@ -133,9 +93,7 @@ export function ScanModal({
           {isLoading ? (
             <div className="flex flex-col items-center gap-4 py-12">
               <Spinner size="lg" color="primary" />
-              <p className="text-default-500">
-                Buscando carpetas de guardados en el sistema...
-              </p>
+              <p className="text-default-500">Buscando carpetas de guardados en el sistema...</p>
             </div>
           ) : candidates && candidates.length > 0 ? (
             <>
@@ -167,21 +125,13 @@ export function ScanModal({
           ) : (
             <div className="flex flex-col items-center gap-4 py-12 text-center">
               <FolderOpen size={48} className="text-default-400" />
-              <p className="text-default-500">
-                No se encontraron carpetas candidatas.
-              </p>
-              <p className="text-sm text-default-400">
-                Puedes añadir un juego manualmente con su ruta.
-              </p>
+              <p className="text-default-500">No se encontraron carpetas candidatas.</p>
+              <p className="text-sm text-default-400">Puedes añadir un juego manualmente con su ruta.</p>
             </div>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button
-            variant="flat"
-            onPress={() => refetch()}
-            isDisabled={isLoading}
-          >
+          <Button variant="flat" onPress={() => refetch()} isDisabled={isLoading}>
             Volver a analizar
           </Button>
           <Button variant="flat" onPress={onClose}>

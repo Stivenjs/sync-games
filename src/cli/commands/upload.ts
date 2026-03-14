@@ -3,10 +3,7 @@ import figures from "figures";
 import type { CliDeps } from "@cli/container";
 import { listAllFilesFromPaths } from "@cli/infrastructure/listSaveFiles";
 
-export async function selectGame(
-  deps: CliDeps,
-  message: string
-): Promise<string | null> {
+export async function selectGame(deps: CliDeps, message: string): Promise<string | null> {
   const games = await deps.listGamesUseCase.execute();
   if (games.length === 0) {
     console.log("No hay juegos configurados. Añade uno primero.");
@@ -60,18 +57,12 @@ async function uploadFileToS3(
 }
 
 export async function runUploadInteractive(deps: CliDeps): Promise<void> {
-  const gameId = await selectGame(
-    deps,
-    "Elige el juego del que subir guardados"
-  );
+  const gameId = await selectGame(deps, "Elige el juego del que subir guardados");
   if (!gameId) return;
   await doUpload(deps, gameId);
 }
 
-export async function runUploadFromArgs(
-  deps: CliDeps,
-  args: string[]
-): Promise<void> {
+export async function runUploadFromArgs(deps: CliDeps, args: string[]): Promise<void> {
   let gameId: string | null = args[1] ?? null;
   if (!gameId) {
     gameId = await selectGame(deps, "Elige el juego del que subir guardados");
@@ -86,15 +77,11 @@ export async function runUploadFromArgs(
 async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
   const config = await deps.getConfigUseCase.execute();
   if (!config.apiBaseUrl?.trim() || !config.userId?.trim()) {
-    console.error(
-      "Configura apiBaseUrl y userId en el config. Usa el comando «config» para ver la ruta del archivo."
-    );
+    console.error("Configura apiBaseUrl y userId en el config. Usa el comando «config» para ver la ruta del archivo.");
     throw new Error("Missing apiBaseUrl or userId in config");
   }
 
-  const game = config.games.find(
-    (g) => g.id.toLowerCase() === gameId.toLowerCase()
-  );
+  const game = config.games.find((g) => g.id.toLowerCase() === gameId.toLowerCase());
   if (!game) {
     console.error(`Juego no encontrado: ${gameId}`);
     throw new Error("Game not found");
@@ -102,36 +89,20 @@ async function doUpload(deps: CliDeps, gameId: string): Promise<void> {
 
   const files = listAllFilesFromPaths([...game.paths]);
   if (files.length === 0) {
-    console.log(
-      `No se encontraron archivos de guardado en las rutas de ${gameId}.`
-    );
+    console.log(`No se encontraron archivos de guardado en las rutas de ${gameId}.`);
     return;
   }
 
-  console.log(
-    `\n${figures.arrowUp} Subiendo ${files.length} archivo(s) de: ${gameId}\n`
-  );
+  console.log(`\n${figures.arrowUp} Subiendo ${files.length} archivo(s) de: ${gameId}\n`);
   let ok = 0;
   let err = 0;
   for (const { absolute, relative } of files) {
     try {
-      await uploadFileToS3(
-        config.apiBaseUrl!,
-        config.userId!,
-        config.apiKey ?? "",
-        gameId,
-        absolute,
-        relative
-      );
+      await uploadFileToS3(config.apiBaseUrl!, config.userId!, config.apiKey ?? "", gameId, absolute, relative);
       console.log(` ${figures.tick}`, relative);
       ok++;
     } catch (e) {
-      console.error(
-        ` ${figures.cross}`,
-        relative,
-        "-",
-        e instanceof Error ? e.message : e
-      );
+      console.error(` ${figures.cross}`, relative, "-", e instanceof Error ? e.message : e);
       err++;
     }
   }

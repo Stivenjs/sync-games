@@ -48,11 +48,7 @@ export interface GamesListMotionContainerProps {
  * Contenedor que anima la aparición de los hijos en escalonado.
  * Si cambia `listKey` (p. ej. al filtrar búsqueda), la animación se vuelve a ejecutar.
  */
-export function GamesListMotionContainer({
-  children,
-  className,
-  listKey,
-}: GamesListMotionContainerProps) {
+export function GamesListMotionContainer({ children, className, listKey }: GamesListMotionContainerProps) {
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   useEffect(() => {
@@ -69,8 +65,7 @@ export function GamesListMotionContainer({
       className={className}
       variants={gamesListContainerVariants}
       initial="hidden"
-      animate={shouldAnimate ? "visible" : "hidden"}
-    >
+      animate={shouldAnimate ? "visible" : "hidden"}>
       {children}
     </motion.div>
   );

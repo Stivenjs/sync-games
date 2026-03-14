@@ -10,9 +10,7 @@ const QUERY_KEY = ["game-running"] as const;
  * Optimizado para hacer una sola llamada a Tauri y
  * refrescar la lista de procesos una vez por intervalo.
  */
-export function useGameRunningStatus(
-  gameIds: readonly string[]
-): Record<string, boolean> {
+export function useGameRunningStatus(gameIds: readonly string[]): Record<string, boolean> {
   const sortedIds = [...gameIds].sort();
 
   const { data } = useQuery({

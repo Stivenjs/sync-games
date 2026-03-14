@@ -8,11 +8,7 @@ interface ConnectionIndicatorProps {
   onRetry?: () => void;
 }
 
-export function ConnectionIndicator({
-  status,
-  error,
-  onRetry,
-}: ConnectionIndicatorProps) {
+export function ConnectionIndicator({ status, error, onRetry }: ConnectionIndicatorProps) {
   if (status === "idle") return null;
 
   const config = {
@@ -43,8 +39,7 @@ export function ConnectionIndicator({
   return (
     <div
       className={`flex items-center gap-2 rounded-lg border border-default-200 bg-default-50 px-3 py-1.5 text-sm dark:bg-default-100/50 ${className}`}
-      title={status === "error" && error ? error : undefined}
-    >
+      title={status === "error" && error ? error : undefined}>
       {icon}
       <span>{label}</span>
       {status === "error" && onRetry && (
@@ -52,8 +47,7 @@ export function ConnectionIndicator({
           type="button"
           onClick={onRetry}
           className="ml-1 rounded p-0.5 hover:bg-default-200"
-          aria-label="Reintentar conexión"
-        >
+          aria-label="Reintentar conexión">
           <RefreshCw size={12} />
         </button>
       )}

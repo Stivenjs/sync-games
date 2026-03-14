@@ -11,10 +11,7 @@ import { resolve, basename } from "path";
 import { mkdir } from "fs/promises";
 import { Glob } from "bun";
 
-const raw =
-  process.env.VERSION ||
-  process.env.GITHUB_REF?.replace(/^refs\/tags\/v?/, "") ||
-  "0.0.0";
+const raw = process.env.VERSION || process.env.GITHUB_REF?.replace(/^refs\/tags\/v?/, "") || "0.0.0";
 const VERSION = raw.replace(/^v/, "");
 const REPO = process.env.GITHUB_REPOSITORY || "Stivenjs/savecloud";
 const BASE_URL = `https://github.com/${REPO}/releases/download/v${VERSION}`;
@@ -33,9 +30,7 @@ const glob = new Glob("**/*.sig");
 for (const [artifact, tauriPlatforms] of Object.entries(ARTIFACT_PLATFORM)) {
   const artifactDir = resolve(cwd, artifact);
 
-  const [sigPath] = Array.from(
-    glob.scanSync({ cwd: artifactDir, absolute: true })
-  );
+  const [sigPath] = Array.from(glob.scanSync({ cwd: artifactDir, absolute: true }));
 
   if (sigPath) {
     const signature = (await Bun.file(sigPath).text()).trim();
@@ -51,9 +46,7 @@ for (const [artifact, tauriPlatforms] of Object.entries(ARTIFACT_PLATFORM)) {
 }
 
 if (!Object.keys(platforms).length) {
-  console.error(
-    "No se encontraron archivos .sig. ¿Los artifacts de desktop tienen createUpdaterArtifacts?"
-  );
+  console.error("No se encontraron archivos .sig. ¿Los artifacts de desktop tienen createUpdaterArtifacts?");
   process.exit(1);
 }
 
@@ -69,11 +62,7 @@ await mkdir(resolve(cwd, "release"), { recursive: true });
 
 await Bun.write(
   outputPath,
-  JSON.stringify(
-    { version: VERSION, notes, pub_date: new Date().toISOString(), platforms },
-    null,
-    2
-  )
+  JSON.stringify({ version: VERSION, notes, pub_date: new Date().toISOString(), platforms }, null, 2)
 );
 
 console.log("latest.json generado:", outputPath);

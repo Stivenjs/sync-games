@@ -1,8 +1,4 @@
-import type {
-  SaveRepository,
-  UploadUrlItem,
-  UploadUrlResult,
-} from "@domain/ports/SaveRepository";
+import type { SaveRepository, UploadUrlItem, UploadUrlResult } from "@domain/ports/SaveRepository";
 
 export interface GetUploadUrlsInput {
   userId: string;
@@ -21,10 +17,7 @@ export class GetUploadUrlsUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: GetUploadUrlsInput): Promise<GetUploadUrlsOutput> {
-    const urls = await this.saveRepository.getUploadUrls(
-      input.userId,
-      input.items
-    );
+    const urls = await this.saveRepository.getUploadUrls(input.userId, input.items);
     return { urls };
   }
 }

@@ -2,18 +2,9 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join, normalize } from "path";
 import type { PathCandidate } from "@cli/domain/entities/PathCandidate";
 import type { PathScanner } from "@cli/domain/ports/PathScanner";
-import {
-  folderContainsSaveLikeFiles,
-  isExcludedFolder,
-} from "@cli/infrastructure/scanFilters";
-import {
-  BASE_PATH_TEMPLATES_WIN32,
-  DEFAULT_STEAM_PATH_WIN32,
-} from "@cli/infrastructure/scanPathTemplates";
-import {
-  resolveAppNames,
-  extractAppId,
-} from "@cli/infrastructure/steamAppNames";
+import { folderContainsSaveLikeFiles, isExcludedFolder } from "@cli/infrastructure/scanFilters";
+import { BASE_PATH_TEMPLATES_WIN32, DEFAULT_STEAM_PATH_WIN32 } from "@cli/infrastructure/scanPathTemplates";
+import { resolveAppNames, extractAppId } from "@cli/infrastructure/steamAppNames";
 import { expandPath } from "@cli/infrastructure/pathUtils";
 import { CRACK_SAVE_LOCATIONS } from "@cli/infrastructure/crackSaveLocations";
 
@@ -32,10 +23,7 @@ function listSubdirs(dirPath: string): { path: string; name: string }[] {
   }
 }
 
-function scanBasePaths(
-  basePath: string,
-  addCandidate: (c: PathCandidate) => void
-): void {
+function scanBasePaths(basePath: string, addCandidate: (c: PathCandidate) => void): void {
   const subdirs = listSubdirs(basePath);
   for (const { path: fullPath, name } of subdirs) {
     if (isExcludedFolder(name)) continue;
@@ -51,14 +39,10 @@ function findSteamUserDataCandidates(steamPath: string): PathCandidate[] {
   if (!existsSync(userdataPath)) return [];
 
   const candidates: PathCandidate[] = [];
-  const userDirs = listSubdirs(userdataPath).filter((d) =>
-    /^\d+$/.test(d.name)
-  );
+  const userDirs = listSubdirs(userdataPath).filter((d) => /^\d+$/.test(d.name));
 
   for (const userDir of userDirs) {
-    const appDirs = listSubdirs(userDir.path).filter((d) =>
-      /^\d+$/.test(d.name)
-    );
+    const appDirs = listSubdirs(userDir.path).filter((d) => /^\d+$/.test(d.name));
     for (const appDir of appDirs) {
       const remotePath = join(appDir.path, "remote");
       const pathToCheck = existsSync(remotePath) ? remotePath : appDir.path;
@@ -83,9 +67,7 @@ function findSteamLibraryPaths(steamPath: string): string[] {
     let match: RegExpExecArray | null;
     while ((match = pathRegex.exec(content)) !== null) {
       const libPath = match[1].replace(/\\\\/g, "\\");
-      if (
-        normalize(libPath).toLowerCase() !== normalize(steamPath).toLowerCase()
-      ) {
+      if (normalize(libPath).toLowerCase() !== normalize(steamPath).toLowerCase()) {
         paths.push(libPath);
       }
     }
@@ -126,8 +108,7 @@ function findCrackSaveCandidates(): PathCandidate[] {
 
     const appDirs = listSubdirs(basePath);
     for (const appDir of appDirs) {
-      if (appDir.name === "steam_settings" || appDir.name === "settings")
-        continue;
+      if (appDir.name === "steam_settings" || appDir.name === "settings") continue;
       if (!containsSavesAtAnyDepth(appDir.path)) continue;
       candidates.push({
         path: appDir.path,
@@ -165,10 +146,7 @@ function containsSavesAtAnyDepth(dirPath: string, depth = 0): boolean {
 
 export class FileSystemPathScanner implements PathScanner {
   async scan(extraPaths?: readonly string[]): Promise<PathCandidate[]> {
-    const templates =
-      process.platform === "win32"
-        ? BASE_PATH_TEMPLATES_WIN32
-        : this.getUnixTemplates();
+    const templates = process.platform === "win32" ? BASE_PATH_TEMPLATES_WIN32 : this.getUnixTemplates();
     const candidates: PathCandidate[] = [];
     const seenPaths = new Set<string>();
 
@@ -194,8 +172,7 @@ export class FileSystemPathScanner implements PathScanner {
       const systemRoot = this.getSystemRoot();
       for (const extra of extraPaths) {
         if (!extra || !existsSync(extra)) continue;
-        if (systemRoot && normalize(extra).toLowerCase() === systemRoot)
-          continue;
+        if (systemRoot && normalize(extra).toLowerCase() === systemRoot) continue;
         scanBasePaths(extra, addCandidate);
       }
     }
@@ -209,9 +186,7 @@ export class FileSystemPathScanner implements PathScanner {
    * "Steam App 2551020" → "Darktide (2551020)"
    * "EMPRESS — 2050650" → "EMPRESS — Resident Evil 4 (2050650)"
    */
-  private async resolveNumericNames(
-    candidates: PathCandidate[]
-  ): Promise<void> {
+  private async resolveNumericNames(candidates: PathCandidate[]): Promise<void> {
     const idsToResolve: string[] = [];
 
     for (const c of candidates) {

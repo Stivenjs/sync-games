@@ -6,10 +6,8 @@ const PERSPECTIVE = 1200;
 const TILT_MAX = 12;
 const SPRING_CONFIG = { stiffness: 300, damping: 30 };
 
-const SHADOW_REST =
-  "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)";
-const SHADOW_HOVER =
-  "0 28px 56px -12px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.06)";
+const SHADOW_REST = "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)";
+const SHADOW_HOVER = "0 28px 56px -12px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.06)";
 
 export interface GameCardHoverMotionProps {
   children: ReactNode;
@@ -22,13 +20,15 @@ export interface GameCardHoverMotionProps {
  * actual, al moverse la card (y/scale) el rect cambia y el tilt se recalcula
  * infinitamente.
  */
-export function GameCardHoverMotion({
-  children,
-  className = "rounded-2xl",
-}: GameCardHoverMotionProps) {
+export function GameCardHoverMotion({ children, className = "rounded-2xl" }: GameCardHoverMotionProps) {
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
-  const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const rectRef = useRef<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const springRotateX = useSpring(rotateX, SPRING_CONFIG);
   const springRotateY = useSpring(rotateY, SPRING_CONFIG);
@@ -77,8 +77,7 @@ export function GameCardHoverMotion({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
+      onMouseLeave={handleMouseLeave}>
       <motion.div
         style={{
           rotateX: springRotateX,
@@ -96,8 +95,7 @@ export function GameCardHoverMotion({
         whileTap={{
           scale: 0.98,
           transition: { type: "spring", stiffness: 500, damping: 30 },
-        }}
-      >
+        }}>
         {children}
       </motion.div>
     </div>

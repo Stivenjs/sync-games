@@ -28,12 +28,7 @@ export function filterGames(
   return result;
 }
 
-export function GamesFilters({
-  searchTerm,
-  onSearchChange,
-  originFilter,
-  onOriginFilterChange,
-}: GamesFiltersProps) {
+export function GamesFilters({ searchTerm, onSearchChange, originFilter, onOriginFilterChange }: GamesFiltersProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <Input
@@ -60,8 +55,7 @@ export function GamesFilters({
             size="sm"
             variant={originFilter === value ? "solid" : "bordered"}
             color={originFilter === value ? "primary" : "default"}
-            onPress={() => onOriginFilterChange(value)}
-          >
+            onPress={() => onOriginFilterChange(value)}>
             {label}
           </Button>
         ))}

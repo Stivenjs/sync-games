@@ -4,14 +4,7 @@
  */
 
 /** Extensiones exclusivas de guardados de juegos — alta confianza. */
-export const STRONG_SAVE_EXTENSIONS: readonly string[] = [
-  ".sav",
-  ".savx",
-  ".save",
-  ".sl2",
-  ".state",
-  ".sr",
-];
+export const STRONG_SAVE_EXTENSIONS: readonly string[] = [".sav", ".savx", ".save", ".sl2", ".state", ".sr"];
 
 /**
  * Extensiones que pueden ser guardados pero también las usan apps normales.
@@ -23,14 +16,7 @@ export const WEAK_SAVE_EXTENSIONS: readonly string[] = [".dat", ".bin", ".bak"];
  * Extensiones adicionales para listado (config, bases de datos, etc.)
  * Usadas por listSaveFiles para incluir más tipos de archivos de guardado.
  */
-export const EXTRA_LIST_EXTENSIONS: readonly string[] = [
-  ".json",
-  ".db",
-  ".sqlite",
-  ".xml",
-  ".cfg",
-  ".ini",
-];
+export const EXTRA_LIST_EXTENSIONS: readonly string[] = [".json", ".db", ".sqlite", ".xml", ".cfg", ".ini"];
 
 /** Todas las extensiones reconocidas como posibles guardados (para listado). */
 export const ALL_SAVE_EXTENSIONS: readonly string[] = [

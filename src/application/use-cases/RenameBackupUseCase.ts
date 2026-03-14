@@ -15,11 +15,6 @@ export class RenameBackupUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: RenameBackupInput): Promise<void> {
-    await this.saveRepository.renameBackup(
-      input.userId,
-      input.gameId,
-      input.key,
-      input.newFilename.trim()
-    );
+    await this.saveRepository.renameBackup(input.userId, input.gameId, input.key, input.newFilename.trim());
   }
 }

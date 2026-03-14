@@ -18,13 +18,7 @@ export interface CreateMultipartUploadOutput {
 export class CreateMultipartUploadUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
-  async execute(
-    input: CreateMultipartUploadInput
-  ): Promise<CreateMultipartUploadOutput> {
-    return this.saveRepository.createMultipartUpload(
-      input.userId,
-      input.gameId,
-      input.filename
-    );
+  async execute(input: CreateMultipartUploadInput): Promise<CreateMultipartUploadOutput> {
+    return this.saveRepository.createMultipartUpload(input.userId, input.gameId, input.filename);
   }
 }

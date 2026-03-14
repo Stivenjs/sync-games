@@ -1,11 +1,5 @@
 import { Button, Spinner } from "@heroui/react";
-import {
-  CloudDownload,
-  CloudUpload,
-  FolderSearch,
-  PlusCircle,
-  RefreshCw,
-} from "lucide-react";
+import { CloudDownload, CloudUpload, FolderSearch, PlusCircle, RefreshCw } from "lucide-react";
 import type { ConnectionStatus } from "@hooks/useLastSyncInfo";
 import { ConnectionIndicator } from "@features/games/ConnectionIndicator";
 
@@ -50,36 +44,21 @@ export function GamesPageHeader({
     <header className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-semibold text-foreground">
-            Juegos configurados
-          </h1>
+          <h1 className="text-3xl font-semibold text-foreground">Juegos configurados</h1>
           {hasSyncConfig && unsyncedCount > 0 && (
             <span className="rounded-full bg-warning/20 px-3 py-1 text-sm font-medium text-warning">
               {unsyncedCount} con cambios sin subir
             </span>
           )}
           {hasSyncConfig && (
-            <ConnectionIndicator
-              status={connectionStatus}
-              error={connectionError}
-              onRetry={onConnectionRetry}
-            />
+            <ConnectionIndicator status={connectionStatus} error={connectionError} onRetry={onConnectionRetry} />
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="bordered"
-            startContent={<FolderSearch size={18} />}
-            onPress={onScanPress}
-          >
+          <Button variant="bordered" startContent={<FolderSearch size={18} />} onPress={onScanPress}>
             Analizar rutas
           </Button>
-          <Button
-            variant="flat"
-            color="primary"
-            startContent={<PlusCircle size={18} />}
-            onPress={onAddPress}
-          >
+          <Button variant="flat" color="primary" startContent={<PlusCircle size={18} />} onPress={onAddPress}>
             Añadir juego
           </Button>
           {hasSyncConfig && (
@@ -88,30 +67,18 @@ export function GamesPageHeader({
                 variant="solid"
                 color="secondary"
                 startContent={
-                  downloading === "all" ? (
-                    <Spinner size="sm" color="current" />
-                  ) : (
-                    <CloudDownload size={18} />
-                  )
+                  downloading === "all" ? <Spinner size="sm" color="current" /> : <CloudDownload size={18} />
                 }
                 onPress={onDownloadAllPress}
-                isDisabled={!gamesCount || isOperationRunning}
-              >
+                isDisabled={!gamesCount || isOperationRunning}>
                 Descargar todos
               </Button>
               <Button
                 variant="solid"
                 color="secondary"
-                startContent={
-                  syncing === "all" ? (
-                    <Spinner size="sm" color="current" />
-                  ) : (
-                    <CloudUpload size={18} />
-                  )
-                }
+                startContent={syncing === "all" ? <Spinner size="sm" color="current" /> : <CloudUpload size={18} />}
                 onPress={onSyncAllPress}
-                isDisabled={!gamesCount || isOperationRunning}
-              >
+                isDisabled={!gamesCount || isOperationRunning}>
                 Subir todos
               </Button>
             </>
@@ -121,8 +88,7 @@ export function GamesPageHeader({
             startContent={!isRefreshing ? <RefreshCw size={18} /> : undefined}
             onPress={onRefreshPress}
             isLoading={isRefreshing}
-            isDisabled={isRefreshing}
-          >
+            isDisabled={isRefreshing}>
             Actualizar
           </Button>
         </div>

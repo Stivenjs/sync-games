@@ -15,15 +15,11 @@ function getBaseUrl(request: FastifyRequest): string {
   const env = process.env.SHARE_BASE_URL?.trim();
   if (env) return env.replace(/\/$/, "");
   const proto = (request.headers["x-forwarded-proto"] as string) || "https";
-  const host =
-    request.headers["x-forwarded-host"] ?? request.headers.host ?? "";
+  const host = request.headers["x-forwarded-host"] ?? request.headers.host ?? "";
   return `${proto}://${host}`;
 }
 
-export async function registerShareRoutes(
-  app: FastifyInstance,
-  shareTokenStore: ShareTokenS3
-): Promise<void> {
+export async function registerShareRoutes(app: FastifyInstance, shareTokenStore: ShareTokenS3): Promise<void> {
   app.post<{
     Body: { gameId?: string; expiresInDays?: number };
   }>("/share", async (request, reply: FastifyReply) => {
@@ -39,31 +35,24 @@ export async function registerShareRoutes(
       typeof expiresInDays === "number" && expiresInDays > 0
         ? Math.min(expiresInDays * 24 * 60 * 60, 365 * 24 * 60 * 60)
         : 7 * 24 * 60 * 60;
-    const { token } = await shareTokenStore.createToken(
-      userId,
-      gameId.trim(),
-      ttlSeconds
-    );
+    const { token } = await shareTokenStore.createToken(userId, gameId.trim(), ttlSeconds);
     const baseUrl = getBaseUrl(request);
     const shareUrl = `${baseUrl}/share/${token}`;
     return reply.send({ token, shareUrl });
   });
 
-  app.get<{ Params: { token: string } }>(
-    "/share/:token",
-    async (request, reply: FastifyReply) => {
-      const { token } = request.params;
-      const payload = await shareTokenStore.getToken(token);
-      if (!payload) {
-        return reply.status(404).send({
-          error: "Not Found",
-          message: "Link inválido o expirado",
-        });
-      }
-      return reply.send({
-        userId: payload.userId,
-        gameId: payload.gameId,
+  app.get<{ Params: { token: string } }>("/share/:token", async (request, reply: FastifyReply) => {
+    const { token } = request.params;
+    const payload = await shareTokenStore.getToken(token);
+    if (!payload) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Link inválido o expirado",
       });
     }
-  );
+    return reply.send({
+      userId: payload.userId,
+      gameId: payload.gameId,
+    });
+  });
 }

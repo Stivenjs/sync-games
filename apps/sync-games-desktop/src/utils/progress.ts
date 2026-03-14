@@ -18,4 +18,3 @@ export function formatEta(seconds: number | null): string {
   if (m === 0) return `${rem}s`;
   return `${m}m ${rem}s`;
 }
-

@@ -1,20 +1,11 @@
 import { existsSync, readdirSync } from "fs";
 import { join } from "path";
-import {
-  SAVE_NAME_HINTS,
-  STRONG_SAVE_EXTENSIONS,
-  WEAK_SAVE_EXTENSIONS,
-} from "@cli/infrastructure/saveExtensions";
-import {
-  EXCLUDED_FOLDER_NAMES,
-  EXCLUDED_PARTIAL_PATTERNS,
-} from "@cli/infrastructure/scanExclusions";
+import { SAVE_NAME_HINTS, STRONG_SAVE_EXTENSIONS, WEAK_SAVE_EXTENSIONS } from "@cli/infrastructure/saveExtensions";
+import { EXCLUDED_FOLDER_NAMES, EXCLUDED_PARTIAL_PATTERNS } from "@cli/infrastructure/scanExclusions";
 
 function isStrongSaveFile(name: string): boolean {
   const lower = name.toLowerCase();
-  return STRONG_SAVE_EXTENSIONS.some(
-    (ext) => lower.endsWith(ext) || lower.includes(ext + ".")
-  );
+  return STRONG_SAVE_EXTENSIONS.some((ext) => lower.endsWith(ext) || lower.includes(ext + "."));
 }
 
 function isWeakSaveFile(name: string): boolean {
@@ -77,7 +68,4 @@ export function isExcludedFolder(folderName: string): boolean {
   return EXCLUDED_PARTIAL_PATTERNS.some((p) => lower.includes(p));
 }
 
-export {
-  BASE_PATH_TEMPLATES_WIN32,
-  DEFAULT_STEAM_PATH_WIN32,
-} from "@cli/infrastructure/scanPathTemplates";
+export { BASE_PATH_TEMPLATES_WIN32, DEFAULT_STEAM_PATH_WIN32 } from "@cli/infrastructure/scanPathTemplates";

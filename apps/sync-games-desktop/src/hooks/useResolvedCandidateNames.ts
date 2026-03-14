@@ -16,12 +16,7 @@ export function useResolvedCandidateNames(
   candidates: PathCandidate[] | undefined
 ): Record<string, string | null | undefined> {
   const toResolve = useMemo(
-    () =>
-      (candidates ?? []).filter(
-        (c) =>
-          c.steamAppId ||
-          extractAppIdFromFolderName(c.folderName ?? "")
-      ),
+    () => (candidates ?? []).filter((c) => c.steamAppId || extractAppIdFromFolderName(c.folderName ?? "")),
     [candidates]
   );
 
@@ -31,12 +26,9 @@ export function useResolvedCandidateNames(
       queryFn: async () => {
         // Escalonar peticiones para reducir rate limiting
         if (index > 0) {
-          await new Promise((r) =>
-            setTimeout(r, index * STAGGER_MS)
-          );
+          await new Promise((r) => setTimeout(r, index * STAGGER_MS));
         }
-        const appId =
-          c.steamAppId ?? extractAppIdFromFolderName(c.folderName ?? "");
+        const appId = c.steamAppId ?? extractAppIdFromFolderName(c.folderName ?? "");
         if (!appId) return null;
         return getSteamAppName(appId);
       },
@@ -49,7 +41,7 @@ export function useResolvedCandidateNames(
     const result: Record<string, string | null | undefined> = {};
     toResolve.forEach((c, i) => {
       const { data, isFetched } = queries[i] ?? {};
-      result[c.path] = isFetched ? data ?? null : undefined;
+      result[c.path] = isFetched ? (data ?? null) : undefined;
     });
     return result;
   }, [toResolve, queries]);

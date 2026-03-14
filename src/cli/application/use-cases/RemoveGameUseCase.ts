@@ -22,9 +22,7 @@ export class RemoveGameUseCase {
     const config = await this.configRepository.load();
     const normalizedId = input.gameId.trim().toLowerCase();
 
-    const existingIndex = config.games.findIndex(
-      (g) => g.id.toLowerCase() === normalizedId
-    );
+    const existingIndex = config.games.findIndex((g) => g.id.toLowerCase() === normalizedId);
 
     if (existingIndex < 0) {
       throw new Error(`Game not found: ${input.gameId}`);
@@ -49,9 +47,7 @@ export class RemoveGameUseCase {
       } else {
         newConfig = {
           ...config,
-          games: config.games.map((g, i) =>
-            i === existingIndex ? { id: g.id, paths: filteredPaths } : g
-          ),
+          games: config.games.map((g, i) => (i === existingIndex ? { id: g.id, paths: filteredPaths } : g)),
         };
         result = { removedGame: false, removedPath: true };
       }

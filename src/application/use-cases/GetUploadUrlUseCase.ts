@@ -19,11 +19,7 @@ export class GetUploadUrlUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: GetUploadUrlInput): Promise<GetUploadUrlOutput> {
-    const uploadUrl = await this.saveRepository.getUploadUrl(
-      input.userId,
-      input.gameId,
-      input.filename
-    );
+    const uploadUrl = await this.saveRepository.getUploadUrl(input.userId, input.gameId, input.filename);
     const key = `${input.userId}/${input.gameId}/${input.filename}`;
     return { uploadUrl, key };
   }

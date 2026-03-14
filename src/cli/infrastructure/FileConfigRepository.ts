@@ -3,29 +3,19 @@ import { userInfo } from "os";
 import { dirname } from "path";
 import type { Config } from "@cli/domain/entities/Config";
 import type { ConfigRepository } from "@cli/domain/ports/ConfigRepository";
-import {
-  CONFIG_DIR_NAME,
-  CONFIG_FILE_NAME,
-} from "@cli/infrastructure/configConstants";
+import { CONFIG_DIR_NAME, CONFIG_FILE_NAME } from "@cli/infrastructure/configConstants";
 
 const DEFAULT_API_BASE_URL = process.env.SYNC_GAMES_API_URL ?? "";
 const DEFAULT_API_KEY = process.env.SYNC_GAMES_API_KEY ?? "";
 
 function getDefaultUserId(): string {
-  return (
-    userInfo().username ||
-    process.env.USERNAME ||
-    process.env.USER ||
-    "default-user"
-  ).toLowerCase();
+  return (userInfo().username || process.env.USERNAME || process.env.USER || "default-user").toLowerCase();
 }
 
 function getConfigDir(): string {
   const base =
     process.env.APPDATA ||
-    (process.platform === "darwin"
-      ? `${process.env.HOME}/Library/Application Support`
-      : `${process.env.HOME}/.config`);
+    (process.platform === "darwin" ? `${process.env.HOME}/Library/Application Support` : `${process.env.HOME}/.config`);
   return `${base}/${CONFIG_DIR_NAME}`;
 }
 
@@ -68,9 +58,7 @@ export class FileConfigRepository implements ConfigRepository {
       apiKey: parsed.apiKey || DEFAULT_API_KEY,
       userId: parsed.userId || getDefaultUserId(),
       games: Array.isArray(parsed.games) ? parsed.games : [],
-      customScanPaths: Array.isArray(parsed.customScanPaths)
-        ? parsed.customScanPaths
-        : [],
+      customScanPaths: Array.isArray(parsed.customScanPaths) ? parsed.customScanPaths : [],
     };
   }
 

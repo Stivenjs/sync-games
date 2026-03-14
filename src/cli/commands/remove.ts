@@ -91,27 +91,17 @@ export async function runRemoveInteractive(deps: CliDeps): Promise<void> {
   }
 }
 
-function printResult(
-  gameId: string,
-  result: { removedGame: boolean; removedPath: boolean }
-): void {
+function printResult(gameId: string, result: { removedGame: boolean; removedPath: boolean }): void {
   if (result.removedGame && result.removedPath) {
-    console.log(
-      `\n${figures.tick} Ruta eliminada. "${gameId}" ya no tenía rutas y fue eliminado.\n`
-    );
+    console.log(`\n${figures.tick} Ruta eliminada. "${gameId}" ya no tenía rutas y fue eliminado.\n`);
   } else if (result.removedGame) {
-    console.log(
-      `\n${figures.tick} Juego "${gameId}" eliminado completamente.\n`
-    );
+    console.log(`\n${figures.tick} Juego "${gameId}" eliminado completamente.\n`);
   } else if (result.removedPath) {
     console.log(`\n${figures.tick} Ruta eliminada de "${gameId}".\n`);
   }
 }
 
-export async function runRemoveFromArgs(
-  deps: CliDeps,
-  args: string[]
-): Promise<void> {
+export async function runRemoveFromArgs(deps: CliDeps, args: string[]): Promise<void> {
   const gameId = args[1];
   if (!gameId) {
     console.error("Uso: sync-games remove <game-id> [ruta]");

@@ -35,8 +35,7 @@ function getErrorMessage(err: unknown): string {
   ) {
     return (err as { message: string }).message;
   }
-  if (err != null && typeof err === "object" && "code" in err)
-    return String((err as { code: unknown }).code);
+  if (err != null && typeof err === "object" && "code" in err) return String((err as { code: unknown }).code);
   return String(err);
 }
 
@@ -66,21 +65,18 @@ export async function registerSavesRoutes(
     return reply.send(saves);
   });
 
-  app.get(
-    "/saves/backups",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = getUserId(request);
-      const gameId = (request.query as { gameId?: string })?.gameId?.trim();
-      if (!gameId) {
-        return reply.status(400).send({
-          error: "Bad Request",
-          message: "query gameId is required",
-        });
-      }
-      const result = await deps.listBackupsUseCase.execute({ userId, gameId });
-      return reply.send(result);
+  app.get("/saves/backups", async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = getUserId(request);
+    const gameId = (request.query as { gameId?: string })?.gameId?.trim();
+    if (!gameId) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "query gameId is required",
+      });
     }
-  );
+    const result = await deps.listBackupsUseCase.execute({ userId, gameId });
+    return reply.send(result);
+  });
 
   app.delete<{
     Body: { gameId: string; key: string };
@@ -139,10 +135,7 @@ export async function registerSavesRoutes(
       return reply.status(204).send();
     } catch (err) {
       const message = getErrorMessage(err);
-      if (
-        message.startsWith("Invalid key:") ||
-        message.includes("newFilename must")
-      ) {
+      if (message.startsWith("Invalid key:") || message.includes("newFilename must")) {
         return reply.status(400).send({ error: "Bad Request", message });
       }
       request.log.error({ err, message }, "rename backup failed");
@@ -187,15 +180,12 @@ export async function registerSavesRoutes(
       if (!Array.isArray(raw) || raw.length === 0) {
         return reply.status(400).send({
           error: "Bad Request",
-          message:
-            "items (non-empty array of { gameId, filename }) is required",
+          message: "items (non-empty array of { gameId, filename }) is required",
         });
       }
       const items = raw
         .map((x) =>
-          x?.gameId?.trim() && x?.filename?.trim()
-            ? { gameId: x.gameId.trim(), filename: x.filename.trim() }
-            : null
+          x?.gameId?.trim() && x?.filename?.trim() ? { gameId: x.gameId.trim(), filename: x.filename.trim() } : null
         )
         .filter((x): x is { gameId: string; filename: string } => x !== null);
       if (items.length === 0) {
@@ -238,11 +228,7 @@ export async function registerSavesRoutes(
         });
       }
       const items = raw
-        .map((x) =>
-          x?.gameId?.trim() && x?.key?.trim()
-            ? { gameId: x.gameId.trim(), key: x.key.trim() }
-            : null
-        )
+        .map((x) => (x?.gameId?.trim() && x?.key?.trim() ? { gameId: x.gameId.trim(), key: x.key.trim() } : null))
         .filter((x): x is { gameId: string; key: string } => x !== null);
       if (items.length === 0) {
         return reply.status(400).send({
@@ -293,9 +279,7 @@ export async function registerSavesRoutes(
         });
       }
       const rangeArg =
-        range != null &&
-        typeof range.start === "number" &&
-        typeof range.end === "number"
+        range != null && typeof range.start === "number" && typeof range.end === "number"
           ? { start: range.start, end: range.end }
           : undefined;
       const result = await deps.getDownloadUrlUseCase.execute({
@@ -355,10 +339,7 @@ export async function registerSavesRoutes(
         message: "gameId and filename are required",
       });
     }
-    const count =
-      typeof partCount === "number" && partCount >= 1
-        ? Math.min(Math.floor(partCount), 2000)
-        : 1;
+    const count = typeof partCount === "number" && partCount >= 1 ? Math.min(Math.floor(partCount), 2000) : 1;
     const result = await deps.createMultipartUploadWithPartUrlsUseCase.execute({
       userId,
       gameId: gameId.trim(),
@@ -419,15 +400,14 @@ export async function registerSavesRoutes(
         message: "key and uploadId are required",
       });
     }
-    const partsArray: Array<{ partNumber: number; etag: string }> =
-      Array.isArray(parts)
-        ? parts
-            .filter(
-              (p): p is { partNumber: number; etag: string } =>
-                typeof p?.partNumber === "number" && typeof p?.etag === "string"
-            )
-            .map((p) => ({ partNumber: p.partNumber, etag: p.etag.trim() }))
-        : [];
+    const partsArray: Array<{ partNumber: number; etag: string }> = Array.isArray(parts)
+      ? parts
+          .filter(
+            (p): p is { partNumber: number; etag: string } =>
+              typeof p?.partNumber === "number" && typeof p?.etag === "string"
+          )
+          .map((p) => ({ partNumber: p.partNumber, etag: p.etag.trim() }))
+      : [];
     if (partsArray.length === 0) {
       return reply.status(400).send({
         error: "Bad Request",
@@ -444,10 +424,7 @@ export async function registerSavesRoutes(
       request.log.error({ err, key, uploadId }, "multipart/complete failed");
       return reply.status(500).send({
         error: "Internal Server Error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to complete multipart upload",
+        message: err instanceof Error ? err.message : "Failed to complete multipart upload",
       });
     }
     return reply.code(204).send();
@@ -472,10 +449,7 @@ export async function registerSavesRoutes(
       request.log.error({ err, key, uploadId }, "multipart/abort failed");
       return reply.status(500).send({
         error: "Internal Server Error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to abort multipart upload",
+        message: err instanceof Error ? err.message : "Failed to abort multipart upload",
       });
     }
     return reply.code(204).send();
@@ -499,10 +473,7 @@ export async function registerSavesRoutes(
       request.log.error({ err, userId, gameId }, "delete-game failed");
       return reply.status(500).send({
         error: "Internal Server Error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to delete game from cloud",
+        message: err instanceof Error ? err.message : "Failed to delete game from cloud",
       });
     }
     return reply.code(204).send();
@@ -534,14 +505,10 @@ export async function registerSavesRoutes(
         newGameId,
       });
     } catch (err) {
-      request.log.error(
-        { err, userId, oldGameId, newGameId },
-        "rename-game failed"
-      );
+      request.log.error({ err, userId, oldGameId, newGameId }, "rename-game failed");
       return reply.status(500).send({
         error: "Internal Server Error",
-        message:
-          err instanceof Error ? err.message : "Failed to rename game in cloud",
+        message: err instanceof Error ? err.message : "Failed to rename game in cloud",
       });
     }
     return reply.code(204).send();

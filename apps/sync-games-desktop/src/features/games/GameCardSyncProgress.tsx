@@ -41,26 +41,19 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
   if (progress.total <= 0 && !isPackagedOperation) return null;
 
   const isIndeterminate =
-    progress.filename?.includes("Empaquetando") ||
-    progress.filename?.includes("Extrayendo") ||
-    progress.total <= 0;
+    progress.filename?.includes("Empaquetando") || progress.filename?.includes("Extrayendo") || progress.total <= 0;
 
-  const percent = Math.min(
-    100,
-    Math.round((progress.loaded / progress.total) * 100)
-  );
+  const percent = Math.min(100, Math.round((progress.loaded / progress.total) * 100));
   const strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 
   return (
     <div
       className="absolute left-2 top-2 z-10 group"
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
+      onMouseLeave={() => setHover(false)}>
       <div
         className="flex cursor-default items-center justify-center rounded-full bg-default-100/90 shadow-sm ring-1 ring-default-200/80"
-        title={progress.type === "upload" ? "Subiendo…" : "Descargando…"}
-      >
+        title={progress.type === "upload" ? "Subiendo…" : "Descargando…"}>
         {isIndeterminate ? (
           <motion.div
             animate={{ rotate: 360 }}
@@ -69,14 +62,8 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
               repeat: Infinity,
               ease: "linear",
             }}
-            className="flex p-0.5"
-          >
-            <svg
-              width={RING_SIZE}
-              height={RING_SIZE}
-              className="-rotate-90"
-              aria-hidden
-            >
+            className="flex p-0.5">
+            <svg width={RING_SIZE} height={RING_SIZE} className="-rotate-90" aria-hidden>
               <circle
                 cx={CX}
                 cy={CY}
@@ -94,21 +81,14 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
                 stroke="currentColor"
                 strokeWidth={RING_STROKE}
                 strokeLinecap="round"
-                strokeDasharray={`${CIRCUMFERENCE * 0.25} ${
-                  CIRCUMFERENCE * 0.75
-                }`}
+                strokeDasharray={`${CIRCUMFERENCE * 0.25} ${CIRCUMFERENCE * 0.75}`}
                 className="text-primary"
               />
             </svg>
           </motion.div>
         ) : (
           <div className="relative flex items-center justify-center p-0.5">
-            <svg
-              width={RING_SIZE}
-              height={RING_SIZE}
-              className="-rotate-90"
-              aria-hidden
-            >
+            <svg width={RING_SIZE} height={RING_SIZE} className="-rotate-90" aria-hidden>
               <circle
                 cx={CX}
                 cy={CY}
@@ -143,26 +123,17 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
         <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-default-200 bg-default-100 px-2 py-1.5 shadow-lg">
           <p className="truncate text-[10px] font-medium text-foreground">
             {progress.type === "upload" ? "Subiendo" : "Descargando"}:{" "}
-            <span className="truncate text-default-600">
-              {progress.filename}
-            </span>
+            <span className="truncate text-default-600">{progress.filename}</span>
           </p>
-          <p className="mt-0.5 text-[10px] tabular-nums text-default-500">
-            {isIndeterminate ? "—" : `${percent}%`}
-          </p>
+          <p className="mt-0.5 text-[10px] tabular-nums text-default-500">{isIndeterminate ? "—" : `${percent}%`}</p>
           <p className="mt-0.5 flex items-center gap-1.5 text-[10px] tabular-nums text-default-500">
             {progress.type === "upload" ? (
               <Upload size={10} className="shrink-0 text-primary" aria-hidden />
             ) : (
-              <HardDrive
-                size={10}
-                className="shrink-0 text-primary"
-                aria-hidden
-              />
+              <HardDrive size={10} className="shrink-0 text-primary" aria-hidden />
             )}
             <span>
-              {progress.type === "upload" ? "Enviados" : "En disco"}:{" "}
-              {formatBytes(progress.loaded)}
+              {progress.type === "upload" ? "Enviados" : "En disco"}: {formatBytes(progress.loaded)}
               {progress.total > 0 ? ` / ${formatBytes(progress.total)}` : ""}
             </span>
           </p>
@@ -173,8 +144,7 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
                   type="button"
                   onClick={onPauseUpload}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200"
-                  aria-label="Pausar subida"
-                >
+                  aria-label="Pausar subida">
                   <Pause size={12} />
                 </button>
               </Tooltip>
@@ -183,8 +153,7 @@ export function GameCardSyncProgress({ progress }: GameCardSyncProgressProps) {
                   type="button"
                   onClick={onCancelUpload}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10"
-                  aria-label="Cancelar subida"
-                >
+                  aria-label="Cancelar subida">
                   <X size={12} />
                 </button>
               </Tooltip>

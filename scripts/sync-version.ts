@@ -8,8 +8,7 @@
 import { resolve } from "path";
 
 const argVersion = process.argv[2];
-const envVersion =
-  process.env.VERSION || process.env.GITHUB_REF?.replace(/^refs\/tags\//, "");
+const envVersion = process.env.VERSION || process.env.GITHUB_REF?.replace(/^refs\/tags\//, "");
 
 const rawVersion = argVersion || envVersion || "0.0.0";
 
@@ -40,9 +39,7 @@ for (const relPath of filesToUpdate) {
 }
 
 if (updatedCount === 0) {
-  console.error(
-    "Error: No se actualizó ningún archivo. Verifica que ejecutas el script desde la raíz del proyecto."
-  );
+  console.error("Error: No se actualizó ningún archivo. Verifica que ejecutas el script desde la raíz del proyecto.");
   process.exit(1);
 }
 

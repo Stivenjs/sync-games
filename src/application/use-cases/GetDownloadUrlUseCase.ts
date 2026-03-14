@@ -22,18 +22,10 @@ export class GetDownloadUrlUseCase {
 
   async execute(input: GetDownloadUrlInput): Promise<GetDownloadUrlOutput> {
     const expectedPrefix = `${input.userId}/${input.gameId}/`;
-    if (
-      !input.key.startsWith(expectedPrefix) ||
-      input.key.includes("..")
-    ) {
+    if (!input.key.startsWith(expectedPrefix) || input.key.includes("..")) {
       throw new Error("Invalid key: must belong to user and game");
     }
-    const downloadUrl = await this.saveRepository.getDownloadUrl(
-      input.userId,
-      input.gameId,
-      input.key,
-      input.range
-    );
+    const downloadUrl = await this.saveRepository.getDownloadUrl(input.userId, input.gameId, input.key, input.range);
     return { downloadUrl };
   }
 }

@@ -73,10 +73,7 @@ export function FriendsPage() {
         <Card>
           <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
             <Users size={40} className="text-default-400" />
-            <p className="text-default-500">
-              Introduce el userId de un amigo para ver sus juegos y
-              configuración.
-            </p>
+            <p className="text-default-500">Introduce el userId de un amigo para ver sus juegos y configuración.</p>
           </CardBody>
         </Card>
       )}
@@ -106,11 +103,7 @@ export function FriendsPage() {
         ourGameIds={ourGameIds}
         onAdded={invalidateConfig}
       />
-      <FriendGameTemplateModal
-        isOpen={templateOpen}
-        game={templateGame}
-        onClose={() => setTemplateOpen(false)}
-      />
+      <FriendGameTemplateModal isOpen={templateOpen} game={templateGame} onClose={() => setTemplateOpen(false)} />
 
       <ShareLinkImportConfirmModal
         isOpen={!!shareLinkPreview}
@@ -136,11 +129,7 @@ export function FriendsPage() {
         newCount={copyConfirmPreview?.newCount ?? 0}
         conflictCount={copyConfirmPreview?.conflictCount ?? 0}
         onConfirm={handleConfirmCopySaves}
-        isLoading={
-          copyConfirmPreview
-            ? copyingGameId === copyConfirmPreview.gameId
-            : false
-        }
+        isLoading={copyConfirmPreview ? copyingGameId === copyConfirmPreview.gameId : false}
       />
     </div>
   );

@@ -12,9 +12,6 @@ export class AbortMultipartUploadUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: AbortMultipartUploadInput): Promise<void> {
-    await this.saveRepository.abortMultipartUpload(
-      input.key,
-      input.uploadId
-    );
+    await this.saveRepository.abortMultipartUpload(input.key, input.uploadId);
   }
 }

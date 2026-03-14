@@ -12,10 +12,7 @@ import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
 import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { getSteamAppId, needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
-import {
-  GamesListMotionContainer,
-  GamesListMotionItem,
-} from "@features/games/GamesListMotion";
+import { GamesListMotionContainer, GamesListMotionItem } from "@features/games/GamesListMotion";
 
 type SyncStatus = "pending_upload" | "pending_download" | "in_sync" | null;
 
@@ -25,27 +22,17 @@ const SYNC_TOLERANCE_MS = 15_000; // 15 segundos
  *  tras subir, S3 pone LastModified = ahora, así que cloud > local; no queremos mostrar "Pendiente descargar". */
 const CLOUD_NEWER_AS_SYNC_MS = 120_000; // 2 minutos
 
-function getSyncStatus(
-  gameId: string,
-  stats: GameStats | undefined,
-  unsyncedGameIds: string[]
-): SyncStatus {
+function getSyncStatus(gameId: string, stats: GameStats | undefined, unsyncedGameIds: string[]): SyncStatus {
   if (unsyncedGameIds.includes(gameId)) return "pending_upload";
   if (!stats?.cloudLastModified) return null;
   const cloud = new Date(stats.cloudLastModified).getTime();
-  const local = stats.localLastModified
-    ? new Date(stats.localLastModified).getTime()
-    : 0;
+  const local = stats.localLastModified ? new Date(stats.localLastModified).getTime() : 0;
   const diff = cloud - local;
   // Solo "pendiente descargar" si la nube es claramente más reciente (p. ej. otro dispositivo subió).
   // Si la diferencia es pequeña (p. ej. tras subir nosotros, S3 = ahora, local = antes) → in_sync.
   if (diff > CLOUD_NEWER_AS_SYNC_MS) return "pending_download";
   // Local más reciente, o diferencia dentro de tolerancia, o nube un poco más reciente (subida reciente) → en sync.
-  if (
-    local > 0 ||
-    Math.abs(diff) <= SYNC_TOLERANCE_MS ||
-    (diff > 0 && diff <= CLOUD_NEWER_AS_SYNC_MS)
-  )
+  if (local > 0 || Math.abs(diff) <= SYNC_TOLERANCE_MS || (diff > 0 && diff <= CLOUD_NEWER_AS_SYNC_MS))
     return "in_sync";
   return null;
 }
@@ -110,17 +97,12 @@ export function GamesList({
 }: GamesListProps) {
   const resolvedSteamAppIds = useResolvedSteamAppIds(games);
   const steamAppIdsForBatch = useMemo(() => {
-    const ids = games
-      .map((g) => getSteamAppId(g, resolvedSteamAppIds[g.id]))
-      .filter((id): id is string => !!id);
+    const ids = games.map((g) => getSteamAppId(g, resolvedSteamAppIds[g.id])).filter((id): id is string => !!id);
     return [...new Set(ids)];
   }, [games, resolvedSteamAppIds]);
 
   const { data: mediaBySteamAppId } = useQuery({
-    queryKey: [
-      "steam-appdetails-media-batch",
-      [...steamAppIdsForBatch].sort().join(","),
-    ],
+    queryKey: ["steam-appdetails-media-batch", [...steamAppIdsForBatch].sort().join(",")],
     queryFn: () => getSteamAppdetailsMediaBatch(steamAppIdsForBatch),
     enabled: steamAppIdsForBatch.length > 0,
     staleTime: 5 * 60 * 1000,
@@ -148,8 +130,7 @@ export function GamesList({
               <p className="text-sm text-default-500">{emptyFilterMessage}</p>
             ) : (
               <p className="max-w-sm text-sm text-default-500">
-                Escanea tu PC para detectar carpetas de guardados o añade un
-                juego manualmente con su ruta.
+                Escanea tu PC para detectar carpetas de guardados o añade un juego manualmente con su ruta.
               </p>
             )}
           </div>
@@ -160,17 +141,12 @@ export function GamesList({
                   color="primary"
                   variant="bordered"
                   startContent={<FolderSearch size={18} />}
-                  onPress={onEmptyScanPress}
-                >
+                  onPress={onEmptyScanPress}>
                   Analizar rutas
                 </Button>
               )}
               {onEmptyAddPress && (
-                <Button
-                  color="primary"
-                  startContent={<PlusCircle size={18} />}
-                  onPress={onEmptyAddPress}
-                >
+                <Button color="primary" startContent={<PlusCircle size={18} />} onPress={onEmptyAddPress}>
                   Añadir juego
                 </Button>
               )}
@@ -189,8 +165,7 @@ export function GamesList({
   return (
     <GamesListMotionContainer
       className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5"
-      listKey={[animationKey ?? "", games.map((g) => g.id).join(",")].join("|")}
-    >
+      listKey={[animationKey ?? "", games.map((g) => g.id).join(",")].join("|")}>
       {games.map((game) => (
         <GamesListMotionItem key={game.id}>
           <GameCard
@@ -201,21 +176,14 @@ export function GamesList({
             mediaFromBatch
             isGameRunning={gameRunningStatus[game.id]}
             syncStatus={(() => {
-              const status = getSyncStatus(
-                game.id,
-                statsByGameId.get(game.id),
-                unsyncedGameIds
-              );
+              const status = getSyncStatus(game.id, statsByGameId.get(game.id), unsyncedGameIds);
               // Si tiene backup empaquetado en la nube, no mostrar "Pendiente subir"
               const cloudBackups = cloudBackupCountByGameId[game.id] ?? 0;
               if (status === "pending_upload" && cloudBackups > 0) return null;
               return status;
             })()}
             cloudBackupCount={cloudBackupCountByGameId[game.id] ?? 0}
-            isLoading={
-              needsSteamSearch(game) &&
-              resolvedSteamAppIds[game.id] === undefined
-            }
+            isLoading={needsSteamSearch(game) && resolvedSteamAppIds[game.id] === undefined}
             onRemove={onRemove}
             onSync={onSync}
             isSyncing={syncingId === game.id || syncingId === "all"}
@@ -228,10 +196,7 @@ export function GamesList({
             onEdit={onEdit}
             onShare={onShare}
             syncProgress={
-              syncOperation?.mode === "single" &&
-              syncOperation.gameId === game.id
-                ? progress ?? null
-                : undefined
+              syncOperation?.mode === "single" && syncOperation.gameId === game.id ? (progress ?? null) : undefined
             }
           />
         </GamesListMotionItem>

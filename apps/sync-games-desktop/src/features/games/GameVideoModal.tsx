@@ -12,11 +12,7 @@ export interface GameVideoModalProps {
   videoUrl: string;
 }
 
-export function GameVideoModal({
-  isOpen,
-  onClose,
-  videoUrl,
-}: GameVideoModalProps) {
+export function GameVideoModal({ isOpen, onClose, videoUrl }: GameVideoModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
 
@@ -74,8 +70,7 @@ export function GameVideoModal({
       classNames={{
         base: "max-w-[95vw] w-full",
         wrapper: "items-center",
-      }}
-    >
+      }}>
       <ModalContent className="bg-black/95 p-0 overflow-hidden">
         <div className="relative flex items-center justify-center bg-black min-h-[60vh] aspect-video max-h-[92vh] w-full">
           <video
@@ -95,8 +90,7 @@ export function GameVideoModal({
               variant="flat"
               className="min-w-9 w-9 h-9 rounded-lg bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
               aria-label="Cerrar"
-              onPress={onClose}
-            >
+              onPress={onClose}>
               <X size={18} strokeWidth={2} />
             </Button>
           </div>

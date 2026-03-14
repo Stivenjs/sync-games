@@ -62,8 +62,7 @@ export function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Configuración</h1>
         <p className="mt-1 text-sm text-default-500">
-          Archivo de config, respaldos, inicio con Windows, actualizaciones y
-          notificaciones.
+          Archivo de config, respaldos, inicio con Windows, actualizaciones y notificaciones.
         </p>
       </div>
 
@@ -84,20 +83,10 @@ export function SettingsPage() {
         onRestoreFromCloud={() => setRestoreConfirmOpen(true)}
       />
 
-      <AutostartCard
-        autostart={autostart}
-        loading={loading}
-        onChange={handleAutostartChange}
-      />
-      <UpdatesCard
-        checkingUpdate={checkingUpdate}
-        onCheckUpdates={handleCheckUpdates}
-      />
+      <AutostartCard autostart={autostart} loading={loading} onChange={handleAutostartChange} />
+      <UpdatesCard checkingUpdate={checkingUpdate} onCheckUpdates={handleCheckUpdates} />
       <ReleaseNotesCard onOpenNotes={() => setReleaseNotesOpen(true)} />
-      <NotificationsCard
-        testingNotification={testingNotification}
-        onTestNotification={handleTestNotification}
-      />
+      <NotificationsCard testingNotification={testingNotification} onTestNotification={handleTestNotification} />
 
       <LocalBackupInfoCard />
       <ExperimentalFeaturesCard
@@ -137,10 +126,7 @@ export function SettingsPage() {
         onClose={() => setPullFriendConfigModalOpen(false)}
         onSubmit={handlePullFriendConfig}
       />
-      <ReleaseNotesDialog
-        isOpen={releaseNotesOpen}
-        onClose={() => setReleaseNotesOpen(false)}
-      />
+      <ReleaseNotesDialog isOpen={releaseNotesOpen} onClose={() => setReleaseNotesOpen(false)} />
     </div>
   );
 }

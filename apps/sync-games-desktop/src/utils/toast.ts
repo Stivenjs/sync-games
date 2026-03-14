@@ -11,11 +11,7 @@ interface ToastOptions {
 /**
  * Muestra un toast de éxito (verde).
  */
-export function toastSuccess(
-  title: string,
-  description?: string,
-  options?: ToastOptions
-): void {
+export function toastSuccess(title: string, description?: string, options?: ToastOptions): void {
   addToast({
     title,
     description,
@@ -28,11 +24,7 @@ export function toastSuccess(
 /**
  * Muestra un toast de error (rojo).
  */
-export function toastError(
-  title: string,
-  description?: string,
-  options?: ToastOptions
-): void {
+export function toastError(title: string, description?: string, options?: ToastOptions): void {
   addToast({
     title,
     description,
@@ -45,11 +37,7 @@ export function toastError(
 /**
  * Muestra un toast de advertencia (amarillo).
  */
-export function toastWarning(
-  title: string,
-  description?: string,
-  options?: ToastOptions
-): void {
+export function toastWarning(title: string, description?: string, options?: ToastOptions): void {
   addToast({
     title,
     description,
@@ -62,11 +50,7 @@ export function toastWarning(
 /**
  * Muestra un toast de información (azul/por defecto).
  */
-export function toastInfo(
-  title: string,
-  description?: string,
-  options?: ToastOptions
-): void {
+export function toastInfo(title: string, description?: string, options?: ToastOptions): void {
   addToast({
     title,
     description,
@@ -81,10 +65,7 @@ export function toastInfo(
  * @param result - Resultado de syncDownloadGame
  * @param gameName - Nombre formateado del juego (opcional, para un solo juego)
  */
-export function toastDownloadResult(
-  result: SyncResult,
-  gameName?: string
-): void {
+export function toastDownloadResult(result: SyncResult, gameName?: string): void {
   if (result.errCount === 0 && result.okCount > 0) {
     toastSuccess(
       "Descarga completada",
@@ -93,20 +74,11 @@ export function toastDownloadResult(
         : `${result.okCount} archivo(s) descargado(s)`
     );
   } else if (result.errCount === 0 && result.okCount === 0) {
-    toastInfo(
-      "Sin guardados en la nube",
-      result.errors[0] ?? "No hay guardados de este juego"
-    );
+    toastInfo("Sin guardados en la nube", result.errors[0] ?? "No hay guardados de este juego");
   } else if (result.okCount > 0) {
-    toastWarning(
-      "Descarga parcial",
-      `${result.okCount} descargado(s), ${result.errCount} error(es)`
-    );
+    toastWarning("Descarga parcial", `${result.okCount} descargado(s), ${result.errCount} error(es)`);
   } else {
-    toastError(
-      "Error en la descarga",
-      result.errors[0] ?? "No se pudo descargar"
-    );
+    toastError("Error en la descarga", result.errors[0] ?? "No se pudo descargar");
   }
 }
 
@@ -119,24 +91,13 @@ export function toastSyncResult(result: SyncResult, gameName?: string): void {
   if (result.errCount === 0 && result.okCount > 0) {
     toastSuccess(
       "Sincronización completada",
-      gameName
-        ? `${gameName}: ${result.okCount} archivo(s) subido(s)`
-        : `${result.okCount} archivo(s) subido(s)`
+      gameName ? `${gameName}: ${result.okCount} archivo(s) subido(s)` : `${result.okCount} archivo(s) subido(s)`
     );
   } else if (result.errCount === 0 && result.okCount === 0) {
-    toastInfo(
-      "Sin cambios en la sincronización",
-      result.errors[0] ?? "No se encontraron archivos para sincronizar"
-    );
+    toastInfo("Sin cambios en la sincronización", result.errors[0] ?? "No se encontraron archivos para sincronizar");
   } else if (result.okCount > 0) {
-    toastWarning(
-      "Sincronización parcial",
-      `${result.okCount} subido(s), ${result.errCount} error(es)`
-    );
+    toastWarning("Sincronización parcial", `${result.okCount} subido(s), ${result.errCount} error(es)`);
   } else {
-    toastError(
-      "Error en la sincronización",
-      result.errors[0] ?? "No se pudo subir"
-    );
+    toastError("Error en la sincronización", result.errors[0] ?? "No se pudo subir");
   }
 }

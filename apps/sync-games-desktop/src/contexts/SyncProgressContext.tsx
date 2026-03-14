@@ -1,20 +1,8 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getPausedUploadInfo } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
-import {
-  notifyDownloadDone,
-  notifyFullBackupDone,
-  notifyUploadDone,
-} from "@utils/notification";
+import { notifyDownloadDone, notifyFullBackupDone, notifyUploadDone } from "@utils/notification";
 
 export interface SyncProgressState {
   type: "upload" | "download";
@@ -52,20 +40,15 @@ type SyncProgressContextValue = {
   clearPausedUploadInfo: () => void;
 };
 
-const SyncProgressContext = createContext<SyncProgressContextValue | null>(
-  null
-);
+const SyncProgressContext = createContext<SyncProgressContextValue | null>(null);
 
 /** Si llevamos 100% más de este tiempo sin recibir *-done, ocultamos por si el evento se perdió. */
 const STALE_100_PERCENT_MS = 4000;
 
 export function SyncProgressProvider({ children }: { children: ReactNode }) {
-  const [syncOperation, setSyncOperationState] = useState<SyncOperation | null>(
-    null
-  );
+  const [syncOperation, setSyncOperationState] = useState<SyncOperation | null>(null);
   const [progress, setProgress] = useState<SyncProgressState | null>(null);
-  const [pausedUploadInfo, setPausedUploadInfo] =
-    useState<PausedUploadInfo | null>(null);
+  const [pausedUploadInfo, setPausedUploadInfo] = useState<PausedUploadInfo | null>(null);
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncOperationRef = useRef<SyncOperation | null>(null);
   syncOperationRef.current = syncOperation;
@@ -128,17 +111,14 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
         notifyUploadDone(formatGameDisplayName(op.gameId)).catch(() => {});
       }
     });
-    const unsubUploadPaused = listen<{ gameId: string; filename: string }>(
-      "sync-upload-paused",
-      (ev) => {
-        setProgress((prev) => (prev?.type === "upload" ? null : prev));
-        setSyncOperationState(null);
-        setPausedUploadInfo({
-          gameId: ev.payload.gameId,
-          filename: ev.payload.filename,
-        });
-      }
-    );
+    const unsubUploadPaused = listen<{ gameId: string; filename: string }>("sync-upload-paused", (ev) => {
+      setProgress((prev) => (prev?.type === "upload" ? null : prev));
+      setSyncOperationState(null);
+      setPausedUploadInfo({
+        gameId: ev.payload.gameId,
+        filename: ev.payload.filename,
+      });
+    });
     const unsubDownloadDone = listen("sync-download-done", () => {
       const op = syncOperationRef.current;
       setProgress((prev) => (prev?.type === "download" ? null : prev));
@@ -204,19 +184,13 @@ export function SyncProgressProvider({ children }: { children: ReactNode }) {
     clearPausedUploadInfo,
   };
 
-  return (
-    <SyncProgressContext.Provider value={value}>
-      {children}
-    </SyncProgressContext.Provider>
-  );
+  return <SyncProgressContext.Provider value={value}>{children}</SyncProgressContext.Provider>;
 }
 
 export function useSyncProgress(): SyncProgressContextValue {
   const ctx = useContext(SyncProgressContext);
   if (!ctx) {
-    throw new Error(
-      "useSyncProgress must be used within a SyncProgressProvider"
-    );
+    throw new Error("useSyncProgress must be used within a SyncProgressProvider");
   }
   return ctx;
 }

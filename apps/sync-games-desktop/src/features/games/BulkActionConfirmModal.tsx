@@ -1,11 +1,4 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { CloudDownload, CloudUpload, Sparkles } from "lucide-react";
 
 interface BulkActionConfirmModalProps {
@@ -27,18 +20,11 @@ export function BulkActionConfirmModal({
   onClose,
 }: BulkActionConfirmModalProps) {
   const isSync = type === "sync";
-  const title = isSync
-    ? "Subir guardados de todos los juegos"
-    : "Descargar guardados de todos los juegos";
+  const title = isSync ? "Subir guardados de todos los juegos" : "Descargar guardados de todos los juegos";
   const message = isSync
-    ? `¿Subir guardados de ${count} ${
-        count === 1 ? "juego" : "juegos"
-      } a la nube?`
-    : `¿Descargar guardados de ${count} ${
-        count === 1 ? "juego" : "juegos"
-      } desde la nube?`;
-  const showPackageRecommendation =
-    isSync && gamesOverSizeThreshold > 0 && count > 0;
+    ? `¿Subir guardados de ${count} ${count === 1 ? "juego" : "juegos"} a la nube?`
+    : `¿Descargar guardados de ${count} ${count === 1 ? "juego" : "juegos"} desde la nube?`;
+  const showPackageRecommendation = isSync && gamesOverSizeThreshold > 0 && count > 0;
 
   const handleConfirm = async () => {
     await onConfirm();
@@ -66,10 +52,9 @@ export function BulkActionConfirmModal({
               <p className="flex items-start gap-2">
                 <Sparkles size={18} className="mt-0.5 shrink-0 text-primary" />
                 <span>
-                  <strong>{gamesOverSizeThreshold}</strong> de {count}{" "}
-                  {count === 1 ? "juego" : "juegos"} superan 400 MB. Para una
-                  subida más rápida, usa <strong>Empaquetar y subir</strong>{" "}
-                  desde el menú ⋯ de cada juego en lugar de subir todos.
+                  <strong>{gamesOverSizeThreshold}</strong> de {count} {count === 1 ? "juego" : "juegos"} superan 400
+                  MB. Para una subida más rápida, usa <strong>Empaquetar y subir</strong> desde el menú ⋯ de cada juego
+                  en lugar de subir todos.
                 </span>
               </p>
             </div>

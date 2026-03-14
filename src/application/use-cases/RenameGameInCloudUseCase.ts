@@ -13,10 +13,6 @@ export class RenameGameInCloudUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
   async execute(input: RenameGameInCloudInput): Promise<void> {
-    await this.saveRepository.renameGame(
-      input.userId,
-      input.oldGameId,
-      input.newGameId
-    );
+    await this.saveRepository.renameGame(input.userId, input.oldGameId, input.newGameId);
   }
 }

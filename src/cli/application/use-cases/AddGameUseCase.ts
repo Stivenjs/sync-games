@@ -23,21 +23,15 @@ export class AddGameUseCase {
     const normalizedId = input.gameId.trim().toLowerCase();
     const normalizedPath = input.path.trim();
     const normalizedEdition =
-      input.editionLabel?.trim() && input.editionLabel.trim().length > 0
-        ? input.editionLabel.trim()
-        : undefined;
+      input.editionLabel?.trim() && input.editionLabel.trim().length > 0 ? input.editionLabel.trim() : undefined;
     const normalizedSourceUrl =
-      input.sourceUrl?.trim() && input.sourceUrl.trim().length > 0
-        ? input.sourceUrl.trim()
-        : undefined;
+      input.sourceUrl?.trim() && input.sourceUrl.trim().length > 0 ? input.sourceUrl.trim() : undefined;
 
     if (!normalizedId || !normalizedPath) {
       throw new Error("gameId y path son obligatorios");
     }
 
-    const existingIndex = config.games.findIndex(
-      (g) => g.id.toLowerCase() === normalizedId
-    );
+    const existingIndex = config.games.findIndex((g) => g.id.toLowerCase() === normalizedId);
     const existing = existingIndex >= 0 ? config.games[existingIndex] : null;
 
     let newGames: ConfiguredGame[];
@@ -55,7 +49,10 @@ export class AddGameUseCase {
       };
       newGames = config.games.map((g, i) => (i === existingIndex ? updated : g));
     } else {
-      let created: ConfiguredGame = { id: normalizedId, paths: [normalizedPath] };
+      let created: ConfiguredGame = {
+        id: normalizedId,
+        paths: [normalizedPath],
+      };
       if (normalizedEdition) {
         created = { ...created, editionLabel: normalizedEdition };
       }

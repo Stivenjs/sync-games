@@ -23,10 +23,10 @@ function formatSizeImpl(bytes: number): string {
     i === 0
       ? String(Math.round(value))
       : value >= 100
-      ? Math.round(value).toLocaleString()
-      : value >= 1
-      ? value.toFixed(1)
-      : value.toFixed(2);
+        ? Math.round(value).toLocaleString()
+        : value >= 1
+          ? value.toFixed(1)
+          : value.toFixed(2);
   return `${formatted} ${unit}`;
 }
 

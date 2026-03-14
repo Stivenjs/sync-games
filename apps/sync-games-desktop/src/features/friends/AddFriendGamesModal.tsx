@@ -24,18 +24,9 @@ interface AddFriendGamesModalProps {
   onAdded?: () => void;
 }
 
-export function AddFriendGamesModal({
-  isOpen,
-  onClose,
-  friendGames,
-  ourGameIds,
-  onAdded,
-}: AddFriendGamesModalProps) {
+export function AddFriendGamesModal({ isOpen, onClose, friendGames, ourGameIds, onAdded }: AddFriendGamesModalProps) {
   const gamesToOffer = useMemo(
-    () =>
-      friendGames.filter(
-        (g) => g.id && !ourGameIds.has(g.id.toLowerCase())
-      ),
+    () => friendGames.filter((g) => g.id && !ourGameIds.has(g.id.toLowerCase())),
     [friendGames, ourGameIds]
   );
 
@@ -89,10 +80,7 @@ export function AddFriendGamesModal({
       onAdded?.();
       onClose();
     } catch (e) {
-      toastError(
-        "No se pudieron añadir",
-        e instanceof Error ? e.message : "Error inesperado"
-      );
+      toastError("No se pudieron añadir", e instanceof Error ? e.message : "Error inesperado");
     } finally {
       setSaving(false);
     }
@@ -109,13 +97,12 @@ export function AddFriendGamesModal({
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-default-600">
-            Se añadirán solo los juegos que aún no tienes. No se modifica tu API
-            key ni tu User ID. Revisa las rutas en Configuración después.
+            Se añadirán solo los juegos que aún no tienes. No se modifica tu API key ni tu User ID. Revisa las rutas en
+            Configuración después.
           </p>
           {gamesToOffer.length === 0 ? (
             <p className="py-4 text-default-500">
-              No hay juegos nuevos que añadir; ya tienes todos los de este
-              perfil.
+              No hay juegos nuevos que añadir; ya tienes todos los de este perfil.
             </p>
           ) : (
             <>
@@ -130,11 +117,7 @@ export function AddFriendGamesModal({
               <ScrollShadow className="max-h-[40vh]">
                 <div className="flex flex-col gap-2">
                   {gamesToOffer.map((g) => (
-                    <Checkbox
-                      key={g.id}
-                      isSelected={selected.has(g.id)}
-                      onValueChange={() => toggle(g.id)}
-                    >
+                    <Checkbox key={g.id} isSelected={selected.has(g.id)} onValueChange={() => toggle(g.id)}>
                       {formatGameDisplayName(g.id)}
                     </Checkbox>
                   ))}
@@ -151,8 +134,7 @@ export function AddFriendGamesModal({
             color="primary"
             onPress={handleAdd}
             isDisabled={gamesToOffer.length === 0 || selected.size === 0}
-            isLoading={saving}
-          >
+            isLoading={saving}>
             Añadir seleccionados ({selected.size})
           </Button>
         </ModalFooter>

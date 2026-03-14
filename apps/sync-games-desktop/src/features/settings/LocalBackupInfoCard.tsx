@@ -1,11 +1,7 @@
 import { Button, Card, CardBody } from "@heroui/react";
 import { Archive, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  cleanupOldBackups,
-  setKeepBackupsPerGame,
-  deleteAllLocalBackups,
-} from "@services/tauri/config.service";
+import { cleanupOldBackups, setKeepBackupsPerGame, deleteAllLocalBackups } from "@services/tauri/config.service";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useConfig } from "@hooks/useConfig";
 
@@ -20,11 +16,7 @@ export function LocalBackupInfoCard() {
 
   useEffect(() => {
     const n = config?.keepBackupsPerGame ?? DEFAULT_KEEP;
-    setKeepLastN(
-      KEEP_OPTIONS.includes(n as (typeof KEEP_OPTIONS)[number])
-        ? n
-        : DEFAULT_KEEP
-    );
+    setKeepLastN(KEEP_OPTIONS.includes(n as (typeof KEEP_OPTIONS)[number]) ? n : DEFAULT_KEEP);
   }, [config?.keepBackupsPerGame]);
 
   const handleCleanup = async () => {
@@ -39,16 +31,11 @@ export function LocalBackupInfoCard() {
       } else {
         toastSuccess(
           "Sin cambios",
-          "No había backups antiguos que eliminar. Se mantienen los últimos " +
-            keepLastN +
-            " por juego."
+          "No había backups antiguos que eliminar. Se mantienen los últimos " + keepLastN + " por juego."
         );
       }
     } catch (e) {
-      toastError(
-        "Error al liberar espacio",
-        e instanceof Error ? e.message : String(e)
-      );
+      toastError("Error al liberar espacio", e instanceof Error ? e.message : String(e));
     } finally {
       setCleaning(false);
     }
@@ -59,17 +46,12 @@ export function LocalBackupInfoCard() {
       <CardBody className="gap-4">
         <div className="flex items-center gap-2">
           <Archive size={20} className="text-default-500" />
-          <h2 className="text-base font-semibold text-foreground">
-            Respaldo local automático
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">Respaldo local automático</h2>
         </div>
         <p className="text-sm text-default-600">
-          Antes de descargar guardados desde la nube, la app crea una copia de
-          seguridad en tu PC para no sobrescribir nada sin respaldo. Las copias
-          se guardan en la carpeta de configuración:{" "}
-          <code className="rounded bg-default-200 px-1 font-mono text-xs">
-            sync-games/backups/[juego]/[fecha]
-          </code>
+          Antes de descargar guardados desde la nube, la app crea una copia de seguridad en tu PC para no sobrescribir
+          nada sin respaldo. Las copias se guardan en la carpeta de configuración:{" "}
+          <code className="rounded bg-default-200 px-1 font-mono text-xs">sync-games/backups/[juego]/[fecha]</code>
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-default-600">
@@ -77,22 +59,16 @@ export function LocalBackupInfoCard() {
             <select
               value={keepLastN}
               onChange={async (e) => {
-                const n = Number(
-                  e.target.value
-                ) as (typeof KEEP_OPTIONS)[number];
+                const n = Number(e.target.value) as (typeof KEEP_OPTIONS)[number];
                 setKeepLastN(n);
                 try {
                   await setKeepBackupsPerGame(n);
                   await refetch();
                 } catch (e) {
-                  toastError(
-                    "Error al guardar",
-                    e instanceof Error ? e.message : String(e)
-                  );
+                  toastError("Error al guardar", e instanceof Error ? e.message : String(e));
                 }
               }}
-              className="rounded-md border border-default-300 bg-default-100 px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
+              className="rounded-md border border-default-300 bg-default-100 px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
               {KEEP_OPTIONS.map((n) => (
                 <option key={n} value={n}>
                   {n}
@@ -107,16 +83,12 @@ export function LocalBackupInfoCard() {
             color="primary"
             onPress={handleCleanup}
             isLoading={cleaning}
-            startContent={<Trash2 size={16} />}
-          >
+            startContent={<Trash2 size={16} />}>
             Liberar espacio ahora
           </Button>
           {confirmDeleteAll ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-default-600">
-              <span className="font-medium">
-                ¿Borrar TODOS los backups locales? Esta acción no se puede
-                deshacer.
-              </span>
+              <span className="font-medium">¿Borrar TODOS los backups locales? Esta acción no se puede deshacer.</span>
               <Button
                 size="sm"
                 variant="flat"
@@ -132,32 +104,19 @@ export function LocalBackupInfoCard() {
                     );
                     setConfirmDeleteAll(false);
                   } catch (e) {
-                    toastError(
-                      "Error al borrar backups",
-                      e instanceof Error ? e.message : String(e)
-                    );
+                    toastError("Error al borrar backups", e instanceof Error ? e.message : String(e));
                   } finally {
                     setCleaning(false);
                   }
-                }}
-              >
+                }}>
                 Confirmar borrado
               </Button>
-              <Button
-                size="sm"
-                variant="light"
-                onPress={() => setConfirmDeleteAll(false)}
-              >
+              <Button size="sm" variant="light" onPress={() => setConfirmDeleteAll(false)}>
                 Cancelar
               </Button>
             </div>
           ) : (
-            <Button
-              size="sm"
-              variant="flat"
-              color="danger"
-              onPress={() => setConfirmDeleteAll(true)}
-            >
+            <Button size="sm" variant="flat" color="danger" onPress={() => setConfirmDeleteAll(true)}>
               Borrar todos los backups locales
             </Button>
           )}

@@ -15,9 +15,7 @@ if (!apiUrl || !apiKey) {
   console.error(`${figures.cross} Faltan variables de entorno:`);
   if (!apiUrl) console.error("   - SYNC_GAMES_API_URL");
   if (!apiKey) console.error("   - SYNC_GAMES_API_KEY");
-  console.error(
-    '\n   Uso: SYNC_GAMES_API_URL="https://..." SYNC_GAMES_API_KEY="..." bun run build:cli'
-  );
+  console.error('\n   Uso: SYNC_GAMES_API_URL="https://..." SYNC_GAMES_API_KEY="..." bun run build:cli');
   process.exit(1);
 }
 
@@ -63,4 +61,3 @@ if (!result.success) {
   process.exit(1);
 }
 console.log(`\n${figures.tick} Build completado: dist/savecloud\n`);
-

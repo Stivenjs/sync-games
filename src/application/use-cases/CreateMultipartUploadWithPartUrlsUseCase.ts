@@ -22,18 +22,8 @@ export interface CreateMultipartUploadWithPartUrlsOutput {
 export class CreateMultipartUploadWithPartUrlsUseCase {
   constructor(private readonly saveRepository: SaveRepository) {}
 
-  async execute(
-    input: CreateMultipartUploadWithPartUrlsInput
-  ): Promise<CreateMultipartUploadWithPartUrlsOutput> {
-    const partCount = Math.min(
-      Math.max(1, Math.floor(input.partCount)),
-      MAX_PARTS_INIT_WITH_URLS
-    );
-    return this.saveRepository.createMultipartUploadWithPartUrls(
-      input.userId,
-      input.gameId,
-      input.filename,
-      partCount
-    );
+  async execute(input: CreateMultipartUploadWithPartUrlsInput): Promise<CreateMultipartUploadWithPartUrlsOutput> {
+    const partCount = Math.min(Math.max(1, Math.floor(input.partCount)), MAX_PARTS_INIT_WITH_URLS);
+    return this.saveRepository.createMultipartUploadWithPartUrls(input.userId, input.gameId, input.filename, partCount);
   }
 }
