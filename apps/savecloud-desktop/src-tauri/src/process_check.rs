@@ -38,11 +38,7 @@ pub fn are_games_running(game_ids: &[String]) -> HashMap<String, bool> {
     // Precalcular nombres de ejecutable para cada juego
     let mut names_by_game: HashMap<String, Vec<String>> = HashMap::new();
     for id in game_ids {
-        if let Some(game) = cfg
-            .games
-            .iter()
-            .find(|g| g.id.eq_ignore_ascii_case(id))
-        {
+        if let Some(game) = cfg.games.iter().find(|g| g.id.eq_ignore_ascii_case(id)) {
             let mut names: Vec<String> = Vec::new();
             if let Some(ref execs) = game.executable_names {
                 if !execs.is_empty() {
@@ -83,10 +79,7 @@ pub fn are_games_running(game_ids: &[String]) -> HashMap<String, bool> {
     for process in sys.processes().values() {
         let proc_name = process.name().to_string_lossy().to_lowercase();
         for (game_id, names) in names_by_game.iter() {
-            if names
-                .iter()
-                .any(|check| proc_name == check.to_lowercase())
-            {
+            if names.iter().any(|check| proc_name == check.to_lowercase()) {
                 result.insert(game_id.clone(), true);
             }
         }
