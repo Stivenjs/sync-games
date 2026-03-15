@@ -1,27 +1,42 @@
 //! Detección de juegos en ejecución para evitar sincronizar mientras hay archivos bloqueados.
+//! Incluye un watcher para emitir eventos al frontend de forma reactiva.
 
 use crate::config;
 use std::collections::HashMap;
-use std::path::Path;
-use sysinfo::{ProcessesToUpdate, System};
+use std::sync::Mutex;
+use std::sync::OnceLock;
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use tauri::{AppHandle, Emitter};
+
+/// Mantener una única instancia de System globalmente para evitar el alto coste
+/// de crear una nueva en cada comprobación (polling).
+static GLOBAL_SYS: OnceLock<Mutex<System>> = OnceLock::new();
+
+fn get_sys() -> std::sync::MutexGuard<'static, System> {
+    GLOBAL_SYS
+        .get_or_init(|| Mutex::new(System::new()))
+        .lock()
+        .expect("Mutex de sysinfo envenenado")
+}
 
 /// Indica si algún proceso de un juego configurado está en ejecución.
-/// Usa `executableNames` del config si está definido, o infiere desde la ruta.
-pub fn is_game_running(game_id: &str, paths: &[String]) -> bool {
-    let names = get_executable_names_to_check(game_id, paths);
+pub fn is_game_running(game_id: &str, _paths: &[String]) -> bool {
+    let names = get_executable_names_to_check(game_id);
     if names.is_empty() {
         return false;
     }
 
-    let mut sys = System::new_all();
-    sys.refresh_processes(ProcessesToUpdate::All);
+    let mut sys = get_sys();
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        ProcessRefreshKind::new().with_exe(UpdateKind::OnlyIfNotSet),
+    );
 
     for process in sys.processes().values() {
         let proc_name = process.name().to_string_lossy().to_lowercase();
+
         for check in &names {
-            let check_lower = check.to_lowercase();
-            // Comparación exacta (ej. eldenring.exe) o el proc puede ser "EldenRing.exe"
-            if proc_name == check_lower {
+            if proc_name == check.to_lowercase() {
                 return true;
             }
         }
@@ -29,17 +44,23 @@ pub fn is_game_running(game_id: &str, paths: &[String]) -> bool {
     false
 }
 
-/// Versión optimizada para varios juegos a la vez: refresca la lista de
-/// procesos solo una vez y comprueba todos los juegos.
+/// Versión optimizada para varios juegos a la vez.
 pub fn are_games_running(game_ids: &[String]) -> HashMap<String, bool> {
     let cfg = config::load_config();
-    let mut result: HashMap<String, bool> = HashMap::new();
+    let mut result: HashMap<String, bool> = HashMap::with_capacity(game_ids.len());
 
-    // Precalcular nombres de ejecutable para cada juego
-    let mut names_by_game: HashMap<String, Vec<String>> = HashMap::new();
+    if game_ids.is_empty() {
+        return result;
+    }
+
+    let mut names_by_game: HashMap<String, Vec<String>> = HashMap::with_capacity(game_ids.len());
+
     for id in game_ids {
+        result.insert(id.clone(), false);
+
         if let Some(game) = cfg.games.iter().find(|g| g.id.eq_ignore_ascii_case(id)) {
             let mut names: Vec<String> = Vec::new();
+
             if let Some(ref execs) = game.executable_names {
                 if !execs.is_empty() {
                     names = execs
@@ -55,47 +76,70 @@ pub fn are_games_running(game_ids: &[String]) -> HashMap<String, bool> {
                         .collect();
                 }
             }
+
             if names.is_empty() {
-                names = infer_exe_candidates_from_paths_and_id(&game.paths, id);
+                names = infer_exe_candidates(id);
             }
+
             if !names.is_empty() {
-                names_by_game.insert(game.id.clone(), names);
-                result.insert(game.id.clone(), false);
+                let names_lower: Vec<String> =
+                    names.into_iter().map(|n| n.to_lowercase()).collect();
+                names_by_game.insert(game.id.clone(), names_lower);
             }
         }
     }
 
-    if names_by_game.is_empty() {
-        // Asegurar claves al menos con false
-        for id in game_ids {
-            result.entry(id.clone()).or_insert(false);
-        }
-        return result;
-    }
-
-    let mut sys = System::new_all();
-    sys.refresh_processes(ProcessesToUpdate::All);
+    let mut sys = get_sys();
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        ProcessRefreshKind::new().with_exe(UpdateKind::OnlyIfNotSet),
+    );
 
     for process in sys.processes().values() {
         let proc_name = process.name().to_string_lossy().to_lowercase();
-        for (game_id, names) in names_by_game.iter() {
-            if names.iter().any(|check| proc_name == check.to_lowercase()) {
-                result.insert(game_id.clone(), true);
+
+        for game_id in game_ids {
+            if result[game_id] {
+                continue;
+            }
+
+            if let Some(check_names) = names_by_game.get(game_id) {
+                if check_names.contains(&proc_name) {
+                    result.insert(game_id.clone(), true);
+                }
             }
         }
-    }
-
-    // Asegurar que todos los ids de entrada tienen clave en el resultado
-    for id in game_ids {
-        result.entry(id.clone()).or_insert(false);
     }
 
     result
 }
 
-/// Genera candidatos de nombres de ejecutable a buscar.
-fn get_executable_names_to_check(game_id: &str, paths: &[String]) -> Vec<String> {
-    // 1. Intentar desde la configuración del juego (si añadimos el campo)
+/// Inicia un hilo en segundo plano que revisa los procesos cada 5 segundos
+/// y emite un evento al frontend SOLO si el estado de algún juego cambia.
+#[tauri::command]
+pub fn start_process_watcher(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut previous_state: HashMap<String, bool> = HashMap::new();
+
+        loop {
+            let cfg = config::load_config();
+            let game_ids: Vec<String> = cfg.games.iter().map(|g| g.id.clone()).collect();
+
+            if !game_ids.is_empty() {
+                let current_state = are_games_running(&game_ids);
+
+                if current_state != previous_state {
+                    let _ = app.emit("games-running-status", &current_state);
+                    previous_state = current_state;
+                }
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
+}
+
+fn get_executable_names_to_check(game_id: &str) -> Vec<String> {
     let cfg = config::load_config();
     if let Some(game) = cfg
         .games
@@ -119,24 +163,7 @@ fn get_executable_names_to_check(game_id: &str, paths: &[String]) -> Vec<String>
         }
     }
 
-    // 2. Inferir desde la última parte de la ruta
-    for raw in paths {
-        let expanded = expand_path(raw.trim());
-        if let Some(p) = expanded {
-            let path = Path::new(&p);
-            if let Some(last) = path.components().last() {
-                let name = last.as_os_str().to_string_lossy();
-                if !name.is_empty() && name != "." && name != ".." {
-                    let candidates = infer_exe_candidates(&name, game_id);
-                    if !candidates.is_empty() {
-                        return candidates;
-                    }
-                }
-            }
-        }
-    }
-
-    Vec::new()
+    infer_exe_candidates(game_id)
 }
 
 fn ensure_exe_ext(s: &str) -> String {
@@ -155,100 +182,48 @@ fn ensure_exe_ext(s: &str) -> String {
     }
 }
 
-fn infer_exe_candidates(folder_name: &str, game_id: &str) -> Vec<String> {
+/// Genera el ejecutable compactando el texto y creando un ACRÓNIMO a partir del ID
+fn infer_exe_candidates(text: &str) -> Vec<String> {
     let mut candidates = Vec::new();
+    let text = text.trim();
+    if text.is_empty() {
+        return candidates;
+    }
 
-    let base = folder_name.replace(['\'', '"'], "").replace(' ', "");
-
+    let base = text.replace(['\'', '"', ':', '-'], "").replace(' ', "");
     if !base.is_empty() {
         #[cfg(target_os = "windows")]
         {
             candidates.push(ensure_exe_ext(&base));
-            candidates.push(ensure_exe_ext(&base.to_lowercase()));
             candidates.push(format!("{}-Win64-Shipping.exe", base));
-            candidates.push(format!("{}-Win64-Shipping.exe", base.to_lowercase()));
         }
         #[cfg(not(target_os = "windows"))]
         {
             candidates.push(base.clone());
-            candidates.push(base.to_lowercase());
         }
     }
 
-    let from_id = game_id
-        .replace('-', " ")
-        .split_whitespace()
-        .map(|w| {
-            let mut c = w.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().chain(c).collect::<String>(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    if !from_id.is_empty() {
-        let compact = from_id.replace(' ', "");
+    let mut acronym = String::new();
+    let words = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty());
+
+    for word in words {
+        if word.chars().all(|c| c.is_ascii_digit()) {
+            acronym.push_str(word);
+        } else if let Some(c) = word.chars().next() {
+            acronym.push(c.to_ascii_lowercase());
+        }
+    }
+
+    if acronym.len() >= 2 && acronym.len() <= 6 {
         #[cfg(target_os = "windows")]
-        {
-            candidates.push(ensure_exe_ext(&compact));
-            candidates.push(ensure_exe_ext(&compact.to_lowercase()));
-        }
+        candidates.push(ensure_exe_ext(&acronym));
         #[cfg(not(target_os = "windows"))]
-        {
-            candidates.push(compact.clone());
-            candidates.push(compact.to_lowercase());
-        }
+        candidates.push(acronym.clone());
     }
 
     candidates.sort();
     candidates.dedup();
     candidates
-}
-
-fn infer_exe_candidates_from_paths_and_id(paths: &[String], game_id: &str) -> Vec<String> {
-    for raw in paths {
-        let expanded = expand_path(raw.trim());
-        if let Some(p) = expanded {
-            let path = Path::new(&p);
-            if let Some(last) = path.components().last() {
-                let name = last.as_os_str().to_string_lossy();
-                if !name.is_empty() && name != "." && name != ".." {
-                    let candidates = infer_exe_candidates(&name, game_id);
-                    if !candidates.is_empty() {
-                        return candidates;
-                    }
-                }
-            }
-        }
-    }
-    Vec::new()
-}
-
-fn expand_path(raw: &str) -> Option<String> {
-    let mut result = raw.to_string();
-    let re = regex::Regex::new(r"%([^%]+)%").ok()?;
-    for cap in re.captures_iter(raw) {
-        let var = cap.get(1)?.as_str();
-        let val = std::env::var(var).unwrap_or_default();
-        result = result.replace(&format!("%{}%", var), &val);
-    }
-    if result.starts_with('~') {
-        let home = std::env::var("USERPROFILE")
-            .or_else(|_| std::env::var("HOME"))
-            .unwrap_or_default();
-        if !home.is_empty() {
-            let rest = result.trim_start_matches('~').trim_start_matches('/');
-            result = if rest.is_empty() {
-                home
-            } else {
-                format!("{}/{}", home.trim_end_matches(&['/', '\\']), rest)
-            };
-        }
-    }
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
 }
