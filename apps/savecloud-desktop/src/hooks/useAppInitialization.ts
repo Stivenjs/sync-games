@@ -9,11 +9,14 @@ import { formatGameDisplayName } from "@utils/gameImage";
  * Hook encargado de inicializar comportamientos globales de la aplicación.
  *
  * Este hook centraliza tareas que deben ejecutarse automáticamente
- * cuando la app arranca, como:
+ * cuando la app arranca.
+ *
+ * Funciones principales:
  *
  * - Respaldar periódicamente la configuración del usuario en la nube.
  * - Comprobar actualizaciones de la aplicación (solo en producción).
  * - Escuchar eventos de sincronización automática emitidos desde el backend de Tauri.
+ * - Bloquear acciones de desarrollo en producción (reload, devtools, click derecho).
  *
  * Debe usarse una sola vez en el nivel raíz de la aplicación
  * (por ejemplo en `App.tsx`).
@@ -28,10 +31,10 @@ import { formatGameDisplayName } from "@utils/gameImage";
  */
 export function useAppInitialization() {
   /**
-   * Realiza respaldos periódicos de la configuración del usuario en la nube.
+   * Respaldos periódicos de configuración del usuario.
    *
-   * Esto permite evitar pérdida de datos si el usuario cambia de dispositivo
-   * o reinstala la aplicación.
+   * Esto evita pérdida de datos si el usuario cambia
+   * de dispositivo o reinstala la aplicación.
    *
    * Frecuencia: cada 5 minutos.
    */
@@ -39,7 +42,7 @@ export function useAppInitialization() {
     const interval = setInterval(
       () => {
         backupConfigToCloud().catch(() => {
-          // Ignorar errores silenciosamente para no interrumpir la UX
+          // Ignorar errores silenciosamente
         });
       },
       5 * 60 * 1000
@@ -49,17 +52,16 @@ export function useAppInitialization() {
   }, []);
 
   /**
-   * Comprueba si hay nuevas versiones disponibles de la aplicación.
+   * Comprueba si hay nuevas versiones disponibles.
    *
-   * - Solo se ejecuta en entorno de producción.
-   * - Espera 2 segundos después del inicio para no afectar el arranque.
-   * - Si hay una actualización disponible, se muestra un prompt al usuario.
+   * - Solo en producción
+   * - Se ejecuta 2 segundos después del arranque
    */
   useEffect(() => {
     if (!import.meta.env.DEV) {
       const timer = setTimeout(() => {
         checkForUpdatesWithPrompt(true).catch(() => {
-          // Ignorar errores de actualización
+          // Ignorar errores
         });
       }, 2000);
 
@@ -68,25 +70,10 @@ export function useAppInitialization() {
   }, []);
 
   /**
-   * Escucha eventos emitidos desde el backend de Tauri relacionados con
-   * sincronización automática de juegos.
-   *
-   * Eventos manejados:
-   *
-   * - `auto-sync-done`
-   *   Se dispara cuando una sincronización termina correctamente.
-   *
-   * - `auto-sync-error`
-   *   Se dispara cuando ocurre un error durante la sincronización.
-   *
-   * En ambos casos:
-   * - Se muestra un toast con el resultado.
-   * - Se envía una notificación del sistema.
+   * Escucha eventos emitidos desde el backend de Tauri
+   * relacionados con sincronización automática.
    */
   useEffect(() => {
-    /**
-     * Evento emitido cuando la sincronización automática finaliza.
-     */
     const unsubDone = listen<{
       gameId: string;
       okCount: number;
@@ -106,9 +93,6 @@ export function useAppInitialization() {
       notifySyncComplete(gameName, ev.payload.okCount, ev.payload.errCount);
     });
 
-    /**
-     * Evento emitido cuando ocurre un error durante la sincronización automática.
-     */
     const unsubErr = listen<{
       gameId: string;
       error: string;
@@ -127,12 +111,49 @@ export function useAppInitialization() {
       notifySyncError(gameName, ev.payload.error);
     });
 
-    /**
-     * Cleanup: elimina los listeners cuando el componente se desmonta.
-     */
     return () => {
       unsubDone.then((f) => f());
       unsubErr.then((f) => f());
+    };
+  }, []);
+
+  /**
+   * Bloquea acciones de desarrollo en producción.
+   *
+   * Evita que el usuario pueda:
+   * - Recargar la app (F5 / Ctrl+R)
+   * - Abrir DevTools (F12 / Ctrl+Shift+I)
+   * - Abrir inspector (Ctrl+Shift+C)
+   * - Abrir menú contextual (click derecho)
+   */
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+
+    const blockKeys = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+
+      if (
+        e.key === "F5" ||
+        e.key === "F12" ||
+        (e.ctrlKey && key === "r") ||
+        (e.ctrlKey && e.shiftKey && key === "r") ||
+        (e.ctrlKey && e.shiftKey && key === "i") ||
+        (e.ctrlKey && e.shiftKey && key === "c")
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    const blockContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("keydown", blockKeys);
+    window.addEventListener("contextmenu", blockContextMenu);
+
+    return () => {
+      window.removeEventListener("keydown", blockKeys);
+      window.removeEventListener("contextmenu", blockContextMenu);
     };
   }, []);
 }

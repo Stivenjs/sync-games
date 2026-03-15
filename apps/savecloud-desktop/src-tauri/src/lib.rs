@@ -18,10 +18,22 @@ fn load_dotenv() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     load_dotenv();
-    tauri::Builder::default()
+
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -105,6 +117,13 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(debug_assertions)]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
+
             let icon_bytes = include_bytes!("../icons/icon.ico");
             let icon = tauri::image::Image::from_bytes(icon_bytes)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
@@ -174,8 +193,6 @@ pub fn run() {
                 app_handle: app.handle().clone(),
             });
 
-            // Auto-sync al cambiar archivos deshabilitado por ahora (no subir tras restaurar empaquetado).
-            // commands::watch_sync::spawn_watcher(app.handle().clone(), tray_state.0.clone());
             commands::game_exit_sync::spawn_exit_watcher(
                 app.handle().clone(),
                 tray_state.0.clone(),
