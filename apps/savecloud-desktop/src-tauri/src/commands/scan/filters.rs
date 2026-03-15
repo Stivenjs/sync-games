@@ -41,7 +41,7 @@ pub(super) fn is_strong_save_file(name: &str) -> bool {
 }
 
 pub(super) fn is_weak_save_file(name: &str) -> bool {
-    let lower = name.to_lowercase();    
+    let lower = name.to_lowercase();
     weak_save_extensions()
         .iter()
         .any(|ext| lower.ends_with(ext))
@@ -130,7 +130,9 @@ pub(super) fn is_excluded_folder(name: &str) -> bool {
     if is_likely_id_or_hash(name) {
         return true;
     }
-    excluded_partial_patterns().iter().any(|p| lower.contains(p))
+    excluded_partial_patterns()
+        .iter()
+        .any(|p| lower.contains(p))
 }
 
 /// Profundidad máxima al buscar archivos recursivamente (ej. GameName/Saved/SaveGames).
