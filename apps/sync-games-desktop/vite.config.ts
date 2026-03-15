@@ -5,13 +5,13 @@ import { resolve } from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
-// React Compiler: memoización automática (ver https://es.react.dev/learn/react-compiler)
+// React Compiler: memoización automática
 const ReactCompilerConfig = {
   target: "19" as const,
 };
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [
     react({
       babel: {
@@ -19,7 +19,8 @@ export default defineConfig(async () => ({
       },
     }),
     tailwindcss(),
-  ],
+  ].flat(),
+
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
@@ -33,11 +34,19 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
+  // Vite options tailored for Tauri development
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+
+  build: {
+    // Tauri uses Chromium on Windows and WebKit on macOS and Linux
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+
+    minify: (!process.env.TAURI_ENV_DEBUG ? "esbuild" : false) as "esbuild" | false,
+
+    // produce sourcemaps for debug builds
+    sourcemap: !!process.env.TAURI_ENV_DEBUG,
+  },
+
   server: {
     port: 1420,
     strictPort: true,
@@ -50,12 +59,12 @@ export default defineConfig(async () => ({
         }
       : undefined,
     fs: {
-      // Permite importar archivos del root del repo (ej. RELEASE_NOTES.md)
       allow: [resolve(__dirname, "..", "..")],
     },
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  envPrefix: ["VITE_", "TAURI_ENV_*"],
 }));
