@@ -11,6 +11,6 @@ export function getCliArgs(): string[] {
   const raw = isUserCommand ? process.argv.slice(1) : process.argv.slice(2);
   const exePath = process.argv[0] ?? process.execPath ?? "";
   const isExePath = (arg: string) =>
-    arg === exePath || arg === process.execPath || arg.endsWith("sync-games.exe") || arg.endsWith("sync-games");
+    arg === exePath || arg === process.execPath || arg.endsWith("SaveCloud.exe") || arg.endsWith("SaveCloud");
   return raw.filter((arg) => !isExePath(arg));
 }

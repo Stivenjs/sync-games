@@ -18,8 +18,8 @@ const root = process.cwd();
 
 const filesToUpdate = [
   "package.json",
-  "apps/sync-games-desktop/package.json",
-  "apps/sync-games-desktop/src-tauri/tauri.conf.json",
+  "apps/savecloud-desktop/package.json",
+  "apps/savecloud-desktop/src-tauri/tauri.conf.json",
 ];
 
 let updatedCount = 0;

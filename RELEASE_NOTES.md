@@ -27,7 +27,7 @@
   - `get_game_stats` ahora calcula el tamaño de cada juego en hilos bloqueantes en paralelo (`spawn_blocking`), evitando bloquear el runtime async.
 - **Gestión de backups locales mejorada:**
   - Selector de “mantener últimos N backups” por juego y botón para limpiar backups antiguos.
-  - Nuevo botón para borrar **todos** los backups locales (`sync-games/backups`) con confirmación explícita.
+  - Nuevo botón para borrar **todos** los backups locales (`savecloud/backups`) con confirmación explícita.
 - **UI de progreso más limpia:**
   - Para operaciones sin porcentaje conocido (empaquetado, streaming), se muestra un spinner de HeroUI con mensaje en lugar de una barra indeterminada en movimiento.
 

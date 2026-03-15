@@ -102,7 +102,7 @@ export const EXCLUDED_FOLDER_NAMES = new Set([
   "logs",
   "cache",
   // Nuestro propio config
-  "sync-games",
+  "SaveCloud",
 ]);
 
 /**

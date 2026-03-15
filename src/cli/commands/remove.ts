@@ -104,7 +104,7 @@ function printResult(gameId: string, result: { removedGame: boolean; removedPath
 export async function runRemoveFromArgs(deps: CliDeps, args: string[]): Promise<void> {
   const gameId = args[1];
   if (!gameId) {
-    console.error("Uso: sync-games remove <game-id> [ruta]");
+    console.error("Uso: SaveCloud remove <game-id> [ruta]");
     throw new Error("Arguments are missing");
   }
   const path = args[2];

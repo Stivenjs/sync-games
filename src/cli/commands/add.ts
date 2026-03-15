@@ -99,7 +99,7 @@ export async function runAddFromArgs(deps: CliDeps, args: string[]): Promise<voi
   const gameId = args[1];
   const path = args[2];
   if (!gameId || !path) {
-    console.error("Uso: sync-games add <game-id> <ruta> [origen/edición] [url-descarga]");
+    console.error("Uso: SaveCloud add <game-id> <ruta> [origen/edición] [url-descarga]");
     throw new Error("Arguments are missing");
   }
   const editionLabel = args[3];

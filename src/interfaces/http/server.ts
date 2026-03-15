@@ -3,7 +3,7 @@ import { buildApp } from "@interfaces/http/app";
 import { S3SaveRepository } from "@infrastructure/persistence/S3SaveRepository";
 import { ShareTokenS3 } from "@infrastructure/share/ShareTokenS3";
 
-const bucketName = process.env.BUCKET_NAME ?? "sync-games-saves-dev";
+const bucketName = process.env.BUCKET_NAME ?? "SaveCloud-saves-dev";
 const s3 = new S3Client({
   region: process.env.AWS_REGION ?? "us-east-2",
   useAccelerateEndpoint: process.env.USE_ACCELERATE_ENDPOINT === "true",

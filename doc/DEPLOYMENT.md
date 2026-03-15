@@ -198,7 +198,7 @@ bun run desktop:build
 El instalador generado se ubicará en:
 
 ```
-apps/sync-games-desktop/src-tauri/target/release/bundle/
+apps/savecloud-desktop/src-tauri/target/release/bundle/
 ```
 
 ---

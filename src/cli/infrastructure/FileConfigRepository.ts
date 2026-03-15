@@ -21,9 +21,9 @@ function getConfigDir(): string {
 
 /**
  * Implementación del puerto ConfigRepository: archivo JSON en directorio de config del SO.
- * Windows: %APPDATA%/sync-games/config.json
- * macOS: ~/Library/Application Support/sync-games/config.json
- * Linux: ~/.config/sync-games/config.json
+ * Windows: %APPDATA%/SaveCloud/config.json
+ * macOS: ~/Library/Application Support/SaveCloud/config.json
+ * Linux: ~/.config/SaveCloud/config.json
  */
 export class FileConfigRepository implements ConfigRepository {
   private readonly configPath: string;

@@ -7,9 +7,9 @@ yarn.lock
 pnpm-lock.yaml
 .
 # Ignore files:
-apps/sync-games-desktop/src-tauri/target
-apps/sync-games-desktop/src-tauri/Cargo.lock
-apps/sync-games-desktop/src-tauri/Cargo.toml
+apps/savecloud-desktop/src-tauri/target
+apps/savecloud-desktop/src-tauri/Cargo.lock
+apps/savecloud-desktop/src-tauri/Cargo.toml
 
 .agents
 .vscode

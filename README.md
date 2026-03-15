@@ -23,7 +23,7 @@ Esta guía cubre la preparación del entorno, generación de API keys, configura
 ## Contenido del repositorio
 
 - **Backend (API + CLI):** raíz del repo — Fastify, TypeScript, despliegue en AWS Lambda + API Gateway, almacenamiento en S3.
-- **App de escritorio:** `apps/sync-games-desktop` — Tauri 2 (React + Vite + Rust), interfaz gráfica para gestionar juegos, subir/descargar guardados, amigos y configuración.
+- **App de escritorio:** `apps/savecloud-desktop` — Tauri 2 (React + Vite + Rust), interfaz gráfica para gestionar juegos, subir/descargar guardados, amigos y configuración.
 
 ## Stack del backend
 

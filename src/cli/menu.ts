@@ -90,7 +90,7 @@ export async function runInteractiveLoop(deps: CliDeps): Promise<void> {
     const { printWelcomeBanner } = await import("@cli/banner");
     await printWelcomeBanner();
   } catch {
-    console.log("\n  sync-games — Guardados en la nube\n");
+    console.log("\n  SaveCloud — Guardados en la nube\n");
   }
 
   while (true) {

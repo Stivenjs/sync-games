@@ -3,11 +3,11 @@ import * as commands from "@cli/commands";
 
 export function showHelp(): void {
   console.log(`
-sync-games — Sube y restaura guardados de juegos en la nube
+SaveCloud — Sube y restaura guardados de juegos en la nube
 
 Uso:
-  sync-games                    Menú interactivo
-  sync-games <comando> [args]    Modo comando
+  SaveCloud                   Menú interactivo
+  SaveCloud <comando> [args]    Modo comando
 
 Comandos:
   add <game-id> <ruta>    Añade un juego
@@ -20,8 +20,8 @@ Comandos:
   config                  Muestra ruta del config
 
 Ejemplos:
-  sync-games add elden-ring "%APPDATA%/EldenRing"
-  sync-games upload
+  SaveCloud add elden-ring "%APPDATA%/EldenRing"
+  SaveCloud upload
 `);
 }
 
