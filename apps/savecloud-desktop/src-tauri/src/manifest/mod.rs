@@ -2,7 +2,7 @@
 //! de juegos (Steam y otros). Fuente: https://github.com/mtkennerly/ludusavi-manifest
 //! Licencia del manifiesto: MIT (mtkennerly).
 
-use serde::Deserialize;
+use serde::{de::IgnoredAny, Deserialize};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
@@ -19,6 +19,9 @@ pub struct GameManifestEntry {
     /// Ruta de registro Windows (opcional).
     #[allow(dead_code)]
     pub registry_path: Option<String>,
+    /// Nombres de la carpeta de instalación base (ej. "Gnorp" o "The Witcher 3").
+    #[allow(dead_code)]
+    pub install_dirs: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,6 +42,8 @@ struct ManifestGame {
     #[serde(rename = "steamExtra")]
     steam_extra: Option<Vec<SteamId>>,
     registry: Option<String>,
+    #[serde(rename = "installDir")]
+    install_dir: Option<HashMap<String, IgnoredAny>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -206,6 +211,15 @@ fn parse_manifest_yaml(content: &str) -> Result<ManifestIndex, String> {
             }
         }
 
+        let mut install_dirs = Vec::new();
+        if let Some(dirs) = game_data.install_dir {
+            for (dir_name, _) in dirs {
+                if !dir_name.trim().is_empty() {
+                    install_dirs.push(dir_name.clone());
+                }
+            }
+        }
+
         let entry = GameManifestEntry {
             name: game_name,
             save_paths,
@@ -213,6 +227,7 @@ fn parse_manifest_yaml(content: &str) -> Result<ManifestIndex, String> {
                 .registry
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty()),
+            install_dirs,
         };
 
         for id in steam_ids {
