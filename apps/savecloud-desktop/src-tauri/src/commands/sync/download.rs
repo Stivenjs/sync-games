@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
-use std::time::{Duration, UNIX_EPOCH};
-
 use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::sync::LazyLock;
+use std::time::{Duration, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
 use futures_util::stream::{self, StreamExt};
@@ -20,6 +20,14 @@ use super::models::{
 use super::path_utils;
 use crate::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
+
+static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .user_agent("SaveCloud-desktop/1.0")
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .expect("Fallo al construir el cliente HTTP de descargas")
+});
 
 /// Calcula los conflictos de descarga para un juego dado su ruta base y la lista de saves remotos.
 fn check_conflicts_for_game(
@@ -98,6 +106,7 @@ pub async fn sync_check_download_conflicts_batch(
     let cfg = crate::config::load_config();
     let all = api::sync_list_remote_saves().await?;
     let mut results = Vec::with_capacity(game_ids.len());
+
     for game_id in game_ids {
         let game = match cfg
             .games
@@ -128,6 +137,7 @@ pub async fn sync_check_download_conflicts_batch(
             .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
             .cloned()
             .collect();
+
         let conflicts = check_conflicts_for_game(&game_id, &dest_base, &saves);
         results.push(GameConflictsResultDto {
             game_id: game_id.clone(),
@@ -138,8 +148,7 @@ pub async fn sync_check_download_conflicts_batch(
 }
 
 /// Tolerancia (segundos) al comparar local vs nube: solo consideramos "pendiente subir" si
-/// el archivo local es claramente más reciente. Evita falsos positivos por precisión (S3 en
-/// segundos, FS con subsegundos) o por desfase de reloj tras subir/descargar.
+/// el archivo local es claramente más reciente. Evita falsos positivos.
 const UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS: i64 = 2;
 
 #[tauri::command]
@@ -192,11 +201,13 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
             match remote_map.get(&key) {
                 None => has_unsynced = true,
                 Some(&cloud_dt) => {
-                    // Solo "pendiente subir" si local es claramente más reciente (por encima de tolerancia).
                     if local_dt > cloud_dt + tolerance {
                         has_unsynced = true;
                     }
                 }
+            }
+            if has_unsynced {
+                break;
             }
         }
 
@@ -211,13 +222,11 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
 }
 
 const DOWNLOAD_PROGRESS_EMIT_BYTES: u64 = 256 * 1024;
-/// Archivos descargados en paralelo por juego.
-/// 8–16 suele ser óptimo; más puede saturar la conexión o el disco y empeorar.
 const DOWNLOAD_FILE_CONCURRENCY: usize = 16;
 
 /// Mensaje claro cuando no se puede escribir (archivo en uso o sin permisos).
 fn file_write_error_message(filename: &str, e: &std::io::Error) -> String {
-    let is_access_denied = e.kind() == ErrorKind::PermissionDenied || e.raw_os_error() == Some(5); // ERROR_ACCESS_DENIED on Windows
+    let is_access_denied = e.kind() == ErrorKind::PermissionDenied || e.raw_os_error() == Some(5);
     if is_access_denied {
         format!(
             "{}: archivo en uso o sin permisos (cierra el juego u otra app que lo use)",
@@ -228,9 +237,8 @@ fn file_write_error_message(filename: &str, e: &std::io::Error) -> String {
     }
 }
 
-/// Descarga un solo archivo (para ejecutar en paralelo con otros).
+/// Descarga un solo archivo usando el DOWNLOAD_CLIENT estático.
 async fn download_one_file(
-    client: &reqwest::Client,
     dest_base: &std::path::Path,
     backup_dir: Option<&std::path::Path>,
     save: &RemoteSaveInfoDto,
@@ -242,6 +250,8 @@ async fn download_one_file(
     if let Some(parent) = dest_path.parent() {
         let _ = fs::create_dir_all(parent);
     }
+
+    // Backup local antes de sobrescribir
     if dest_path.exists() {
         if let Some(backup_base) = backup_dir {
             if let Ok(rel) = dest_path.strip_prefix(dest_base) {
@@ -254,11 +264,12 @@ async fn download_one_file(
         }
     }
 
-    let res = client
+    let res = DOWNLOAD_CLIENT
         .get(download_url)
         .send()
         .await
         .map_err(|e| format!("{}: {}", save.filename, e))?;
+
     let total = res.content_length().or(save.size).unwrap_or(0);
     let mut loaded: u64 = 0;
     let mut last_emit: u64 = 0;
@@ -274,14 +285,14 @@ async fn download_one_file(
                 match tokio::fs::File::create(&dest_path).await {
                     Ok(f) => f,
                     Err(e2) => {
-                        let msg =
-                            file_write_error_message(&save.filename, &std::io::Error::from(e2));
-                        return Err(msg);
+                        return Err(file_write_error_message(
+                            &save.filename,
+                            &std::io::Error::from(e2),
+                        ))
                     }
                 }
             } else {
-                let msg = file_write_error_message(&save.filename, &e);
-                return Err(msg);
+                return Err(file_write_error_message(&save.filename, &e));
             }
         }
     };
@@ -291,6 +302,7 @@ async fn download_one_file(
 
     let mut stream = res.bytes_stream();
     let mut write_err: Option<String> = None;
+
     while let Some(chunk_result) = stream.next().await {
         match chunk_result {
             Ok(chunk) => {
@@ -324,6 +336,7 @@ async fn download_one_file(
             }
         }
     }
+
     if total > 0 && loaded < total {
         let _ = app.emit(
             "sync-download-progress",
@@ -335,6 +348,7 @@ async fn download_one_file(
             },
         );
     }
+
     if write_err.is_none() {
         if let Err(e) = writer.flush().await {
             write_err = Some(file_write_error_message(
@@ -343,6 +357,7 @@ async fn download_one_file(
             ));
         }
     }
+
     match write_err {
         Some(e) => Err(e),
         None => Ok(()),
@@ -358,7 +373,8 @@ pub async fn sync_download_game(
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    let result = sync_download_game_impl(game_id.clone(), app.clone()).await;
+    // Como es un solo juego, le pasamos None para que obtenga la lista él mismo
+    let result = sync_download_game_impl(game_id.clone(), app.clone(), None).await;
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
@@ -367,7 +383,12 @@ pub async fn sync_download_game(
     result
 }
 
-async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<SyncResultDto, String> {
+// Ahora acepta prefetched_saves para evitar el problema N+1 en las llamadas batch
+pub(crate) async fn sync_download_game_impl(
+    game_id: String,
+    app: AppHandle,
+    prefetched_saves: Option<Vec<RemoteSaveInfoDto>>,
+) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
         .games
@@ -399,11 +420,16 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
         None => return Err("No se pudo expandir la ruta de destino".into()),
     };
 
-    let all = api::sync_list_remote_saves().await?;
-    let saves: Vec<_> = all
-        .into_iter()
-        .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
-        .collect();
+    // Usamos la lista proveída por el lote, o la descargamos si es una descarga individual
+    let saves: Vec<_> = match prefetched_saves {
+        Some(s) => s,
+        None => {
+            let all = api::sync_list_remote_saves().await?;
+            all.into_iter()
+                .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
+                .collect()
+        }
+    };
 
     if saves.is_empty() {
         let result = SyncResultDto {
@@ -427,12 +453,14 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
 
     const DOWNLOAD_URLS_BATCH_SIZE: usize = 500;
     let mut download_urls = Vec::with_capacity(saves.len());
+
     for chunk in items.chunks(DOWNLOAD_URLS_BATCH_SIZE) {
         let batch = api::get_download_urls(api_base, user_id, api_key, chunk)
             .await
             .map_err(|e| format!("download-urls: {}", e))?;
         download_urls.extend(batch);
     }
+
     if download_urls.len() != saves.len() {
         return Err(format!(
             "API devolvió {} URLs para {} archivos",
@@ -440,11 +468,6 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
             saves.len()
         ));
     }
-
-    let client = reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .build()
-        .map_err(|e| e.to_string())?;
 
     let backup_dir = crate::config::config_dir().map(|root| {
         let ts = chrono::Utc::now().format("%Y-%m-%d_%H-%M-%S");
@@ -458,14 +481,13 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
             .map(|(save, (download_url, _))| (save, download_url)),
     )
     .map(|(save, download_url)| {
-        let client = client.clone();
         let dest_base = dest_base.clone();
         let backup_dir = backup_dir.clone();
         let game_id = game_id.clone();
         let app = app.clone();
+
         async move {
             download_one_file(
-                &client,
                 &dest_base,
                 backup_dir.as_deref(),
                 &save,
@@ -507,15 +529,9 @@ async fn sync_download_game_impl(game_id: String, app: AppHandle) -> Result<Sync
     Ok(result)
 }
 
-/// Número de juegos que se descargan en paralelo en "descargar todos" (solo archivos, no empaquetados).
 const DOWNLOAD_BATCH_CONCURRENCY: usize = 4;
-
-/// Máximo de restauraciones de backups empaquetados en paralelo (evita saturar disco/CPU).
 const RESTORE_PACKAGED_CONCURRENCY: usize = 2;
 
-/// Descarga los guardados de todos los juegos. Si un juego tiene backup empaquetado en la nube,
-/// restaura ese .tar (descarga + extracción); si no, descarga archivo a archivo. Restauraciones
-/// empaquetadas se limitan a RESTORE_PACKAGED_CONCURRENCY para no saturar el PC.
 #[tauri::command]
 pub async fn sync_download_all_games(
     app: AppHandle,
@@ -565,18 +581,20 @@ pub async fn sync_download_all_games(
         .map(|g| g.id.clone())
         .collect();
 
-    let api_base = api_base.to_string();
-    let user_id = user_id.to_string();
+    let api_base_owned = api_base.to_string();
+    let user_id_owned = user_id.to_string();
+
     let backups_fetched: Vec<(String, Option<String>)> = stream::iter(to_process.clone())
         .map(|game_id| {
-            let api_base = api_base.clone();
-            let user_id = user_id.clone();
+            let api_base = api_base_owned.clone();
+            let user_id = user_id_owned.clone();
             async move {
                 let list =
                     super::full_backup::list_cloud_backups(&api_base, &user_id, api_key, &game_id)
                         .await
                         .ok()
                         .filter(|l| !l.is_empty());
+
                 let backup_key = list.and_then(|mut list| {
                     list.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
                     list.into_iter().next().map(|b| b.key)
@@ -588,17 +606,19 @@ pub async fn sync_download_all_games(
         .collect()
         .await;
 
-    let (to_restore, to_download_normal): (Vec<_>, Vec<_>) = backups_fetched
-        .into_iter()
-        .partition(|(_, key)| key.is_some());
-    let to_restore: Vec<(String, String)> = to_restore
-        .into_iter()
-        .map(|(id, k)| (id, k.unwrap()))
-        .collect();
-    let to_download_normal: Vec<String> =
-        to_download_normal.into_iter().map(|(id, _)| id).collect();
+    let mut to_restore = Vec::new();
+    let mut to_download_normal = Vec::new();
+
+    for (id, key_opt) in backups_fetched {
+        if let Some(k) = key_opt {
+            to_restore.push((id, k));
+        } else {
+            to_download_normal.push(id);
+        }
+    }
 
     let tray_inner = tray_state.0.clone();
+
     let restore_results: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_restore)
         .map(|(game_id, backup_key)| {
             let app = app.clone();
@@ -612,6 +632,7 @@ pub async fn sync_download_all_games(
                     false,
                 )
                 .await;
+
                 let result = match r {
                     Ok(()) => SyncResultDto {
                         ok_count: 1,
@@ -632,22 +653,53 @@ pub async fn sync_download_all_games(
         .await;
 
     for (game_id, r) in restore_results {
-        let result = match r {
-            Ok(x) => x,
-            Err(e) => SyncResultDto {
-                ok_count: 0,
-                err_count: 1,
-                errors: vec![e],
-            },
-        };
+        let result = r.unwrap_or_else(|e| SyncResultDto {
+            ok_count: 0,
+            err_count: 1,
+            errors: vec![e],
+        });
         results_by_id.insert(game_id.clone(), GameSyncResultDto { game_id, result });
     }
+
+    let all_saves = if !to_download_normal.is_empty() {
+        match api::sync_list_remote_saves().await {
+            Ok(s) => s,
+            Err(e) => {
+                for game_id in to_download_normal {
+                    results_by_id.insert(
+                        game_id.clone(),
+                        GameSyncResultDto {
+                            game_id,
+                            result: SyncResultDto {
+                                ok_count: 0,
+                                err_count: 1,
+                                errors: vec![format!("Fallo al contactar API: {}", e)],
+                            },
+                        },
+                    );
+                }
+                return Ok(cfg
+                    .games
+                    .iter()
+                    .filter_map(|g| results_by_id.get(&g.id).cloned())
+                    .collect());
+            }
+        }
+    } else {
+        Vec::new()
+    };
 
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_download_normal)
         .map(|game_id| {
             let app = app.clone();
+            let game_saves: Vec<_> = all_saves
+                .iter()
+                .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
+                .cloned()
+                .collect();
+
             async move {
-                let r = sync_download_game_impl(game_id.clone(), app).await;
+                let r = sync_download_game_impl(game_id.clone(), app, Some(game_saves)).await;
                 (game_id, r)
             }
         })
@@ -656,14 +708,11 @@ pub async fn sync_download_all_games(
         .await;
 
     for (game_id, r) in completed {
-        let result = match r {
-            Ok(x) => x,
-            Err(e) => SyncResultDto {
-                ok_count: 0,
-                err_count: 1,
-                errors: vec![e],
-            },
-        };
+        let result = r.unwrap_or_else(|e| SyncResultDto {
+            ok_count: 0,
+            err_count: 1,
+            errors: vec![e],
+        });
         results_by_id.insert(game_id.clone(), GameSyncResultDto { game_id, result });
     }
 
@@ -678,7 +727,6 @@ pub async fn sync_download_all_games(
 
     let _ = app.emit("sync-download-done", ());
 
-    let cfg = crate::config::load_config();
     let keep = cfg
         .keep_backups_per_game
         .unwrap_or(backup::DEFAULT_KEEP_BACKUPS_PER_GAME);

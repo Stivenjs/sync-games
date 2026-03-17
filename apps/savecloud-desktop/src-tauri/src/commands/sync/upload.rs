@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufReader, Read};
+use std::sync::LazyLock;
 
 use super::api;
 use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
@@ -25,6 +26,14 @@ const SIMPLE_PUT_CONCURRENCY: usize = 24;
 /// el usuario debe usar "Empaquetar y subir" obligatoriamente.
 const LARGE_GAME_BLOCK_FILE_COUNT: usize = 200;
 const LARGE_GAME_BLOCK_SIZE_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
+
+static UPLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .user_agent("SaveCloud-desktop/1.0")
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .expect("Fallo al construir cliente HTTP de subidas")
+});
 
 /// Stream que recibe chunks de un canal (llenado por un hilo que lee el archivo).
 #[allow(dead_code)]
@@ -54,6 +63,7 @@ fn file_stream_with_progress(
 ) -> Result<FileProgressStream, String> {
     let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(2);
     let absolute = absolute.to_path_buf();
+
     std::thread::spawn(move || {
         let file = match fs::File::open(&absolute) {
             Ok(f) => f,
@@ -62,11 +72,12 @@ fn file_stream_with_progress(
                 return;
             }
         };
-        const READ_BUF_SIZE: usize = 256 * 1024;
-        let mut reader = BufReader::with_capacity(READ_BUF_SIZE, file);
+
+        let mut reader = BufReader::with_capacity(PROGRESS_CHUNK_BYTES, file);
         let mut loaded: u64 = 0;
         let mut last_emit: u64 = 0;
         let mut buf = vec![0u8; PROGRESS_CHUNK_BYTES];
+
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
@@ -86,6 +97,7 @@ fn file_stream_with_progress(
                             },
                         );
                     }
+
                     let chunk = Bytes::from(buf[..n].to_vec());
                     if tx.blocking_send(Ok(chunk)).is_err() {
                         break;
@@ -97,6 +109,7 @@ fn file_stream_with_progress(
                 }
             }
         }
+
         if loaded > 0 && loaded < total {
             let _ = app.emit(
                 "sync-upload-progress",
@@ -223,7 +236,6 @@ pub(crate) async fn sync_upload_game_impl(
         });
     }
 
-    // Archivos grandes (>= umbral) se suben por multipart (pausable/cancelable).
     let files_with_size: Vec<((String, String), u64)> = files
         .iter()
         .map(|(abs, rel)| {
@@ -236,9 +248,8 @@ pub(crate) async fn sync_upload_game_impl(
 
     let file_count = files_with_size.len();
     let total_size: u64 = files_with_size.iter().map(|(_, s)| s).sum();
-    if file_count >= LARGE_GAME_BLOCK_FILE_COUNT
-        || total_size >= LARGE_GAME_BLOCK_SIZE_BYTES
-    {
+
+    if file_count >= LARGE_GAME_BLOCK_FILE_COUNT || total_size >= LARGE_GAME_BLOCK_SIZE_BYTES {
         return Err(format!(
             "Este juego es demasiado grande para subir archivo a archivo ({} archivos, {} MB). Usa \"Empaquetar y subir\" desde el menú del juego.",
             file_count,
@@ -254,14 +265,13 @@ pub(crate) async fn sync_upload_game_impl(
     let mut err_count = 0u32;
     let mut errors = Vec::new();
 
-    // Subida multipart para archivos grandes.
     for ((absolute, relative), total) in multipart_files {
         if let Some(ref t) = tray_inner {
-            if t.upload_pause_requested() {
+            if t.upload_pause_requested() || t.upload_cancel_requested() {
                 break;
             }
         }
-        let cancel = tray_inner.clone();
+
         match multipart_upload::upload_one_file_multipart(
             std::path::Path::new(&absolute),
             &relative,
@@ -271,7 +281,7 @@ pub(crate) async fn sync_upload_game_impl(
             user_id,
             api_key,
             app.clone(),
-            cancel,
+            tray_inner.clone(),
         )
         .await
         {
@@ -285,6 +295,7 @@ pub(crate) async fn sync_upload_game_impl(
                             "filename": relative,
                         }),
                     );
+                    break;
                 } else {
                     super::sync_logger::log_error(
                         "upload_multipart",
@@ -298,15 +309,17 @@ pub(crate) async fn sync_upload_game_impl(
         }
     }
 
-    // Subida PUT simple para archivos pequeños. Pedir URLs por lotes (máx 500 por petición) para no saturar Lambda.
     const UPLOAD_URLS_BATCH_SIZE: usize = 500;
     if !simple_files.is_empty() {
+        let total_simple = simple_files.len();
         super::sync_logger::log_operation(
             "upload_simple_batch",
-            &format!("gameId={} file_count={}", game_id, simple_files.len()),
+            &format!("gameId={} file_count={}", game_id, total_simple),
         );
+
         let filenames: Vec<String> = simple_files.iter().map(|((_, r), _)| r.clone()).collect();
         let mut upload_urls = Vec::with_capacity(filenames.len());
+
         for chunk in filenames.chunks(UPLOAD_URLS_BATCH_SIZE) {
             let batch = api::get_upload_urls(api_base, user_id, api_key, &game_id, chunk)
                 .await
@@ -320,29 +333,19 @@ pub(crate) async fn sync_upload_game_impl(
                 })?;
             upload_urls.extend(batch);
         }
-        if upload_urls.len() != simple_files.len() {
+
+        if upload_urls.len() != total_simple {
             return Err(format!(
                 "API devolvió {} URLs para {} archivos",
                 upload_urls.len(),
-                simple_files.len()
+                total_simple
             ));
         }
 
-        let total_simple = upload_urls.len();
         super::sync_logger::log_operation(
             "upload_simple_urls_ok",
-            &format!(
-                "gameId={} total={} batches={}",
-                game_id,
-                total_simple,
-                (total_simple + UPLOAD_URLS_BATCH_SIZE - 1) / UPLOAD_URLS_BATCH_SIZE
-            ),
+            &format!("gameId={} total={}", game_id, total_simple),
         );
-
-        let client = reqwest::Client::builder()
-            .user_agent("SaveCloud-desktop/1.0")
-            .build()
-            .map_err(|e| e.to_string())?;
 
         let items: Vec<_> = simple_files
             .into_iter()
@@ -352,42 +355,33 @@ pub(crate) async fn sync_upload_game_impl(
 
         let mut put_count: usize = 0;
         let mut stream = stream::iter(items)
-            .map(|(absolute, relative, total, upload_url)| {
-                let client = client.clone();
-                async move {
-                    let body = match tokio::fs::read(&absolute).await {
-                        Ok(b) => b,
-                        Err(e) => {
-                            return Err((
-                                relative.clone(),
-                                absolute,
-                                format!("{}: {}", relative, e),
-                            ));
-                        }
-                    };
-                    let put_res = match client
-                        .put(&upload_url)
-                        .body(body)
-                        .header("Content-Type", "application/octet-stream")
-                        .header("Content-Length", total.to_string())
-                        .send()
-                        .await
-                    {
-                        Ok(r) => r,
-                        Err(e) => {
-                            return Err((
-                                relative.clone(),
-                                absolute,
-                                format!("{}: {}", relative, e),
-                            ));
-                        }
-                    };
-                    if put_res.status().is_success() {
-                        Ok(())
-                    } else {
-                        let msg = format!("{}: S3 PUT {}", relative, put_res.status());
-                        Err((relative, absolute, msg))
+            .map(|(absolute, relative, total, upload_url)| async move {
+                let body = match tokio::fs::read(&absolute).await {
+                    Ok(b) => b,
+                    Err(e) => {
+                        return Err((relative.clone(), absolute, format!("{}: {}", relative, e)))
                     }
+                };
+
+                let put_res = match UPLOAD_CLIENT
+                    .put(&upload_url)
+                    .body(body)
+                    .header("Content-Type", "application/octet-stream")
+                    .header("Content-Length", total.to_string())
+                    .send()
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        return Err((relative.clone(), absolute, format!("{}: {}", relative, e)))
+                    }
+                };
+
+                if put_res.status().is_success() {
+                    Ok(())
+                } else {
+                    let msg = format!("{}: S3 PUT {}", relative, put_res.status());
+                    Err((relative, absolute, msg))
                 }
             })
             .buffer_unordered(SIMPLE_PUT_CONCURRENCY);
@@ -398,6 +392,7 @@ pub(crate) async fn sync_upload_game_impl(
                     break;
                 }
             }
+
             put_count += 1;
             if put_count % 500 == 0 {
                 super::sync_logger::log_operation(
@@ -405,6 +400,7 @@ pub(crate) async fn sync_upload_game_impl(
                     &format!("gameId={} done={}/{}", game_id, put_count, total_simple),
                 );
             }
+
             match result {
                 Ok(()) => ok_count += 1,
                 Err((relative, absolute, err_msg)) => {
@@ -431,7 +427,6 @@ pub(crate) async fn sync_upload_game_impl(
         errors,
     };
 
-    // Registrar en historial (errores o éxito).
     let _ =
         crate::config::append_operation_log("upload", &game_id, result.ok_count, result.err_count);
 
@@ -465,6 +460,7 @@ pub async fn sync_upload_all_games(
     tray_state.0.update_tooltip();
 
     let mut results_by_id: HashMap<String, GameSyncResultDto> = HashMap::new();
+
     for game in &cfg.games {
         if crate::process_check::is_game_running(&game.id, &game.paths) {
             let game_id = game.id.clone();
@@ -495,6 +491,7 @@ pub async fn sync_upload_all_games(
     for game_id in &to_sync {
         tray_state.0.clear_restore_cooldown(game_id);
     }
+
     let tray_inner = Some(tray_state.0.clone());
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_sync)
         .map(|game_id| {
