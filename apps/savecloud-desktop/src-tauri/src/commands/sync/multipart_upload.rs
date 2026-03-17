@@ -8,7 +8,8 @@
 
 use std::collections::HashMap;
 use std::io::SeekFrom;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use super::api;
 use super::models::SyncProgressPayload;
@@ -18,10 +19,18 @@ use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-/// Mensaje de error cuando la subida se pausó (el caller puede emitir evento y no contar como error).
 pub const PAUSED_ERR_MSG: &str = "PAUSED";
 
 const PAUSED_STATE_FILE: &str = "paused_upload.json";
+
+static MULTIPART_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .user_agent("SaveCloud-desktop/1.0")
+        .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .build()
+        .expect("Fallo al construir cliente HTTP multipart")
+});
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -199,8 +208,7 @@ async fn multipart_init(
     Ok((parsed.upload_id, parsed.key))
 }
 
-/// Inicia multipart y obtiene todas las URLs de partes en una sola llamada (menos invocaciones Lambda).
-/// Devuelve None si la API no soporta el endpoint (404) o falla por otro motivo; el caller puede usar init + part-urls.
+/// Inicia multipart y obtiene todas las URLs de partes en una sola llamada.
 async fn multipart_init_with_part_urls(
     api_base: &str,
     user_id: &str,
@@ -307,7 +315,7 @@ async fn multipart_part_urls(
         .collect())
 }
 
-/// Pide URLs de partes en lotes (para fallback o cuando num_parts > MAX_PARTS_INIT_WITH_URLS).
+/// Pide URLs de partes en lotes.
 async fn fetch_part_urls_in_batches(
     api_base: &str,
     user_id: &str,
@@ -419,8 +427,6 @@ async fn multipart_abort(
 }
 
 /// Sube un archivo mediante multipart. Emite progreso y respeta cancelación entre partes.
-///
-/// `cancel`: si se proporciona (p. ej. `Arc<TrayStateInner>`), se comprueba entre partes; si está en true se hace abort y se devuelve error.
 pub(crate) async fn upload_one_file_multipart(
     absolute_path: &Path,
     relative_filename: &str,
@@ -511,13 +517,6 @@ pub(crate) async fn upload_one_file_multipart(
         (uid, k, map)
     };
 
-    let client = reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
-        .build()
-        .map_err(|e| e.to_string())?;
-
     let path_buf = absolute_path.to_path_buf();
     let game_id_owned = game_id.to_string();
     let filename_owned = relative_filename.to_string();
@@ -539,7 +538,6 @@ pub(crate) async fn upload_one_file_multipart(
 
     let mut stream = stream::iter(jobs)
         .map(|(part_number, start, part_len, url)| {
-            let client = client.clone();
             let path = path_buf.clone();
             async move {
                 let mut f = tokio::fs::File::open(&path)
@@ -552,7 +550,8 @@ pub(crate) async fn upload_one_file_multipart(
                 AsyncReadExt::read_exact(&mut f, &mut buf)
                     .await
                     .map_err(|e| format!("leer parte {}: {}", part_number, e))?;
-                let res = client
+
+                let res = MULTIPART_CLIENT
                     .put(&url)
                     .body(buf)
                     .header("Content-Type", "application/octet-stream")
@@ -637,7 +636,7 @@ pub(crate) async fn upload_one_file_multipart(
     Ok(())
 }
 
-/// Reanuda una subida multipart desde el estado guardado en disco.
+/// Reanuda una subida multipart desde el estado guardado en disco con concurrencia.
 pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), String> {
     let state = load_paused_state().ok_or("No hay ninguna subida pausada")?;
 
@@ -665,10 +664,12 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         .iter()
         .map(|p| p.part_number)
         .collect();
+
     let remaining: Vec<u32> = (1..=num_parts)
         .filter(|n| !completed_set.contains(n))
         .collect();
 
+    // Si ya no faltan partes, completamos
     if remaining.is_empty() {
         multipart_complete(
             api_base,
@@ -696,14 +697,7 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         return Ok(());
     }
 
-    let client = reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    // Pedir URLs de las partes restantes en lotes (con reintentos).
+    // Pedir URLs de las partes restantes en lotes
     let part_urls: HashMap<u32, String> = {
         let mut map = HashMap::with_capacity(remaining.len());
         for chunk in remaining.chunks(PARTS_PER_URL_BATCH as usize) {
@@ -726,65 +720,71 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         map
     };
 
-    let mut file = tokio::fs::File::open(&state.absolute_path)
-        .await
-        .map_err(|e| format!("abrir archivo para reanudar: {}", e))?;
     let mut all_parts: Vec<(u32, String)> = state
         .completed_parts
         .iter()
         .map(|p| (p.part_number, p.etag.clone()))
         .collect();
 
-    for part_number in &remaining {
-        let start = (*part_number - 1) as u64 * PART_SIZE;
-        let part_len = std::cmp::min(PART_SIZE, state.total_size.saturating_sub(start));
-        file.seek(SeekFrom::Start(start))
-            .await
-            .map_err(|e| format!("seek parte {}: {}", part_number, e))?;
-        let mut buf = vec![0u8; part_len as usize];
-        file.read_exact(&mut buf)
-            .await
-            .map_err(|e| format!("leer parte {}: {}", part_number, e))?;
+    let path_buf = PathBuf::from(&state.absolute_path);
+    let mut loaded = (all_parts.len() as u64) * PART_SIZE;
 
-        let url = part_urls
-            .get(part_number)
-            .ok_or_else(|| format!("Falta URL para parte {}", part_number))?
-            .clone();
+    // Concurrencia para la reanudación
+    let jobs: Vec<(u32, u64, u64, String)> = remaining
+        .into_iter()
+        .map(|part_number| {
+            let start = (part_number - 1) as u64 * PART_SIZE;
+            let part_len = std::cmp::min(PART_SIZE, state.total_size.saturating_sub(start));
+            let url = part_urls
+                .get(&part_number)
+                .cloned()
+                .expect("Falta URL de parte en resume");
+            (part_number, start, part_len, url)
+        })
+        .collect();
 
-        let put_res = match with_retry(|| {
-            let body = buf.clone();
-            let c = client.clone();
-            let u = url.clone();
+    let mut stream = stream::iter(jobs)
+        .map(|(part_number, start, part_len, url)| {
+            let path = path_buf.clone();
             async move {
-                let res = c
-                    .put(&u)
-                    .body(body)
+                let mut f = tokio::fs::File::open(&path)
+                    .await
+                    .map_err(|e| format!("abrir archivo para reanudar {}: {}", part_number, e))?;
+                f.seek(SeekFrom::Start(start))
+                    .await
+                    .map_err(|e| format!("seek parte {}: {}", part_number, e))?;
+                let mut buf = vec![0u8; part_len as usize];
+                AsyncReadExt::read_exact(&mut f, &mut buf)
+                    .await
+                    .map_err(|e| format!("leer parte {}: {}", part_number, e))?;
+
+                let res = MULTIPART_CLIENT
+                    .put(&url)
+                    .body(buf)
                     .header("Content-Type", "application/octet-stream")
                     .send()
                     .await
                     .map_err(|e| format!("PUT parte {}: {}", part_number, e))?;
+
                 if !res.status().is_success() {
                     return Err(format!("parte {}: S3 PUT {}", part_number, res.status()));
                 }
-                Ok(res)
+                let etag = res
+                    .headers()
+                    .get("etag")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                Ok((part_number, etag, part_len))
             }
         })
-        .await
-        {
-            Ok(r) => r,
-            Err(e) => return Err(e),
-        };
+        .buffer_unordered(MULTIPART_PUT_CONCURRENCY);
 
-        let etag = put_res
-            .headers()
-            .get("etag")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+    while let Some(result) = stream.next().await {
+        let (part_number, etag, part_len) = result?;
+        all_parts.push((part_number, etag));
+        loaded = std::cmp::min(loaded + part_len, state.total_size);
 
-        all_parts.push((*part_number, etag));
-
-        let loaded = std::cmp::min(start + part_len, state.total_size);
         let _ = app.emit(
             "sync-upload-progress",
             SyncProgressPayload {

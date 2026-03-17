@@ -436,7 +436,6 @@ fn base_scan_jobs(cfg: &config::Config) -> Vec<(String, String)> {
         if trimmed.is_empty() {
             continue;
         }
-
         let path = expand_path(trimmed).unwrap_or_else(|| trimmed.to_string());
         if !Path::new(&path).exists() {
             continue;
@@ -454,17 +453,15 @@ fn base_scan_jobs(cfg: &config::Config) -> Vec<(String, String)> {
         }
         jobs.push((path, "Personalizada".to_string()));
     }
-
     jobs
 }
 
 fn scan_path_candidates_sync(
-    manifest_index: Option<crate::manifest::ManifestIndex>,
+    #[cfg(target_os = "windows")] manifest_index: Option<crate::manifest::ManifestIndex>,
 ) -> Vec<PathCandidateDto> {
     let cfg = config::load_config();
     let mut list = CandidateList::new();
 
-    // Escaneo paralelo de rutas base (mantenemos Rayon porque es muy rápido para el disco)
     let parallel_candidates: Vec<PathCandidateDto> = base_scan_jobs(&cfg)
         .par_iter()
         .flat_map(|(base_path, label)| scan_base_paths_into_vec(base_path, label))
@@ -474,8 +471,7 @@ fn scan_path_candidates_sync(
 
     #[cfg(target_os = "windows")]
     {
-        let path_to_appid = steam::get_steam_path_to_appid_map();
-
+        let path_to_appid = crate::steam::get_steam_path_to_appid_map();
         windows_scanners::scan_steam(&mut list, &path_to_appid, &manifest_index);
         windows_scanners::scan_cracks(&mut list, &manifest_index);
     }
@@ -493,13 +489,19 @@ fn scan_path_candidates_sync(
 
 #[tauri::command]
 pub async fn scan_path_candidates() -> Result<Vec<PathCandidateDto>, String> {
-    // Descargamos/cargamos el manifiesto de forma asíncrona primero.
-    // Usamos .ok() para convertir el Result a Option, de modo que si falla la red,
-    // el escáner siga funcionando (aunque con menor precisión al no tener el manifiesto).
+    #[cfg(target_os = "windows")]
     let manifest_index = crate::manifest::load_manifest_index_async().await.ok();
 
-    // Mandamos la tarea pesada de leer el disco al pool de hilos de bloqueo
-    tauri::async_runtime::spawn_blocking(move || scan_path_candidates_sync(manifest_index))
-        .await
-        .map_err(|e| format!("Error en el hilo de escaneo: {}", e))
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            scan_path_candidates_sync(manifest_index)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            scan_path_candidates_sync()
+        }
+    })
+    .await
+    .map_err(|e| format!("Error en el hilo de escaneo: {}", e))
 }
