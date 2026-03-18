@@ -17,6 +17,7 @@ function App() {
   return (
     <SyncProgressProvider>
       <TrayActionsListener />
+
       <UnsyncedSavesModalWithProgress />
 
       <AppLayout navItems={NAV_ITEMS} activeNavId={activeNavId} onNavSelect={setActiveNavId}>
