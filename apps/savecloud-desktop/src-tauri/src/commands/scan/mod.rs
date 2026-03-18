@@ -599,9 +599,7 @@ fn scan_path_candidates_sync(
     let cfg = config::load_config();
     let mut list = CandidateList::new();
 
-    // ==========================================================
-    // FASE 0: Escaneo Activo desde la Base de Datos (MULTIHILO SÚPER RÁPIDO)
-    // ==========================================================
+    
     #[cfg(target_os = "windows")]
     if let Some(manifest) = &manifest_index {
         let mut unique_entries = Vec::new();
@@ -671,7 +669,7 @@ fn scan_path_candidates_sync(
                     }
                 }
 
-                // AGRUPACIÓN: Si un juego de Ludusavi tiene múltiples rutas, las agrupamos en un solo DTO.
+            // Si un juego de Ludusavi tiene múltiples rutas, las agrupamos en un solo DTO.
                 if !valid_game_paths.is_empty() {
                     let display_path = valid_game_paths[0].clone();
                     let paths_opt = if valid_game_paths.len() > 1 {
@@ -695,7 +693,6 @@ fn scan_path_candidates_sync(
 
         list.extend(active_candidates);
     }
-    // ==========================================================
 
     let parallel_candidates: Vec<PathCandidateDto> = base_scan_jobs(&cfg)
         .par_iter()
@@ -713,15 +710,11 @@ fn scan_path_candidates_sync(
 
     let (final_candidates, _) = list.into_inner();
 
-    // ==========================================================
-    // ELIMINADOR DE REDUNDANCIAS (Sabueso vs Fase 0)
-    // ==========================================================
+ 
     let mut filtered_candidates = Vec::new();
     for cand in &final_candidates {
         if cand.base_path != "Base de Datos Oficial" {
-            // Si el sabueso encontró una carpeta, verificamos que no sea redundante.
-            // Ej: Sabueso encontró "AppData/Local/DeadIsland".
-            // Ludusavi ya tiene "AppData/Local/DeadIsland/Saved". Borramos la del Sabueso.
+      
             let is_redundant = final_candidates.iter().any(|official| {
                 if official.base_path == "Base de Datos Oficial" {
                     let cand_path_lower = cand.path.to_lowercase();
