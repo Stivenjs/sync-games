@@ -12,6 +12,16 @@
 
 Servidor de guardado en la nube para juegos (S3 + Lambda) y app de escritorio para sincronizar guardados. Clean Architecture en backend y CLI.
 
+---
+
+## Vista de la aplicación
+
+<p align="center">
+  <img src="./docs/images/preview.png" width="800" />
+</p>
+
+---
+
 ## Guía de despliegue
 
 La infraestructura backend y la configuración completa del proyecto se explican en la guía de despliegue disponible en:
