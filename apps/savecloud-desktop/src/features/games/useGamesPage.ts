@@ -1,4 +1,5 @@
-import { useReducer } from "react";
+import { useReducer, useEffect, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   addGame,
   createAndUploadFullBackup,
@@ -221,7 +222,7 @@ export function useGamesPage() {
   });
   const unsyncedGameIds = unsyncedGames?.map((g) => g.gameId) ?? [];
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     dispatch({ type: "SET_REFRESHING", payload: true });
     try {
       await Promise.all([
@@ -230,11 +231,37 @@ export function useGamesPage() {
         queryClient.invalidateQueries({ queryKey: CONFIG_QUERY_KEY, type: "active" }),
         queryClient.invalidateQueries({ queryKey: ["game-stats"], type: "active" }),
         queryClient.invalidateQueries({ queryKey: ["unsynced-games"], type: "active" }),
+        queryClient.invalidateQueries({ queryKey: ["last-sync-info"], type: "active" }),
       ]);
     } finally {
       dispatch({ type: "SET_REFRESHING", payload: false });
     }
-  };
+  }, [refetch, refetchLastSync, queryClient]);
+
+  useEffect(() => {
+    let unlistenUpload: (() => void) | undefined;
+    let unlistenDownload: (() => void) | undefined;
+    let unlistenFullBackup: (() => void) | undefined;
+
+    const setupListeners = async () => {
+      const onGlobalSyncEvent = () => {
+        console.log("Actividad en la nube detectada (Tauri). Refrescando UI...");
+        handleRefresh();
+      };
+
+      unlistenUpload = await listen("sync-upload-done", onGlobalSyncEvent);
+      unlistenDownload = await listen("sync-download-done", onGlobalSyncEvent);
+      unlistenFullBackup = await listen("full-backup-done", onGlobalSyncEvent);
+    };
+
+    setupListeners();
+
+    return () => {
+      if (unlistenUpload) unlistenUpload();
+      if (unlistenDownload) unlistenDownload();
+      if (unlistenFullBackup) unlistenFullBackup();
+    };
+  }, [handleRefresh]);
 
   const handleDismissOperationError = () => {
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
@@ -301,13 +328,14 @@ export function useGamesPage() {
       } catch (e) {
         toastError("No se pudieron borrar los guardados en la nube", e instanceof Error ? e.message : String(e));
       }
+
       await removeGame(gameId);
       scheduleConfigBackupToCloud();
 
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      queryClient.invalidateQueries({ queryKey: CONFIG_QUERY_KEY });
-      refetch?.();
+      handleRefresh();
+
       dispatch({ type: "SET_GAME_TO_REMOVE", game: null });
     } catch (e) {
       console.error("Error al eliminar juego:", e);
