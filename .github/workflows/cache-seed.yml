@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "apps/savecloud-desktop/src-tauri/**"
-      - "**/Cargo.lock"
+  workflow_dispatch:
 
 jobs:
   seed-rust-cache:
@@ -23,5 +21,6 @@ jobs:
           workspaces: "apps/savecloud-desktop/src-tauri"
 
       - name: Fetch dependencies
-        run: cargo fetch
+
+        run: cargo check
         working-directory: apps/savecloud-desktop/src-tauri
