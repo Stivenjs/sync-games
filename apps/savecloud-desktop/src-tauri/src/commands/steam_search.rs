@@ -2,8 +2,8 @@
 
 use futures_util::StreamExt;
 use regex::{Regex, RegexBuilder};
-use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::collections::{HashMap, HashSet};
+use std::sync::{LazyLock, RwLock};
 
 static STEAM_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
@@ -25,6 +25,9 @@ static NAME_REGEX: LazyLock<Regex> =
 
 const STEAM_CONCURRENCY_LIMIT: usize = 3;
 
+static MEDIA_CACHE: LazyLock<RwLock<HashMap<String, SteamAppdetailsMedia>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
 async fn fetch_single_app_name(app_id: &str) -> Option<(String, String)> {
     let url = format!(
         "https://store.steampowered.com/api/appdetails?appids={}",
@@ -43,8 +46,6 @@ async fn fetch_single_app_name(app_id: &str) -> Option<(String, String)> {
     None
 }
 
-/// Obtiene los nombres de varios juegos a partir de sus Steam App IDs.
-/// Hace peticiones en paralelo controladas para evitar baneos.
 #[tauri::command]
 pub async fn get_steam_app_names_batch(app_ids: Vec<String>) -> HashMap<String, String> {
     let mut valid_ids: Vec<String> = app_ids
@@ -60,7 +61,6 @@ pub async fn get_steam_app_names_batch(app_ids: Vec<String>) -> HashMap<String, 
         return HashMap::new();
     }
 
-    // Disparamos las peticiones con un límite de concurrencia
     let stream = futures_util::stream::iter(valid_ids.into_iter().map(|app_id| async move {
         for _ in 0..2 {
             if let Some(result) = fetch_single_app_name(&app_id).await {
@@ -82,7 +82,6 @@ pub async fn get_steam_app_names_batch(app_ids: Vec<String>) -> HashMap<String, 
     final_map
 }
 
-/// Obtiene el nombre del juego a partir del Steam App ID.
 #[tauri::command]
 pub async fn get_steam_app_name(app_id: String) -> Option<String> {
     let app_id = app_id.trim().to_string();
@@ -94,7 +93,6 @@ pub async fn get_steam_app_name(app_id: String) -> Option<String> {
     results.remove(&app_id)
 }
 
-/// Lógica interna: busca Steam App ID por texto de búsqueda (una petición HTTP).
 async fn search_steam_app_id_impl(query: String) -> Option<String> {
     let term = query.replace('-', " ");
     let url = format!(
@@ -118,7 +116,6 @@ async fn search_steam_app_id_impl(query: String) -> Option<String> {
         .map(|m| m.as_str().to_string())
 }
 
-/// Busca el Steam App ID por nombre usando el endpoint de sugerencias de Steam.
 #[tauri::command]
 pub async fn search_steam_app_id(query: String) -> Option<String> {
     let query = query.trim();
@@ -128,7 +125,6 @@ pub async fn search_steam_app_id(query: String) -> Option<String> {
     search_steam_app_id_impl(query.to_string()).await
 }
 
-/// Busca Steam App IDs para varias consultas en paralelo de forma controlada.
 #[tauri::command]
 pub async fn search_steam_app_ids_batch(queries: Vec<String>) -> Vec<Option<String>> {
     if queries.is_empty() {
@@ -156,7 +152,6 @@ pub struct SteamSearchResult {
     pub name: String,
 }
 
-/// Busca varios juegos en Steam por nombre usando el endpoint de sugerencias.
 #[tauri::command]
 pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
     let query = query.trim();
@@ -213,7 +208,7 @@ pub struct SteamAppdetailsMedia {
 
 async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetailsMedia, String> {
     let url = format!(
-        "https://store.steampowered.com/api/appdetails?appids={}&l=english",
+        "https://store.steampowered.com/api/appdetails?appids={}&l=english&filters=basic,screenshots,movies",
         app_id
     );
 
@@ -221,8 +216,26 @@ async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetai
         .get(&url)
         .send()
         .await
-        .map_err(|e| format!("Request: {}", e))?;
-    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON: {}", e))?;
+        .map_err(|e| format!("Request Error: {}", e))?;
+
+    let status = res.status();
+    if !status.is_success() {
+        if status.as_u16() == 429 {
+            eprintln!("Límite de Steam (429) alcanzado en app_id: {}", app_id);
+        }
+        return Err(format!("HTTP Error: {}", status));
+    }
+
+    let body_text = res.text().await.unwrap_or_default();
+    if body_text.trim().is_empty() || body_text == "null" {
+        return Err("Empty response".into());
+    }
+
+    let data: serde_json::Value =
+        serde_json::from_str(&body_text).map_err(|e| format!("JSON Parse Error: {}", e))?;
+
+    let mut media_urls = Vec::new();
+    let mut video_url: Option<String> = None;
 
     let success = data
         .get(app_id)
@@ -232,8 +245,8 @@ async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetai
 
     if !success {
         return Ok(SteamAppdetailsMedia {
-            media_urls: Vec::new(),
-            video_url: None,
+            media_urls,
+            video_url,
         });
     }
 
@@ -241,14 +254,11 @@ async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetai
         Some(d) => d,
         None => {
             return Ok(SteamAppdetailsMedia {
-                media_urls: Vec::new(),
-                video_url: None,
+                media_urls,
+                video_url,
             })
         }
     };
-
-    let mut media_urls = Vec::new();
-    let mut video_url: Option<String> = None;
 
     if let Some(s) = data_obj.get("header_image").and_then(|v| v.as_str()) {
         if !s.is_empty() {
@@ -320,17 +330,29 @@ pub async fn get_steam_appdetails_media(app_id: String) -> Result<SteamAppdetail
         return Err("App ID inválido".to_string());
     }
 
-    fetch_steam_appdetails_media_impl(&app_id).await
+    {
+        let cache = MEDIA_CACHE.read().unwrap();
+        if let Some(cached_media) = cache.get(&app_id) {
+            return Ok(cached_media.clone());
+        }
+    }
+
+    let result = fetch_steam_appdetails_media_impl(&app_id).await?;
+
+    {
+        let mut cache = MEDIA_CACHE.write().unwrap();
+        cache.insert(app_id, result.clone());
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn get_steam_appdetails_media_batch(
     app_ids: Vec<String>,
-) -> Result<std::collections::HashMap<String, SteamAppdetailsMedia>, String> {
-    use std::collections::HashSet;
-
+) -> Result<HashMap<String, SteamAppdetailsMedia>, String> {
     let mut seen = HashSet::new();
-    let valid: Vec<String> = app_ids
+    let valid_ids: Vec<String> = app_ids
         .into_iter()
         .filter_map(|id| {
             let id = id.trim().to_string();
@@ -345,8 +367,26 @@ pub async fn get_steam_appdetails_media_batch(
         })
         .collect();
 
-    if valid.is_empty() {
-        return Ok(std::collections::HashMap::new());
+    if valid_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut final_results = HashMap::new();
+    let mut ids_to_fetch = Vec::new();
+
+    {
+        let cache = MEDIA_CACHE.read().unwrap();
+        for id in valid_ids {
+            if let Some(cached_data) = cache.get(&id) {
+                final_results.insert(id, cached_data.clone());
+            } else {
+                ids_to_fetch.push(id);
+            }
+        }
+    }
+
+    if ids_to_fetch.is_empty() {
+        return Ok(final_results);
     }
 
     let empty = SteamAppdetailsMedia {
@@ -354,16 +394,22 @@ pub async fn get_steam_appdetails_media_batch(
         video_url: None,
     };
 
-    let stream = futures_util::stream::iter(valid.into_iter().map(|app_id| {
+    let stream = futures_util::stream::iter(ids_to_fetch.into_iter().map(|app_id| {
         let fallback = empty.clone();
         async move {
             let result = fetch_steam_appdetails_media_impl(&app_id).await;
             (app_id, result.unwrap_or(fallback))
         }
     }))
-    .buffer_unordered(STEAM_CONCURRENCY_LIMIT);
+    .buffer_unordered(5);
 
-    let results: Vec<(String, SteamAppdetailsMedia)> = stream.collect().await;
+    let fetched_results: Vec<(String, SteamAppdetailsMedia)> = stream.collect().await;
 
-    Ok(results.into_iter().collect())
+    let mut cache = MEDIA_CACHE.write().unwrap();
+    for (id, media) in fetched_results {
+        cache.insert(id.clone(), media.clone());
+        final_results.insert(id, media);
+    }
+
+    Ok(final_results)
 }

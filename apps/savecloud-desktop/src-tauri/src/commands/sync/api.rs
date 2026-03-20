@@ -15,6 +15,9 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .expect("Fallo al construir el cliente HTTP estático")
 });
 
+static S3_ENDPOINT_CACHE: LazyLock<std::sync::RwLock<Option<String>>> =
+    LazyLock::new(|| std::sync::RwLock::new(None));
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UploadUrlItemRequest {
@@ -348,7 +351,6 @@ async fn copy_friend_saves_with_plan_impl(
         });
     }
 
-    // A. Pedir TODAS las URLs de descarga del amigo de una vez
     let download_requests: Vec<(String, String)> = plan
         .iter()
         .map(|p| (game_id.to_string(), p.key.clone()))
@@ -371,7 +373,6 @@ async fn copy_friend_saves_with_plan_impl(
         }
     };
 
-    // B. Pedir TODAS las URLs de subida propias de una vez
     let upload_requests: Vec<String> = plan.iter().map(|p| p.target_filename.clone()).collect();
     let upload_urls = match get_upload_urls(
         &ctx.base_url,
@@ -386,7 +387,6 @@ async fn copy_friend_saves_with_plan_impl(
         Err(e) => return Err(format!("Fallo al obtener URLs de subida en bloque: {}", e)),
     };
 
-    // Mapeos rápidos para buscar las URLs por clave/filename
     let download_map: std::collections::HashMap<_, _> = download_urls
         .into_iter()
         .map(|(url, key)| (key, url))
@@ -396,7 +396,6 @@ async fn copy_friend_saves_with_plan_impl(
         .map(|(url, filename)| (filename, url))
         .collect();
 
-    // C. Lanzar todas las transferencias en paralelo
     let mut set = tokio::task::JoinSet::new();
 
     for item in plan {
@@ -416,7 +415,6 @@ async fn copy_friend_saves_with_plan_impl(
                 None => return (item, false, Some("Sin URL de subida".to_string())),
             };
 
-            // Descargar de S3 a memoria
             let bytes = match HTTP_CLIENT.get(&d_url).send().await {
                 Ok(resp) if resp.status().is_success() => match resp.bytes().await {
                     Ok(b) => b,
@@ -438,7 +436,6 @@ async fn copy_friend_saves_with_plan_impl(
                 }
             };
 
-            // Subir desde memoria al S3 destino
             let content_length = bytes.len();
             match HTTP_CLIENT
                 .put(&u_url)
@@ -457,7 +454,6 @@ async fn copy_friend_saves_with_plan_impl(
         });
     }
 
-    // D. Recolectar resultados a medida que los hilos terminan
     let mut ok_count = 0;
     let mut err_count = 0;
     let mut errors = Vec::new();
@@ -554,6 +550,12 @@ pub async fn copy_friend_saves_with_plan(
 
 #[tauri::command]
 pub async fn get_s3_transfer_endpoint_type() -> Result<String, String> {
+    if let Ok(lock) = S3_ENDPOINT_CACHE.read() {
+        if let Some(cached) = &*lock {
+            return Ok(cached.clone());
+        }
+    }
+
     let Ok(ctx) = get_api_context() else {
         return Ok("unknown".to_string());
     };
@@ -585,9 +587,15 @@ pub async fn get_s3_transfer_endpoint_type() -> Result<String, String> {
     let json: serde_json::Value = res.json().await.unwrap_or_default();
     let upload_url = json.get("uploadUrl").and_then(|v| v.as_str()).unwrap_or("");
 
-    Ok(if upload_url.contains(S3_ACCELERATE_HOST) {
+    let endpoint_type = if upload_url.contains(S3_ACCELERATE_HOST) {
         "accelerated".to_string()
     } else {
         "standard".to_string()
-    })
+    };
+
+    if let Ok(mut lock) = S3_ENDPOINT_CACHE.write() {
+        *lock = Some(endpoint_type.clone());
+    }
+
+    Ok(endpoint_type)
 }
