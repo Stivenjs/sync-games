@@ -1,5 +1,12 @@
 # SaveCloud
 
+<h1>
+  <img src="/assets/icon.ico" width="40" style="vertical-align: middle; margin-right: 10px;" />
+  SaveCloud
+</h1>
+
+Servidor de guardado en la nube para juegos (S3 + Lambda) y app de escritorio para sincronizar guardados.
+
 ![Bun](https://img.shields.io/badge/runtime-bun-black)
 ![Node](https://img.shields.io/badge/node-20-green)
 ![TypeScript](https://img.shields.io/badge/language-typescript-blue)
