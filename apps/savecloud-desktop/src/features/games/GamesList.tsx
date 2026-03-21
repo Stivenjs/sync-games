@@ -175,14 +175,17 @@ export function GamesList({
         <GamesListMotionItem key={game.id}>
           <GameCard
             game={game}
-            stats={statsByGameId.get(game.id)}
+            stats={statsByGameId.get(game.id) as GameStats | undefined}
             resolvedSteamAppId={resolvedSteamAppIds[game.id]}
             mediaBySteamAppId={mediaBySteamAppId ?? null}
             mediaFromBatch
-            isGameRunning={gameRunningStatus[game.id]}
+            isGameRunning={gameRunningStatus[game.id] ?? false}
             syncStatus={(() => {
-              const status = getSyncStatus(game.id, statsByGameId.get(game.id), unsyncedGameIds);
-              // Si tiene backup empaquetado en la nube, no mostrar "Pendiente subir"
+              const status = getSyncStatus(
+                game.id,
+                statsByGameId.get(game.id) as GameStats | undefined,
+                unsyncedGameIds
+              );
               const cloudBackups = cloudBackupCountByGameId[game.id] ?? 0;
               if (status === "pending_upload" && cloudBackups > 0) return null;
               return status;

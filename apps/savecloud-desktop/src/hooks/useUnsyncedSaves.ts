@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { syncCheckUnsyncedGames, syncUploadGame } from "@services/tauri";
+import { syncCheckUnsyncedGames, syncUploadGame, type UnsyncedGame } from "@services/tauri";
 import { useConfig, CONFIG_QUERY_KEY } from "@hooks/useConfig";
 import { LAST_SYNC_QUERY_KEY } from "@hooks/useLastSyncInfo";
 import { toastSyncResult } from "@utils/toast";
@@ -28,7 +28,7 @@ export function useUnsyncedSaves() {
     staleTime: 30 * 1000,
   });
 
-  const unsyncedGameIds = useMemo(() => unsyncedList.map((g) => g.gameId), [unsyncedList]);
+  const unsyncedGameIds = useMemo(() => unsyncedList.map((g: UnsyncedGame) => g.gameId), [unsyncedList]);
 
   const { mutateAsync: uploadAll, isPending: isUploading } = useMutation({
     mutationKey: ["upload-all-unsynced"],

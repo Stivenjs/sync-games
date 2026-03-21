@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, useMemo, useState, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from "@heroui/react";
 import { FolderOpen, Plus, Search } from "lucide-react";
@@ -7,9 +7,10 @@ import type { PathCandidate } from "@services/tauri";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
 import { useResolvedCandidateNames } from "@hooks/useResolvedCandidateNames";
 import { extractAppIdFromFolderName, toGameId } from "@utils/gameImage";
-import MagicRings from "@components/external/MagicRings";
 import { useNavigable } from "@features/input/useNavigable";
 import { getGamepadFocusClass } from "@features/input/styles";
+
+const MagicRings = lazy(() => import("@components/external/MagicRings"));
 
 interface ScanModalProps {
   isOpen: boolean;
@@ -86,7 +87,7 @@ export function ScanModal({ isOpen, onClose, onSelectCandidate }: ScanModalProps
   const filteredCandidates = useMemo(() => {
     if (!candidates?.length) return [];
     if (!debouncedSearch) return candidates;
-    return candidates.filter((c) => {
+    return candidates.filter((c: PathCandidate) => {
       const resolvedName = resolvedNames[c.path];
       const hasAppId = !!c.steamAppId || !!extractAppIdFromFolderName(c.folderName ?? "");
       const displayName = hasAppId && resolvedName ? resolvedName : (c.folderName ?? "");
@@ -134,29 +135,31 @@ export function ScanModal({ isOpen, onClose, onSelectCandidate }: ScanModalProps
           {isLoading ? (
             <div className="flex flex-col items-center justify-center gap-4 py-8">
               <div style={{ width: "600px", height: "250px", position: "relative" }}>
-                <MagicRings
-                  color="#fc42ff"
-                  colorTwo="#42fcff"
-                  ringCount={6}
-                  speed={1.5}
-                  attenuation={10}
-                  lineThickness={2}
-                  baseRadius={0.35}
-                  radiusStep={0.1}
-                  scaleRate={0.1}
-                  opacity={1}
-                  blur={0}
-                  noiseAmount={0.1}
-                  rotation={0}
-                  ringGap={1.5}
-                  fadeIn={0.7}
-                  fadeOut={0.5}
-                  followMouse={true}
-                  mouseInfluence={0}
-                  hoverScale={1}
-                  parallax={0}
-                  clickBurst={false}
-                />
+                <Suspense>
+                  <MagicRings
+                    color="#fc42ff"
+                    colorTwo="#42fcff"
+                    ringCount={6}
+                    speed={1.5}
+                    attenuation={10}
+                    lineThickness={2}
+                    baseRadius={0.35}
+                    radiusStep={0.1}
+                    scaleRate={0.1}
+                    opacity={1}
+                    blur={0}
+                    noiseAmount={0.1}
+                    rotation={0}
+                    ringGap={1.5}
+                    fadeIn={0.7}
+                    fadeOut={0.5}
+                    followMouse={true}
+                    mouseInfluence={0}
+                    hoverScale={1}
+                    parallax={0}
+                    clickBurst={false}
+                  />
+                </Suspense>
               </div>
               <p className="text-default-500 animate-pulse">Buscando carpetas de guardados en el sistema...</p>
             </div>
@@ -181,7 +184,7 @@ export function ScanModal({ isOpen, onClose, onSelectCandidate }: ScanModalProps
 
               <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-2">
                 {filteredCandidates.length > 0 ? (
-                  filteredCandidates.map((c, idx) => (
+                  filteredCandidates.map((c: PathCandidate, idx: number) => (
                     <CandidateRow
                       key={c.path}
                       candidate={c}

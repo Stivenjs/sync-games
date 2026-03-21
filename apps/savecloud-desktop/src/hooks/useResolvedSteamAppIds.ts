@@ -18,7 +18,7 @@ export function useResolvedSteamAppIds(games: readonly ConfiguredGame[]): Record
     () => [
       ...STEAM_APP_ID_QUERY_KEY,
       gamesToSearch
-        .map((g) => g.id)
+        .map((g: ConfiguredGame) => g.id)
         .sort()
         .join(","),
     ],

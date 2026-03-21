@@ -229,8 +229,8 @@ export function GamesPage() {
         gamesOverSizeThreshold={
           bulkConfirm?.type === "sync" && config?.games?.length
             ? countGamesOverSizeThreshold(
-                config.games.map((g) => g.id),
-                statsByGameId
+                config.games.map((g: ConfiguredGame) => g.id),
+                statsByGameId as unknown as Map<string, { localSizeBytes: number }>
               )
             : 0
         }

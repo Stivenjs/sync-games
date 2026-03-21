@@ -15,6 +15,7 @@ import {
   syncUploadAllGames,
   syncUploadGame,
   type SyncResult,
+  type UnsyncedGame,
 } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
 import { formatGameDisplayName } from "@utils/gameImage";
@@ -220,7 +221,7 @@ export function useGamesPage() {
     enabled: hasSyncConfig,
     refetchInterval: 60_000,
   });
-  const unsyncedGameIds = unsyncedGames?.map((g) => g.gameId) ?? [];
+  const unsyncedGameIds = unsyncedGames?.map((g: UnsyncedGame) => g.gameId) ?? [];
 
   const handleRefresh = useCallback(async () => {
     dispatch({ type: "SET_REFRESHING", payload: true });
@@ -269,7 +270,7 @@ export function useGamesPage() {
 
   const handleRetryOperationError = (gameId: string, opType: "sync" | "download") => {
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
-    const game = config?.games?.find((g) => g.id === gameId);
+    const game = config?.games?.find((g: ConfiguredGame) => g.id === gameId);
     if (game) {
       dispatch({
         type: "SET_SYNC_PREVIEW",
@@ -617,7 +618,7 @@ export function useGamesPage() {
     dispatch({ type: "SET_DOWNLOADING", value: "all" });
     dispatch({ type: "SET_OPERATION_RESULT", value: null });
     try {
-      const batchResults = await syncCheckDownloadConflictsBatch(config.games.map((g) => g.id));
+      const batchResults = await syncCheckDownloadConflictsBatch(config.games.map((g: ConfiguredGame) => g.id));
       const gamesWithConflicts: { gameId: string; conflictCount: number }[] = batchResults
         .filter((r) => r.conflicts.length > 0)
         .map((r) => ({

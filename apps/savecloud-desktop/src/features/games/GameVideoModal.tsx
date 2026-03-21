@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import Hls from "hls.js";
+import type HlsType from "hls.js";
 import { Button, Modal, ModalContent } from "@heroui/react";
 import { X } from "lucide-react";
 
@@ -14,7 +14,7 @@ export interface GameVideoModalProps {
 
 export function GameVideoModal({ isOpen, onClose, videoUrl }: GameVideoModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hlsRef = useRef<Hls | null>(null);
+  const hlsRef = useRef<HlsType | null>(null);
 
   const useHls = isOpen && videoUrl != null && isHlsUrl(videoUrl);
 
@@ -31,26 +31,40 @@ export function GameVideoModal({ isOpen, onClose, videoUrl }: GameVideoModalProp
     if (!isOpen || !videoUrl || !useHls) return;
     const videoEl = videoRef.current;
     if (!videoEl) return;
-    if (Hls.isSupported()) {
-      const hls = new Hls();
-      hlsRef.current = hls;
-      hls.loadSource(videoUrl);
-      hls.attachMedia(videoEl);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+
+    let isMounted = true;
+
+    const initVideo = async () => {
+      const Hls = (await import("hls.js")).default;
+
+      if (!isMounted) return;
+
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(videoUrl);
+        hls.attachMedia(videoEl);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoEl.play().catch(() => {});
+        });
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) hls.destroy();
+        });
+      } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+        videoEl.src = videoUrl;
         videoEl.play().catch(() => {});
-      });
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) hls.destroy();
-      });
-      return () => {
-        hls.destroy();
+      }
+    };
+
+    initVideo();
+
+    return () => {
+      isMounted = false;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
         hlsRef.current = null;
-      };
-    }
-    if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
-      videoEl.src = videoUrl;
-      videoEl.play().catch(() => {});
-    }
+      }
+    };
   }, [isOpen, videoUrl, useHls]);
 
   useEffect(() => {
