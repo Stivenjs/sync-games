@@ -111,7 +111,7 @@ export function ScanModal({ isOpen, onClose, onSelectCandidate }: ScanModalProps
                   ringGap={1.5}
                   fadeIn={0.7}
                   fadeOut={0.5}
-                  followMouse={false}
+                  followMouse={true}
                   mouseInfluence={0}
                   hoverScale={1}
                   parallax={0}
