@@ -5,6 +5,7 @@ import { FolderOpen, ImagePlus, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { addGame, readImageAsDataUrl, searchSteamGames } from "@services/tauri";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
+import type { ManifestSearchResult } from "@services/tauri";
 
 interface AddGameModalProps {
   isOpen: boolean;
@@ -207,7 +208,7 @@ export function AddGameModal({ isOpen, onClose, onSuccess, initialPath = "", sug
                 ) : steamResults.length === 0 ? (
                   <p className="px-1 py-1 text-default-500">No se encontraron juegos en Steam.</p>
                 ) : (
-                  steamResults.map((r) => (
+                  steamResults.map((r: ManifestSearchResult) => (
                     <button
                       key={r.steamAppId}
                       type="button"

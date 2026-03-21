@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ConfiguredGame } from "@app-types/config";
 import { readImageAsDataUrl, renameGame, renameGameInCloud, updateGame, searchSteamGames } from "@services/tauri";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
+import type { ManifestSearchResult } from "@services/tauri";
 
 interface EditGameModalProps {
   isOpen: boolean;
@@ -225,7 +226,7 @@ export function EditGameModal({ isOpen, game, onClose, onSuccess }: EditGameModa
                     ) : steamResults.length === 0 ? (
                       <p className="px-1 py-1 text-default-500">No se encontraron juegos en Steam.</p>
                     ) : (
-                      steamResults.map((r) => (
+                      steamResults.map((r: ManifestSearchResult) => (
                         <button
                           key={r.steamAppId}
                           type="button"

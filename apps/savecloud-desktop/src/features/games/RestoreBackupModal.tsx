@@ -220,7 +220,7 @@ export function RestoreBackupModal({ isOpen, onClose, game, onSuccess }: Restore
                     </p>
                   ) : (
                     <ul className="max-h-60 space-y-2 overflow-y-auto">
-                      {backups.map((b) => (
+                      {backups.map((b: BackupInfo) => (
                         <li
                           key={b.id}
                           className="flex items-center justify-between gap-4 rounded-lg border border-default-200 bg-default-50/50 px-4 py-3 dark:bg-default-100/20">
@@ -278,7 +278,7 @@ export function RestoreBackupModal({ isOpen, onClose, game, onSuccess }: Restore
                     </p>
                   ) : (
                     <ul className="max-h-52 space-y-2 overflow-y-auto">
-                      {cloudBackups.map((b) => (
+                      {cloudBackups.map((b: CloudBackupInfo) => (
                         <li
                           key={b.key}
                           className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-default-200 bg-default-50/50 px-4 py-3 dark:bg-default-100/20">

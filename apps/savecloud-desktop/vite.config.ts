@@ -9,7 +9,6 @@ const ReactCompilerConfig = {
   target: "19" as const,
 };
 
-// https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [
     react({
@@ -18,7 +17,7 @@ export default defineConfig(() => ({
       },
     }),
     tailwindcss(),
-  ].flat(),
+  ],
 
   resolve: {
     alias: {
@@ -35,17 +34,27 @@ export default defineConfig(() => ({
 
   clearScreen: false,
 
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-router-dom", "zustand", "three", "hls.js"],
+  },
+
   build: {
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: (!process.env.TAURI_ENV_DEBUG ? "esbuild" : false) as "esbuild" | false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
 
+    esbuild: {
+      drop: !process.env.TAURI_ENV_DEBUG ? ["console", "debugger"] : [],
+    },
+
     rollupOptions: {
       output: {
         manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-core": ["react", "react-dom", "react-router-dom", "zustand", "@tanstack/react-query"],
           "vendor-ui": ["@heroui/react", "lucide-react", "framer-motion"],
-          "vendor-utils": ["gsap", "@tanstack/react-query", "hls.js", "three", "zustand"],
+          "vendor-3d": ["three"],
+          "vendor-video": ["hls.js"],
+          "vendor-anim": ["gsap"],
         },
       },
     },

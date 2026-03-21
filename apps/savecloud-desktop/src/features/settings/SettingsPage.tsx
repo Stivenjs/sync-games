@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { AutostartCard } from "@features/settings/AutostartCard";
 import { ConfigSection } from "@features/settings/ConfigSection";
 import { CreateConfigModal } from "@features/settings/CreateConfigModal";
@@ -6,11 +6,14 @@ import { ExperimentalFeaturesCard } from "@features/settings/ExperimentalFeature
 import { LocalBackupInfoCard } from "@features/settings/LocalBackupInfoCard";
 import { NotificationsCard } from "@features/settings/NotificationsCard";
 import { ReleaseNotesCard } from "@features/settings/ReleaseNotesCard";
-import { ReleaseNotesDialog } from "@features/settings/ReleaseNotesDialog";
 import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
 import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
+
+const ReleaseNotesDialogLazy = lazy(() =>
+  import("@features/settings/ReleaseNotesDialog").then((module) => ({ default: module.ReleaseNotesDialog }))
+);
 
 export function SettingsPage() {
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
@@ -66,7 +69,6 @@ export function SettingsPage() {
           Archivo de config, respaldos, inicio con Windows, actualizaciones y notificaciones.
         </p>
       </div>
-
       <ConfigSection
         exporting={exporting}
         importing={importing}
@@ -84,12 +86,10 @@ export function SettingsPage() {
         onBackupToCloud={handleBackupConfigToCloud}
         onRestoreFromCloud={() => setRestoreConfirmOpen(true)}
       />
-
       <AutostartCard autostart={autostart} loading={loading} onChange={handleAutostartChange} />
       <UpdatesCard checkingUpdate={checkingUpdate} onCheckUpdates={handleCheckUpdates} />
       <ReleaseNotesCard onOpenNotes={() => setReleaseNotesOpen(true)} />
       <NotificationsCard testingNotification={testingNotification} onTestNotification={handleTestNotification} />
-
       <LocalBackupInfoCard />
       <ExperimentalFeaturesCard
         fullBackupStreaming={!!config?.fullBackupStreaming}
@@ -97,7 +97,6 @@ export function SettingsPage() {
         fullBackupStreamingDryRun={!!config?.fullBackupStreamingDryRun}
         onFullBackupStreamingDryRunChange={handleFullBackupStreamingDryRunChange}
       />
-
       <CreateConfigModal
         isOpen={createConfigModalOpen}
         apiBaseUrl={createApiBaseUrl}
@@ -128,7 +127,11 @@ export function SettingsPage() {
         onClose={() => setPullFriendConfigModalOpen(false)}
         onSubmit={handlePullFriendConfig}
       />
-      <ReleaseNotesDialog isOpen={releaseNotesOpen} onClose={() => setReleaseNotesOpen(false)} />
+      {releaseNotesOpen && (
+        <Suspense fallback={null}>
+          <ReleaseNotesDialogLazy isOpen={releaseNotesOpen} onClose={() => setReleaseNotesOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

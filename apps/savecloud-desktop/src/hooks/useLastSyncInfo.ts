@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type Query } from "@tanstack/react-query";
 import { syncListRemoteSaves } from "@services/tauri";
 
 export const LAST_SYNC_QUERY_KEY = ["last-sync-info"] as const;
@@ -18,8 +18,17 @@ export interface CloudGameSummary {
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "error" | "retrying";
 
+type LastSyncQueryData = {
+  lastSyncAt: Date | null;
+  lastSyncGameId: string | null;
+  cloudGames: CloudGameSummary[];
+  totalCloudSize: number;
+};
+
 function computeLastSync(saves: { gameId: string; lastModified: string }[]): LastSyncInfo {
-  if (saves.length === 0) return { lastSyncAt: null, lastSyncGameId: null };
+  if (saves.length === 0) {
+    return { lastSyncAt: null, lastSyncGameId: null };
+  }
 
   let latest: { gameId: string; date: Date } | null = null;
 
@@ -44,6 +53,7 @@ function computeCloudGames(saves: { gameId: string; size?: number }[]): {
 
   for (const s of saves) {
     const existing = byGame.get(s.gameId) ?? { count: 0, size: 0 };
+
     byGame.set(s.gameId, {
       count: existing.count + 1,
       size: existing.size + (s.size ?? 0),
@@ -57,27 +67,35 @@ function computeCloudGames(saves: { gameId: string; size?: number }[]): {
   }));
 
   const totalSize = cloudGames.reduce((sum, g) => sum + g.totalSize, 0);
+
   return { cloudGames, totalSize };
 }
 
 export function useLastSyncInfo(enabled: boolean) {
-  const query = useQuery({
+  const query = useQuery<LastSyncQueryData, Error>({
     queryKey: LAST_SYNC_QUERY_KEY,
-    queryFn: async () => {
+
+    queryFn: async (): Promise<LastSyncQueryData> => {
       const allSaves = await syncListRemoteSaves();
+
       const saves = allSaves.filter((s) => s.gameId !== CONFIG_GAME_ID);
 
       const lastSync = computeLastSync(saves);
       const { cloudGames, totalSize } = computeCloudGames(saves);
 
-      return { ...lastSync, cloudGames, totalCloudSize: totalSize };
+      return {
+        ...lastSync,
+        cloudGames,
+        totalCloudSize: totalSize,
+      };
     },
+
     enabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
 
-    refetchInterval: (query) => (query.state.status === "error" ? 30_000 : false),
+    refetchInterval: (query: Query<LastSyncQueryData, Error>) => (query.state.status === "error" ? 30_000 : false),
     retry: 2,
   });
 
@@ -92,10 +110,13 @@ export function useLastSyncInfo(enabled: boolean) {
 
   const connectionStatus = useMemo((): ConnectionStatus => {
     if (!enabled) return "idle";
+
     if (query.isError) {
       return query.isFetching ? "retrying" : "error";
     }
+
     if (query.isLoading) return "connecting";
+
     return "connected";
   }, [enabled, query.isError, query.isFetching, query.isLoading]);
 
