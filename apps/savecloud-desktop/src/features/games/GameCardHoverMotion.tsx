@@ -14,21 +14,12 @@ export interface GameCardHoverMotionProps {
   className?: string;
 }
 
-/**
- * Card con tilt 3D que sigue el ratón y elevación + sombra al hover.
- * Usamos un rect fijo al entrar para evitar feedback: si usáramos el rect
- * actual, al moverse la card (y/scale) el rect cambia y el tilt se recalcula
- * infinitamente.
- */
 export function GameCardHoverMotion({ children, className = "rounded-2xl" }: GameCardHoverMotionProps) {
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
-  const rectRef = useRef<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+
+  const rafRef = useRef<number | null>(null);
 
   const springRotateX = useSpring(rotateX, SPRING_CONFIG);
   const springRotateY = useSpring(rotateY, SPRING_CONFIG);
@@ -44,25 +35,26 @@ export function GameCardHoverMotion({ children, className = "rounded-2xl" }: Gam
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = rectRef.current ?? e.currentTarget.getBoundingClientRect();
-    if (!rectRef.current) {
-      rectRef.current = {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-      };
-    }
-    const { left, top, width, height } = rectRef.current;
-    const x = e.clientX - left - width / 2;
-    const y = e.clientY - top - height / 2;
-    const rotateYValue = (x / width) * TILT_MAX;
-    const rotateXValue = (y / height) * -TILT_MAX;
-    rotateY.set(rotateYValue);
-    rotateX.set(rotateXValue);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+    rafRef.current = requestAnimationFrame(() => {
+      const rect = rectRef.current;
+      if (!rect) return;
+
+      const { left, top, width, height } = rect;
+      const x = e.clientX - left - width / 2;
+      const y = e.clientY - top - height / 2;
+
+      const rotateYValue = (x / width) * TILT_MAX;
+      const rotateXValue = (y / height) * -TILT_MAX;
+
+      rotateY.set(rotateYValue);
+      rotateX.set(rotateXValue);
+    });
   };
 
   const handleMouseLeave = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rectRef.current = null;
     rotateX.set(0);
     rotateY.set(0);
@@ -84,6 +76,7 @@ export function GameCardHoverMotion({ children, className = "rounded-2xl" }: Gam
           rotateY: springRotateY,
           transformStyle: "preserve-3d",
           boxShadow: SHADOW_REST,
+          willChange: "transform, box-shadow",
         }}
         initial={false}
         whileHover={{
