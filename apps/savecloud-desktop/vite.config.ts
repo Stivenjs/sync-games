@@ -5,7 +5,6 @@ import { resolve } from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
-// React Compiler: memoización automática
 const ReactCompilerConfig = {
   target: "19" as const,
 };
@@ -34,11 +33,9 @@ export default defineConfig(() => ({
     },
   },
 
-  // Vite options tailored for Tauri development
   clearScreen: false,
 
   build: {
-    // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: (!process.env.TAURI_ENV_DEBUG ? "esbuild" : false) as "esbuild" | false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
@@ -48,7 +45,7 @@ export default defineConfig(() => ({
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-ui": ["@heroui/react", "lucide-react", "framer-motion"],
-          "vendor-utils": ["gsap", "@tanstack/react-query", "hls.js", "three"],
+          "vendor-utils": ["gsap", "@tanstack/react-query", "hls.js", "three", "zustand"],
         },
       },
     },
