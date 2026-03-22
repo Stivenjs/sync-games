@@ -1,5 +1,6 @@
 //! Comandos Tauri expuestos al frontend.
 
+pub mod plugins;
 mod config;
 mod config_io;
 pub(crate) mod game_exit_sync;

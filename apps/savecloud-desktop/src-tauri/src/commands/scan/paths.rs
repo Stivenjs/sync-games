@@ -1,4 +1,13 @@
-//! Rutas de guardados.
+//! Módulo de configuración de rutas de guardados.
+//!
+//! Contiene las rutas de guardados que se utilizan para escanear
+//! el sistema de archivos en busca de carpetas de guardados.
+//!
+//! Incluye soporte para:
+//!
+//! - Rutas de guardados para Windows.
+//! - Rutas de guardados para Unix.
+//!
 #![allow(dead_code)]
 use serde::Deserialize;
 use std::sync::OnceLock;

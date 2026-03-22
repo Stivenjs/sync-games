@@ -1,4 +1,10 @@
-//! Búsqueda de juegos en el manifiesto de Ludusavi por nombre.
+//! Módulo de búsqueda de juegos en el manifiesto de Ludusavi por nombre.
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Buscar juegos en el manifiesto de Ludusavi cuyo nombre contenga el texto indicado.
+//! - Obtener el ID de Steam del juego.
+//! - Obtener el nombre del juego.
 
 use serde::Serialize;
 

@@ -1,3 +1,14 @@
+//! Módulo de motor de torrenting.
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Añadir un torrent por magnet link.
+//! - Añadir un torrent por archivo.
+//! - Cancelar un torrent.
+//! - Obtener el estado de un torrent.
+//! - Obtener el progreso de un torrent.
+//! - Obtener el estado de un torrent.
+
 use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions};
 use std::collections::HashMap;
 use std::path::PathBuf;

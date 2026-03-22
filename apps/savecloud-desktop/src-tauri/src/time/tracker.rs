@@ -1,5 +1,13 @@
+//! Módulo de seguimiento del tiempo de juego.
+//!
+//! Contiene las funciones para:
+//!
+//! - Añadir segundos al contador de un juego específico.
+//! - Obtener el tiempo de un juego en segundos.
+//! - Obtener la suma de tiempo de todos los juegos.
+//! - Convertir segundos a formato legible.
+
 #![allow(dead_code)]
-//! Tracker de tiempo de juego.
 
 use crate::config;
 

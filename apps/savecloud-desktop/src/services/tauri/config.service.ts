@@ -613,6 +613,12 @@ export async function cancelTorrent(infoHash: string): Promise<void> {
   await invoke("cancel_torrent", { infoHash });
 }
 
+/** Obtiene los nombres de los juegos de Steam en batch. */
 export async function getSteamAppNamesBatch(appIds: string[]): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("get_steam_app_names_batch", { appIds });
+}
+
+/** Exporta el SDK de plugins. */
+export async function exportPluginSdk(): Promise<string> {
+  return invoke<string>("export_plugin_sdk");
 }

@@ -1,4 +1,11 @@
-//! Previsualización de sincronización (archivos, tamaño, conflictos).
+//! Módulo de previsualización de sincronización de archivos.
+//!
+//! Proporciona un análisis previo al proceso de sincronización,
+//! incluyendo:
+//!
+//! - Archivos a transferir.
+//! - Tamaño total de la operación.
+//! - Detección de conflictos entre estados local y remoto.
 
 use super::api;
 use super::download;

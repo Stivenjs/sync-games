@@ -1,0 +1,49 @@
+use super::api::register_savecloud_api;
+use mlua::{Function, Lua, Result};
+use std::path::Path;
+use tauri::AppHandle;
+
+pub struct Plugin {
+    pub name: String,
+    lua: Lua,
+}
+
+impl Plugin {
+    pub fn load_from_dir(dir_path: &Path, app_handle: AppHandle) -> Result<Self> {
+        let lua = Lua::new();
+
+        register_savecloud_api(&lua, app_handle)?;
+
+        let name = dir_path.file_name().unwrap().to_string_lossy().to_string();
+
+        let folder_str = dir_path.to_string_lossy().replace('\\', "/");
+        let setup_script = format!(
+            "package.path = package.path .. ';{}/?.lua;{}/?/init.lua'",
+            folder_str, folder_str
+        );
+        lua.load(&setup_script).exec()?;
+
+        let init_path = dir_path.join("init.lua");
+        if !init_path.exists() {
+            return Err(mlua::Error::RuntimeError(format!(
+                "init.lua no encontrado en {}",
+                name
+            )));
+        }
+
+        let script = std::fs::read_to_string(&init_path)?;
+        lua.load(&script).exec()?;
+
+        Ok(Self { name, lua })
+    }
+
+    pub fn trigger_on_init(&self) -> Result<()> {
+        let globals = self.lua.globals();
+
+        if let Ok(func) = globals.get::<Function>("on_init") {
+            let _: () = func.call(())?;
+        }
+
+        Ok(())
+    }
+}

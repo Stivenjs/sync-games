@@ -1,4 +1,7 @@
-//! Comando para actualizar el tooltip de la bandeja (p. ej. tras cargar la app).
+//! Módulo de actualización del tooltip de la bandeja.
+//!
+//! Contiene la función para actualizar el tooltip de la bandeja,
+//! que se actualiza cuando se carga la aplicación.
 
 use crate::tray_state::TrayState;
 use tauri::State;

@@ -1,4 +1,10 @@
-//! Descarga de guardados desde la nube.
+//! Módulo de descarga de archivos de guardado desde almacenamiento remoto.
+//!
+//! Implementa la lógica de recuperación de archivos desde la nube,
+//! gestionando la transferencia, validación y almacenamiento local.
+//!
+//! Incluye soporte para seguimiento de progreso, manejo de errores
+//! y reintentos en caso de fallos de red.
 
 use std::collections::HashMap;
 use std::fs;

@@ -1,4 +1,11 @@
-//! Estadísticas por juego: tamaño en disco, última modificación local, en la nube y tiempo de juego.
+//! Módulo de cálculo de estadísticas por juego.
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Obtener las estadísticas por juego.
+//! - Expandir variables de entorno en rutas.
+//! - Recorrer directorios para sumar tamaños y encontrar la fecha más reciente.
+//! - Calcular estadísticas locales para una lista de rutas de un juego.
 
 use crate::commands::sync;
 use crate::config;

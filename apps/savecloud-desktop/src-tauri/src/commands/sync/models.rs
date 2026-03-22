@@ -1,4 +1,11 @@
-//! DTOs y estructuras compartidas para sincronización.
+//! Definiciones de datos compartidas para procesos de sincronización.
+//!
+//! Contiene los DTOs y estructuras utilizadas para la comunicación
+//! entre componentes del sistema, incluyendo operaciones de subida,
+//! descarga y resolución de estado.
+//!
+//! Estas estructuras garantizan consistencia en el intercambio de datos
+//! entre cliente y backend.
 
 use serde::{Deserialize, Serialize};
 

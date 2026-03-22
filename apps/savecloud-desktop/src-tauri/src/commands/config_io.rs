@@ -1,4 +1,13 @@
-//! Exportar e importar configuración (lista de juegos) a/desde JSON.
+//! Módulo de exportación e importación de configuración (lista de juegos) a/desde JSON.
+//!
+//! Contiene funciones para:
+//!
+//! - Exportar la configuración a un archivo JSON.
+//! - Importar la configuración desde un archivo JSON.
+//! - Expandir rutas de guardados.
+//! - Obtener la primera ruta expandida del juego (para abrir en explorador).
+//! - Abrir la carpeta de guardados del juego en el explorador.
+//! - Backup de la configuración a la nube.
 
 use crate::commands::config::{ConfigDto, GameDto};
 use crate::commands::sync::api::{

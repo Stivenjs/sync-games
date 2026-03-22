@@ -1,5 +1,10 @@
-//! Extensiones, patrones y exclusiones para detectar carpetas de guardados.
-//! Réplica la lógica del CLI (FileSystemPathScanner).
+//! Definición de reglas para la detección de carpetas de guardado.
+//!
+//! Contiene extensiones, patrones y exclusiones utilizadas para
+//! identificar rutas válidas de guardados en el sistema de archivos.
+//!
+//! Replica la lógica del escáner de rutas del CLI (`FileSystemPathScanner`),
+//! garantizando consistencia en la detección entre distintos entornos.
 
 use serde::Deserialize;
 use std::collections::HashSet;

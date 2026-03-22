@@ -1,7 +1,6 @@
 //! Módulo para registrar todos los comandos Tauri.
 use tauri::{Builder, Wry};
 
-/// Registra todos los comandos Tauri.
 pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
     builder.invoke_handler(tauri::generate_handler![
         crate::torrent::commands::start_torrent_download,
@@ -72,5 +71,6 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::list_operation_history,
         crate::commands::tray_tooltip::refresh_tray_tooltip,
         crate::commands::get_steam_app_names_batch,
+        crate::commands::plugins::export_plugin_sdk,
     ])
 }

@@ -1,3 +1,13 @@
+//! Módulo de control de Gamepad.
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Iniciar el bucle de eventos del Gamepad.
+//! - Emitir las acciones del Gamepad.
+//! - Manejar los eventos del Gamepad.
+//! - Manejar los estados del Gamepad.
+//! - Manejar los repeticiones de las acciones del Gamepad.
+
 pub mod actions;
 pub mod mapper;
 pub mod state;

@@ -1,4 +1,11 @@
-//! Cliente HTTP para la API de guardados.
+//! Cliente HTTP para la API de gestión de guardados.
+//!
+//! Encapsula la comunicación con el backend, proporcionando métodos
+//! para interactuar con los endpoints relacionados con la sincronización
+//! de archivos.
+//!
+//! Incluye configuración de timeouts, manejo de errores y soporte para
+//! reintentos en solicitudes críticas.
 
 use super::models::SyncResultDto;
 use super::models::{RemoteSaveDto, RemoteSaveInfoDto};

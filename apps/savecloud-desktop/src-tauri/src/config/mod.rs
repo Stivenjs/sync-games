@@ -1,4 +1,12 @@
-//! Lógica de rutas y lectura del archivo de configuración.
+//! Módulo de configuración de la aplicación.
+//!
+//! Contiene las funciones para:
+//!
+//! - Obtener el directorio de configuración.
+//! - Obtener la ruta al archivo de configuración.
+//! - Leer el archivo de configuración.
+//! - Escribir el archivo de configuración.
+//!
 //! Compatible con la ubicación usada por el CLI.
 
 use chrono::Utc;

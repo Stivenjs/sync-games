@@ -1,4 +1,13 @@
-//! Búsqueda dinámica de Steam App ID por nombre y resolución de App ID a nombre.
+//! Resolución de identificadores, nombres y metadata de aplicaciones de Steam.
+//!
+//! Proporciona mecanismos para:
+//!
+//! - Buscar dinámicamente el App ID a partir del nombre del juego.
+//! - Resolver el nombre del juego a partir de un App ID.
+//! - Obtener metadata asociada, como imágenes, videos y otros recursos.
+//!
+//! Facilita la integración con servicios que requieren identificación
+//! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
 use futures_util::StreamExt;
 use regex::{Regex, RegexBuilder};

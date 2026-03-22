@@ -1,5 +1,11 @@
-//! Detección de juegos en ejecución para evitar sincronizar mientras hay archivos bloqueados.
-//! Incluye un watcher para emitir eventos al frontend de forma reactiva.
+//! Detección de juegos en ejecución y monitoreo de estado.
+//!
+//! Permite identificar procesos de juegos activos para evitar
+//! operaciones de sincronización sobre archivos potencialmente bloqueados.
+//!
+//! Incluye un sistema de observación que emite eventos de estado
+//! de forma reactiva hacia el frontend, facilitando la coordinación
+//! con la interfaz de usuario.
 
 use crate::config;
 use crate::time;

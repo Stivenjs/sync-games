@@ -1,4 +1,14 @@
 //! Módulo para crear el tray.
+//!
+//! Contiene las funciones para:
+//!
+//! - Crear el tray.
+//! - Mostrar el tray.
+//! - Subir todo.
+//! - Descargar todo.
+//! - Backup completo (primer juego).
+//! - Salir.    
+
 use crate::tray_state::TrayState;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;

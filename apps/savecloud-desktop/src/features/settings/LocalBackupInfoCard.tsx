@@ -1,4 +1,4 @@
-import { Button, Card, CardBody } from "@heroui/react";
+import { Button, Card, CardBody, Select, SelectItem } from "@heroui/react";
 import { Archive, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cleanupOldBackups, setKeepBackupsPerGame, deleteAllLocalBackups } from "@services/tauri/config.service";
@@ -48,35 +48,39 @@ export function LocalBackupInfoCard() {
           <Archive size={20} className="text-default-500" />
           <h2 className="text-base font-semibold text-foreground">Respaldo local automático</h2>
         </div>
+
         <p className="text-sm text-default-600">
           Antes de descargar guardados desde la nube, la app crea una copia de seguridad en tu PC para no sobrescribir
           nada sin respaldo. Las copias se guardan en la carpeta de configuración:{" "}
           <code className="rounded bg-default-200 px-1 font-mono text-xs">SaveCloud/backups/[juego]/[fecha]</code>
         </p>
+
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-default-600">
             Mantener últimos
-            <select
-              value={keepLastN}
-              onChange={async (e) => {
-                const n = Number(e.target.value) as (typeof KEEP_OPTIONS)[number];
-                setKeepLastN(n);
+            <Select
+              selectedKeys={[String(keepLastN)]}
+              onSelectionChange={async (keys) => {
+                const value = Number(Array.from(keys)[0]) as (typeof KEEP_OPTIONS)[number];
+                setKeepLastN(value);
                 try {
-                  await setKeepBackupsPerGame(n);
+                  await setKeepBackupsPerGame(value);
                   await refetch();
                 } catch (e) {
                   toastError("Error al guardar", e instanceof Error ? e.message : String(e));
                 }
               }}
-              className="rounded-md border border-default-300 bg-default-100 px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+              className="min-w-[90px]"
+              size="sm">
               {KEEP_OPTIONS.map((n) => (
-                <option key={n} value={n}>
+                <SelectItem key={String(n)} textValue={String(n)}>
                   {n}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </Select>
             backups por juego
           </label>
+
           <Button
             size="sm"
             variant="flat"
@@ -86,6 +90,7 @@ export function LocalBackupInfoCard() {
             startContent={<Trash2 size={16} />}>
             Liberar espacio ahora
           </Button>
+
           {confirmDeleteAll ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-default-600">
               <span className="font-medium">¿Borrar TODOS los backups locales? Esta acción no se puede deshacer.</span>
