@@ -8,8 +8,9 @@ Este documento explica la arquitectura del sistema de plugins de SaveCloud, como
 
 El sistema de plugins permite que scripts Lua externos se enganchen al ciclo de vida de SaveCloud sin modificar el codigo Rust. Cada plugin corre dentro de su propia VM `mlua::Lua` aislada. La capa Rust es responsable de:
 
-- Escanear el directorio de plugins y cargar cada plugin
+- Escanear el directorio de plugins y cargar cada plugin en un hilo separado para no bloquear la app
 - Exponer una API controlada a Lua (la tabla global `savecloud`)
+- Mantener un buffer de logs en memoria que recibe entradas desde los plugins en tiempo real
 - Llamar las funciones hook definidas en el `init.lua` de cada plugin
 - Ejecutar el pipeline de pre-subida pasando los datos por cada plugin cargado
 
@@ -19,17 +20,18 @@ El sistema de plugins permite que scripts Lua externos se enganchen al ciclo de 
 
 ```
 src/plugins/
-  mod.rs       -- Declaraciones publicas de modulos y alias de tipo compartido
-  api.rs       -- Registra la API Lua de savecloud.*
-  plugin.rs    -- Representa y gestiona una instancia individual de plugin
-  manager.rs   -- Carga y orquesta todos los plugins
+  mod.rs        -- Declaraciones publicas de modulos y alias de tipo compartido
+  api.rs        -- Registra la API Lua de savecloud.*
+  plugin.rs     -- Representa y gestiona una instancia individual de plugin
+  manager.rs    -- Carga y orquesta todos los plugins
+  log_buffer.rs -- Buffer en memoria de logs emitidos por plugins
 ```
 
 ---
 
 ## mod.rs
 
-Declara los tres submodulos y exporta un alias de tipo compartido usado en toda la app:
+Declara los cuatro submodulos y exporta un alias de tipo compartido usado en toda la app:
 
 ```rust
 pub type AppPluginManager = Arc<Mutex<manager::PluginManager>>;
@@ -39,13 +41,84 @@ Este tipo envuelve `PluginManager` en `Arc<Mutex<...>>` para que pueda compartir
 
 ---
 
+## log_buffer.rs
+
+### Proposito
+
+Mantiene un buffer circular en memoria de todas las entradas de log emitidas por plugins durante la sesion activa. Los logs se pierden al cerrar la app, lo cual es el comportamiento esperado.
+
+### LogEntry
+
+```rust
+pub struct LogEntry {
+    pub timestamp: String,  // formato HH:MM:SS
+    pub level: String,      // "info" o "error"
+    pub plugin: String,     // nombre del plugin que emitio el log
+    pub message: String,
+}
+```
+
+### LogBuffer
+
+Internamente usa `VecDeque` para que eliminar la entrada mas antigua sea O(1). El limite por defecto es 1000 entradas. Cuando se alcanza el limite, la entrada mas antigua se descarta automaticamente al insertar una nueva.
+
+```rust
+pub struct LogBuffer {
+    entries: VecDeque<LogEntry>,
+    max_size: usize,
+}
+```
+
+### AppLogs
+
+Alias de tipo para compartir el buffer entre hilos:
+
+```rust
+pub type AppLogs = Arc<Mutex<LogBuffer>>;
+```
+
+Registralo como estado de Tauri con `app.manage(logs.clone())` para que los comandos puedan accederlo.
+
+### new_log_buffer
+
+Funcion de conveniencia para crear el buffer:
+
+```rust
+pub fn new_log_buffer() -> AppLogs {
+    Arc::new(Mutex::new(LogBuffer::new()))
+}
+```
+
+---
+
 ## api.rs
 
 ### Proposito
 
-`register_savecloud_api` se llama una vez por VM de plugin. Construye una tabla Lua llamada `savecloud` y le adjunta tres sub-tablas (`log`, `ui`, `db`), cada una conteniendo closures Rust llamables desde Lua.
+`register_savecloud_api` se llama una vez por VM de plugin. Recibe `AppLogs` y `plugin_name` ademas del `AppHandle`, y construye la tabla Lua `savecloud` con tres sub-tablas (`log`, `ui`, `db`).
 
-Tambien deshabilita los globales `os` e `io` asignandoles `nil`, evitando que los plugins accedan al sistema de archivos o ejecuten comandos del sistema.
+Tambien deshabilita los globales `os` e `io` asignandoles `nil`.
+
+### Firma actual
+
+```rust
+pub fn register_savecloud_api(
+    lua: &Lua,
+    app_handle: AppHandle,
+    logs: AppLogs,
+    plugin_name: String,
+) -> Result<()>
+```
+
+### Como funciona savecloud.log internamente
+
+Cada llamada a `savecloud.log.info` o `savecloud.log.error` desde Lua hace tres cosas:
+
+1. Imprime el mensaje en stdout/stderr con el nombre del plugin
+2. Empuja una `LogEntry` al `LogBuffer` via `AppLogs`
+3. Emite el evento `plugin_log` al frontend con la entrada serializada
+
+El paso 2 y 3 ocurren dentro de un `tauri::async_runtime::spawn` para no bloquear el hilo del plugin.
 
 ### Agregar un nuevo modulo a la API
 
@@ -80,11 +153,9 @@ register_storage_module(lua, &savecloud_table)?;
 El `app_handle` que se pasa a `register_ui_module` se mueve al closure con `move`. Si necesitas `AppHandle` en un nuevo modulo, clonalo antes de pasarlo a `register_savecloud_api` y reenvía el clon a tu nueva funcion:
 
 ```rust
-pub fn register_savecloud_api(lua: &Lua, app_handle: AppHandle) -> Result<()> {
-    // ...
+pub fn register_savecloud_api(lua: &Lua, app_handle: AppHandle, ...) -> Result<()> {
     register_ui_module(lua, &savecloud_table, app_handle.clone())?;
     register_mi_modulo(lua, &savecloud_table, app_handle.clone())?;
-    // ...
 }
 ```
 
@@ -98,11 +169,11 @@ La struct `Plugin` contiene dos cosas: el nombre del plugin (derivado del nombre
 
 ### load_from_dir
 
-Este es el constructor. Realiza estos pasos en orden:
+Este es el constructor. Recibe `AppLogs` ademas de `AppHandle` y realiza estos pasos en orden:
 
 1. Crea una nueva VM Lua
-2. Llama `register_savecloud_api` para inyectar el global `savecloud` en esa VM
-3. Extrae el nombre de la carpeta como nombre del plugin
+2. Extrae el nombre de la carpeta como nombre del plugin
+3. Llama `register_savecloud_api` pasando el nombre del plugin para que los logs se etiqueten correctamente
 4. Configura `package.path` dentro de Lua para que `require("modulo")` resuelva a archivos dentro de la carpeta del plugin
 5. Lee y ejecuta `init.lua`
 6. Devuelve la instancia de `Plugin` (las funciones hook no se llaman aqui)
@@ -153,7 +224,7 @@ pub fn on_post_upload(&self, resultado: &str) -> Result<()> {
 
 ### load_all
 
-Itera sobre las entradas en `plugins_dir`. Por cada entrada que sea un directorio, llama `Plugin::load_from_dir`. Si la carga tiene exito, llama inmediatamente `trigger_on_init` en el nuevo plugin y luego lo agrega a `self.plugins`.
+Recibe `AppLogs` y lo pasa a cada `Plugin::load_from_dir`. Itera sobre las entradas en `plugins_dir`. Por cada entrada que sea un directorio, llama `Plugin::load_from_dir`. Si la carga tiene exito, llama inmediatamente `trigger_on_init` en el nuevo plugin y luego lo agrega a `self.plugins`.
 
 Los fallos se registran y se omiten -- un plugin malo no impide que los demas carguen.
 
@@ -172,35 +243,60 @@ datos originales
 
 ## Integracion con Tauri
 
-Para hacer disponible `PluginManager` en los comandos Tauri, configuralo como estado manejado durante la inicializacion de la app:
+### setup.rs
+
+Los plugins se cargan en un hilo separado con `std::thread::spawn` para que el `on_init` de cada plugin no bloquee el hilo principal ni congele la app, incluso si el plugin hace trabajo pesado o tiene delays.
+
+El flujo es:
+
+1. Crear `AppLogs` y registrarlo como estado de Tauri inmediatamente
+2. Crear un `PluginManager` vacio y registrarlo como estado de Tauri inmediatamente
+3. Lanzar un hilo separado que ejecuta `load_all`
+4. Cuando `load_all` termina, reemplazar el contenido del manager vacio con el manager cargado
 
 ```rust
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use plugins::{AppPluginManager, manager::PluginManager};
+let logs = new_log_buffer();
+app.manage(logs.clone());
 
-fn main() {
-    let plugin_manager: AppPluginManager = Arc::new(Mutex::new(PluginManager::new()));
+let shared_manager: AppPluginManager = Arc::new(Mutex::new(PluginManager::new()));
+app.manage(shared_manager.clone());
 
-    tauri::Builder::default()
-        .setup(|app| {
-            let plugins_dir = app.path().app_data_dir()?.join("plugins");
-            let handle = app.handle().clone();
+// Capturar el handle del runtime de Tokio antes de entrar al hilo
+let tokio_handle = tauri::async_runtime::handle();
+let handle = app.handle().clone();
 
-            let manager = plugin_manager.clone();
-            tauri::async_runtime::spawn(async move {
-                manager.lock().await.load_all(plugins_dir, handle);
-            });
+std::thread::spawn(move || {
+    let mut manager = PluginManager::new();
+    manager.load_all(plugins_dir, handle, logs);
 
-            Ok(())
-        })
-        .manage(plugin_manager)
-        .run(tauri::generate_context!())
-        .unwrap();
+    tokio_handle.block_on(async {
+        *shared_manager.lock().await = manager;
+    });
+});
+```
+
+Nota: se usa `tauri::async_runtime::handle()` capturado desde el hilo principal antes del spawn. No se puede llamar `tokio::runtime::Handle::current()` desde dentro del hilo nuevo porque ese hilo no tiene contexto Tokio.
+
+### Comando get_plugin_logs
+
+Expone los logs acumulados al frontend:
+
+```rust
+#[tauri::command]
+pub async fn get_plugin_logs(
+    logs: tauri::State<'_, AppLogs>
+) -> Result<Vec<LogEntry>, String> {
+    Ok(logs.lock().await.all())
 }
 ```
 
-Dentro de un comando Tauri, accede al manager asi:
+Registralo en el `invoke_handler` de Tauri junto a los demas comandos.
+
+### Eventos en tiempo real
+
+Cada vez que un plugin llama `savecloud.log.info` o `savecloud.log.error`, el frontend recibe automaticamente el evento `plugin_log` con la `LogEntry` serializada. El frontend puede escucharlo con `listen("plugin_log", ...)` para actualizar el panel de logs sin necesidad de polling.
+
+### Acceder al manager desde un comando
 
 ```rust
 #[tauri::command]
@@ -218,20 +314,18 @@ async fn subir_archivo(
 
 ## Dependencias
 
-| Crate   | Uso                                               |
-| ------- | ------------------------------------------------- |
-| `mlua`  | VM Lua, bindings de funciones, creacion de tablas |
-| `tauri` | `AppHandle` para emitir eventos al frontend       |
-| `tokio` | Runtime async, `Mutex` para estado compartido     |
-
-Los feature flags de `mlua` requeridos en `Cargo.toml`:
+| Crate    | Uso                                               |
+| -------- | ------------------------------------------------- |
+| `mlua`   | VM Lua, bindings de funciones, creacion de tablas |
+| `tauri`  | `AppHandle` para emitir eventos al frontend       |
+| `tokio`  | Runtime async, `Mutex` para estado compartido     |
+| `chrono` | Timestamps en los logs (`HH:MM:SS`)               |
 
 ```toml
 [dependencies]
 mlua = { version = "...", features = ["lua54", "vendored"] }
+chrono = { version = "0.4", features = ["serde"] }
 ```
-
-Ajusta el feature de version Lua (`lua54`, `lua53`, etc.) para que coincida con la version que quieras embeber.
 
 ---
 
@@ -241,3 +335,4 @@ Ajusta el feature de version Lua (`lua54`, `lua53`, etc.) para que coincida con 
 - Los plugins no pueden comunicarse entre si -- cada uno tiene su propia VM aislada sin globales compartidos.
 - Los plugins solo pueden llamar las funciones explicitamente registradas en `api.rs`. No hay forma de que un plugin alcance codigo Rust que no este expuesto a traves de la tabla `savecloud`.
 - Si agregas una nueva funcion a la API que realiza una operacion destructiva o privilegiada, considera si deberia estar protegida por algun tipo de verificacion de permisos antes de registrarla.
+- Los plugins corren en un hilo separado del hilo principal de Tauri. Si un plugin bloquea su hilo (por ejemplo con un busy-loop en `on_init`), solo afecta ese hilo y no congela la UI.

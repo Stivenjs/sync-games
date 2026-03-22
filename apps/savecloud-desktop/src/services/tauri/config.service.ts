@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Config } from "@app-types/config";
 
+export interface PluginLogEntry {
+  timestamp: string;
+  level: "info" | "error";
+  plugin: string;
+  message: string;
+}
+
 export interface PathCandidate {
   path: string;
   folderName: string;
@@ -621,4 +628,9 @@ export async function getSteamAppNamesBatch(appIds: string[]): Promise<Record<st
 /** Exporta el SDK de plugins. */
 export async function exportPluginSdk(): Promise<string> {
   return invoke<string>("export_plugin_sdk");
+}
+
+/** Obtiene los logs de los plugins. */
+export async function getPluginLogs(): Promise<PluginLogEntry[]> {
+  return invoke<PluginLogEntry[]>("get_plugin_logs");
 }

@@ -8,6 +8,7 @@
 //! - Ejecutar el hook de pre-subida (Pipeline).
 
 use super::plugin::Plugin;
+use crate::plugins::log_buffer::AppLogs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
@@ -26,7 +27,7 @@ impl PluginManager {
         self.plugins.len()
     }
 
-    pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle) {
+    pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle, logs: AppLogs) {
         println!("Escaneando carpeta de plugins en: {:?}", plugins_dir);
 
         if let Ok(entries) = std::fs::read_dir(plugins_dir) {
@@ -34,7 +35,7 @@ impl PluginManager {
                 let path = entry.path();
 
                 if path.is_dir() {
-                    match Plugin::load_from_dir(&path, app_handle.clone()) {
+                    match Plugin::load_from_dir(&path, app_handle.clone(), logs.clone()) {
                         Ok(plugin) => {
                             println!("Plugin registrado exitosamente: {}", plugin.name);
 

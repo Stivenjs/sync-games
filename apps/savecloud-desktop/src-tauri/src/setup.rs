@@ -11,7 +11,7 @@
 
 use crate::commands::game_exit_sync;
 use crate::controller::start_gamepad_loop;
-use crate::plugins::AppPluginManager;
+use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
 use crate::process_check::start_process_watcher;
 use crate::torrent::{engine::TorrentEngine, state::TorrentState};
 use crate::tray_state::TrayState;
@@ -38,11 +38,24 @@ pub fn init_states_and_background_tasks(app: &mut App) {
         let _ = std::fs::create_dir_all(&plugins_dir);
     }
 
-    let mut manager = crate::plugins::manager::PluginManager::new();
-    manager.load_all(plugins_dir, app.handle().clone());
+    let logs = new_log_buffer();
+    app.manage(logs.clone());
 
-    let shared_manager: AppPluginManager = Arc::new(Mutex::new(manager));
-    app.manage(shared_manager);
+    let shared_manager: AppPluginManager =
+        Arc::new(Mutex::new(crate::plugins::manager::PluginManager::new()));
+    app.manage(shared_manager.clone());
+
+    let tokio_handle = tauri::async_runtime::handle();
+    let handle = app.handle().clone();
+
+    std::thread::spawn(move || {
+        let mut manager = crate::plugins::manager::PluginManager::new();
+        manager.load_all(plugins_dir, handle, logs);
+
+        tokio_handle.block_on(async {
+            *shared_manager.lock().await = manager;
+        });
+    });
 
     app.manage(TorrentState {
         engine: std::sync::Arc::new(tokio::sync::Mutex::new(tauri::async_runtime::block_on(

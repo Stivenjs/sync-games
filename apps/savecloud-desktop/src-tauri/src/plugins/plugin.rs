@@ -7,6 +7,7 @@
 //! - Ejecutar el hook de pre-subida (Pipeline).
 
 use super::api::register_savecloud_api;
+use crate::plugins::log_buffer::AppLogs;
 use mlua::{Function, Lua, Result};
 use std::path::Path;
 use tauri::AppHandle;
@@ -17,12 +18,12 @@ pub struct Plugin {
 }
 
 impl Plugin {
-    pub fn load_from_dir(dir_path: &Path, app_handle: AppHandle) -> Result<Self> {
+    pub fn load_from_dir(dir_path: &Path, app_handle: AppHandle, logs: AppLogs) -> Result<Self> {
         let lua = Lua::new();
 
-        register_savecloud_api(&lua, app_handle)?;
-
         let name = dir_path.file_name().unwrap().to_string_lossy().to_string();
+
+        register_savecloud_api(&lua, app_handle, logs, name.clone())?;
 
         let folder_str = dir_path.to_string_lossy().replace('\\', "/");
         let setup_script = format!(
