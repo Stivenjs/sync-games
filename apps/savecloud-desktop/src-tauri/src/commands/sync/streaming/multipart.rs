@@ -1,3 +1,15 @@
+//! Subida multipart de archivos grandes a S3 en modo streaming.
+//!
+//! Implementa la transferencia de archivos directamente desde la fuente
+//! de datos sin necesidad de almacenamiento temporal en disco.
+//!
+//! Utiliza multipart upload para dividir el flujo en partes manejables,
+//! optimizando el uso de memoria y permitiendo la subida de archivos
+//! de gran tamaño de forma eficiente.
+//!
+//! Incluye soporte para control de flujo, manejo de errores y reintentos
+//! en operaciones críticas.
+
 use std::collections::HashMap;
 use std::sync::LazyLock;
 

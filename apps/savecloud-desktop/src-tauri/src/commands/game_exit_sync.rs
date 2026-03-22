@@ -1,3 +1,5 @@
+//! Módulo de detección de cierre de juegos y subida automática de guardados.
+//!
 //! Detecta cuando un juego se cierra y dispara la subida automática de guardados.
 //! Complementa el watcher de archivos: captura el guardado final al salir.
 //! Escucha los eventos emitidos por `process_check` en lugar de hacer polling.

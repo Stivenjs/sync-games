@@ -1,16 +1,21 @@
-//! Logger de diagnóstico para la sincronización (subida/descarga).
+//! Módulo de logging de diagnóstico para procesos de sincronización.
 //!
-//! Escribe en un archivo en el directorio de configuración para poder ver
-//! qué está pasando cuando hay errores 500 u otros fallos.
+//! Registra información detallada de operaciones de subida y descarga,
+//! facilitando el análisis de fallos y comportamientos inesperados.
 //!
-//! Archivo principal:
-//! `<config_dir>/savecloud-debug.log`
+//! Los logs se almacenan en el directorio de configuración de la aplicación.
 //!
-//! Rotación automática:
-//! savecloud-debug.log
-//! savecloud-debug.1.log
-//! savecloud-debug.2.log
-
+//! # Archivos de salida
+//!
+//! - `<config_dir>/savecloud-debug.log`
+//!
+//! # Rotación de logs
+//!
+//! Se implementa rotación automática de archivos:
+//!
+//! - `savecloud-debug.log`
+//! - `savecloud-debug.1.log`
+//! - `savecloud-debug.2.log`
 use chrono::Utc;
 use std::sync::Mutex;
 

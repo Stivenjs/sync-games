@@ -1,3 +1,12 @@
+//! Manejo de streaming de archivos TAR en memoria.
+//!
+//! Implementa la transferencia de archivos en modo streaming,
+//! sin necesidad de almacenamiento temporal en disco.
+//!
+//! Utiliza un buffer interno para agrupar bloques de datos antes
+//! de enviarlos al canal, optimizando el uso de memoria y
+//! evitando la sobrecarga de llamadas al sistema operativo.
+
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 

@@ -1,5 +1,14 @@
-//! Integración con el manifiesto de Ludusavi para detectar rutas de guardados
-//! de juegos (Steam y otros). Fuente: https://github.com/mtkennerly/ludusavi-manifest
+//! Módulo de integración con el manifiesto de Ludusavi para detectar rutas de guardados
+//! de juegos (Steam y otros).
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Cargar el manifiesto de Ludusavi.
+//! - Buscar juegos en el manifiesto de Ludusavi.
+//! - Obtener el ID de Steam del juego.
+//! - Obtener el nombre del juego.
+//!
+//! Fuente: https://github.com/mtkennerly/ludusavi-manifest
 //! Licencia del manifiesto: MIT (mtkennerly).
 
 use serde::{de::IgnoredAny, Deserialize};

@@ -1,4 +1,13 @@
-//! Comandos relacionados con la configuración.
+//! Módulo de comandos relacionados con la configuración.
+//!
+//! Contiene las estructuras de datos y funciones para:
+//!
+//! - Obtener la configuración actual.
+//! - Guardar la configuración actual.
+//! - Añadir un juego a la configuración.
+//! - Actualizar un juego existente.
+//! - Renombrar un juego.
+//! - Eliminar un juego.
 
 use crate::config;
 use crate::steam;

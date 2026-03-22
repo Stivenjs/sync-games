@@ -1,4 +1,14 @@
-//! Backups locales: listar, restaurar y limpiar.
+//! Módulo de gestión de backups locales.
+//!
+//! Proporciona funcionalidades para administrar copias de seguridad
+//! almacenadas en el sistema local, incluyendo:
+//!
+//! - Listado de backups disponibles.
+//! - Restauración de backups existentes.
+//! - Eliminación de backups obsoletos o innecesarios.
+//!
+//! Está diseñado para facilitar la recuperación de datos y el
+//! mantenimiento del almacenamiento local.
 
 use std::fs;
 use std::path::Path;

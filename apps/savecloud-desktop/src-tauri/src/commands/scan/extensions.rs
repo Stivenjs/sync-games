@@ -1,4 +1,9 @@
-//! Extensiones de guardados.
+//! Módulo de configuración de extensiones de archivos de guardado.
+//!
+//! Contiene las extensiones de archivos que se consideran guardados
+//! válidos, así como los nombres de carpetas y patrones de nombres
+//! que se utilizan para detectar guardados.
+
 use serde::Deserialize;
 use std::sync::OnceLock;
 

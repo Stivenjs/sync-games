@@ -1,4 +1,12 @@
 //! Módulo para inicializar los estados y las tareas en segundo plano.
+//!
+//! Contiene las funciones para:
+//!
+//! - Inicializar los estados y las tareas en segundo plano.
+//! - Inicializar el motor de torrenting.
+//! - Inicializar el tray.
+//! - Inicializar el watcher de procesos.
+//! - Inicializar el bucle de eventos del Gamepad.
 use crate::commands::game_exit_sync;
 use crate::controller::start_gamepad_loop;
 use crate::process_check::start_process_watcher;
@@ -6,7 +14,6 @@ use crate::torrent::{engine::TorrentEngine, state::TorrentState};
 use crate::tray_state::TrayState;
 use tauri::{App, Manager};
 
-/// Inicializa los estados y las tareas en segundo plano.
 pub fn init_states_and_background_tasks(app: &mut App) {
     #[cfg(debug_assertions)]
     {

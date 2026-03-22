@@ -1,10 +1,22 @@
-//! Subida multipart a S3 para archivos grandes (pausable/cancelable).
+//! Subida multipart de archivos grandes a S3 con soporte de pausa y cancelación.
 //!
-//! Flujo: init → part-urls (por lotes) → PUT cada parte a S3 → complete (o abort si cancel).
-//! Si se pide pausa, se guarda estado en disco y se retorna PAUSED para poder reanudar después.
+//! Este módulo implementa el flujo completo de multipart upload:
 //!
-//! Optimizaciones para reducir fallos: URLs en lotes (menos Lambda), reintentos con backoff
-//! (init, part-urls, PUT, complete), timeouts de conexión y de request en el cliente HTTP.
+//! 1. Inicialización de la subida.
+//! 2. Obtención de URLs prefirmadas por partes (en lote).
+//! 3. Transferencia de cada parte mediante solicitudes PUT.
+//! 4. Finalización de la subida o abort en caso de cancelación.
+//!
+//! Permite pausar la operación persistiendo el estado en disco,
+//! facilitando su reanudación posterior.
+//!
+//! # Fiabilidad
+//!
+//! Para mejorar la resiliencia del proceso:
+//!
+//! - Las URLs prefirmadas se generan en lote para reducir la carga sobre el backend.
+//! - Se aplican reintentos con backoff en todas las fases críticas del flujo.
+//! - Se configuran timeouts de conexión y de request en el cliente HTTP.
 
 use std::collections::HashMap;
 use std::io::SeekFrom;

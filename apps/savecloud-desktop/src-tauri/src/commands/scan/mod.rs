@@ -1,6 +1,13 @@
-//! Escaneo de rutas candidatas para guardados.
-//! Réplica de la lógica del CLI (FileSystemPathScanner).
-//! Mejorado con el manifiesto de Ludusavi para nombres y rutas precisas (Steam y otros).
+//! Módulo de escaneo de rutas candidatas para guardados.
+//!
+//! Implementa la lógica de escaneo de rutas candidatas para guardados,
+//! incluyendo:
+//!
+//! - Escaneo de rutas candidatas para Windows.
+//! - Escaneo de rutas candidatas para Unix.
+//! - Escaneo de rutas candidatas para Steam.
+//! - Escaneo de rutas candidatas para Ludusavi.
+//! - Escaneo de rutas candidatas para otros juegos.
 
 mod extensions;
 mod filters;

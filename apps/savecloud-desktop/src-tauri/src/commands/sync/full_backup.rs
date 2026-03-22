@@ -1,7 +1,18 @@
-//! Backup completo del juego como un solo archivo .tar en S3.
+//! Módulo de backup completo de juegos mediante archivo `.tar` en S3.
 //!
-//! Flujo: empaquetar carpeta en .tar → subir con multipart → listar/descargar por key → extraer.
-//! Pensado para juegos pesados con muchos archivos (una sola subida/descarga en lugar de miles).
+//! Agrupa todos los archivos de un juego en un único archivo `.tar`
+//! para optimizar la transferencia hacia y desde almacenamiento remoto.
+//!
+//! Flujo de operación:
+//!
+//! 1. Empaquetado del directorio del juego en un archivo `.tar`.
+//! 2. Subida del archivo mediante multipart upload.
+//! 3. Identificación y gestión del backup mediante su clave en S3.
+//! 4. Descarga y extracción del contenido en el sistema local.
+//!
+//! Este enfoque reduce la sobrecarga asociada a la transferencia de
+//! múltiples archivos pequeños, siendo especialmente útil para juegos
+//! con grandes volúmenes de datos.
 
 use std::fs;
 use std::io::BufWriter;

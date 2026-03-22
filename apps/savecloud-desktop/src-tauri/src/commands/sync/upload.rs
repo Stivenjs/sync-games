@@ -1,5 +1,23 @@
-//! Subida de guardados a la nube.
-
+//! Módulo de subida de archivos de guardado a almacenamiento remoto.
+//!
+//! Este módulo implementa la lógica de transferencia de archivos,
+//! seleccionando automáticamente la estrategia de subida en función
+//! del tamaño del archivo:
+//!
+//! - Subida simple para archivos pequeños.
+//! - Subida multipart para archivos grandes.
+//!
+//! Además, expone mecanismos para el seguimiento del progreso y la
+//! notificación del resultado de cada operación.
+//!
+//! # Fiabilidad
+//!
+//! Para mejorar la resiliencia ante fallos de red o backend:
+//!
+//! - Se utilizan URLs prefirmadas generadas en lote para minimizar
+//!   la cantidad de solicitudes al backend.
+//! - Se aplican reintentos con backoff en operaciones críticas.
+//! - Se configuran timeouts a nivel de conexión y de request en el cliente HTTP.
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufReader, Read};
@@ -19,7 +37,7 @@ use tokio::sync::mpsc;
 #[allow(dead_code)]
 const PROGRESS_CHUNK_BYTES: usize = 256 * 1024;
 
-/// Cuántos PUTs simples se ejecutan en paralelo (acelera mucho cuando hay miles de archivos).
+/// Cuántos PUTs simples se ejecutan en paralelo.
 const SIMPLE_PUT_CONCURRENCY: usize = 24;
 
 /// Umbrales para prohibir subida archivo a archivo. Por encima de estos valores
