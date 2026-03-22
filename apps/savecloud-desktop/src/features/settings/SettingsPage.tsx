@@ -10,6 +10,7 @@ import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
 import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
+import { DevSdk } from "@features/settings/DevSdk";
 
 const ReleaseNotesDialogLazy = lazy(() =>
   import("@features/settings/ReleaseNotesDialog").then((module) => ({ default: module.ReleaseNotesDialog }))
@@ -91,6 +92,7 @@ export function SettingsPage() {
       <ReleaseNotesCard onOpenNotes={() => setReleaseNotesOpen(true)} />
       <NotificationsCard testingNotification={testingNotification} onTestNotification={handleTestNotification} />
       <LocalBackupInfoCard />
+      <DevSdk />
       <ExperimentalFeaturesCard
         fullBackupStreaming={!!config?.fullBackupStreaming}
         onFullBackupStreamingChange={handleFullBackupStreamingChange}
