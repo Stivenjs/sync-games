@@ -5,13 +5,14 @@
 //! - Cargar todos los plugins.
 //! - Registrar el plugin.
 //! - Ejecutar el hook de inicialización.
+//! - Ejecutar el hook de pre-subida (Pipeline).
 
 use super::plugin::Plugin;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
 pub struct PluginManager {
-    plugins: Vec<Plugin>,
+    pub plugins: Vec<Plugin>,
 }
 
 impl PluginManager {
@@ -19,6 +20,10 @@ impl PluginManager {
         Self {
             plugins: Vec::new(),
         }
+    }
+
+    pub fn _plugin_count(&self) -> usize {
+        self.plugins.len()
     }
 
     pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle) {
@@ -46,5 +51,22 @@ impl PluginManager {
                 }
             }
         }
+    }
+
+    pub fn _execute_pre_upload(&self, mut data: Vec<u8>) -> Vec<u8> {
+        for plugin in &self.plugins {
+            match plugin._on_pre_upload(&data) {
+                Ok(modified_data) => {
+                    data = modified_data;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[Plugin Error] {} falló en on_pre_upload: {}",
+                        plugin.name, e
+                    );
+                }
+            }
+        }
+        data
     }
 }

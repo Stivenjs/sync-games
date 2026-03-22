@@ -46,4 +46,15 @@ impl Plugin {
 
         Ok(())
     }
+
+    pub fn _on_pre_upload(&self, data: &[u8]) -> Result<Vec<u8>> {
+        let globals = self.lua.globals();
+
+        if let Ok(func) = globals.get::<Function>("on_pre_upload") {
+            let modified_data: Vec<u8> = func.call(data)?;
+            return Ok(modified_data);
+        }
+
+        Ok(data.to_vec())
+    }
 }
