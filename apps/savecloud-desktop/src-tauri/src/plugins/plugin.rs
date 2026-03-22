@@ -17,6 +17,14 @@ pub struct Plugin {
     lua: Lua,
 }
 
+pub fn clean_lua_error(err: &mlua::Error) -> String {
+    match err {
+        mlua::Error::RuntimeError(msg) => msg.clone(),
+        mlua::Error::CallbackError { cause, .. } => clean_lua_error(cause),
+        otro => otro.to_string(),
+    }
+}
+
 impl Plugin {
     pub fn load_from_dir(dir_path: &Path, app_handle: AppHandle, logs: AppLogs) -> Result<Self> {
         let lua = Lua::new();
@@ -50,7 +58,8 @@ impl Plugin {
         let globals = self.lua.globals();
 
         if let Ok(func) = globals.get::<Function>("on_init") {
-            let _: () = func.call(())?;
+            func.call::<()>(())
+                .map_err(|err| mlua::Error::RuntimeError(clean_lua_error(&err)))?;
         }
 
         Ok(())
@@ -60,7 +69,9 @@ impl Plugin {
         let globals = self.lua.globals();
 
         if let Ok(func) = globals.get::<Function>("on_pre_upload") {
-            let modified_data: Vec<u8> = func.call(data)?;
+            let modified_data: Vec<u8> = func
+                .call::<Vec<u8>>(data)
+                .map_err(|err| mlua::Error::RuntimeError(clean_lua_error(&err)))?;
             return Ok(modified_data);
         }
 

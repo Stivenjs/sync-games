@@ -7,7 +7,7 @@
 //! - Ejecutar el hook de inicialización.
 //! - Ejecutar el hook de pre-subida (Pipeline).
 
-use super::plugin::Plugin;
+use super::plugin::{clean_lua_error, Plugin};
 use crate::plugins::log_buffer::AppLogs;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -40,13 +40,21 @@ impl PluginManager {
                             println!("Plugin registrado exitosamente: {}", plugin.name);
 
                             if let Err(e) = plugin.trigger_on_init() {
-                                eprintln!("Error ejecutando on_init en {}: {}", plugin.name, e);
+                                eprintln!(
+                                    "Error en on_init de '{}': {}",
+                                    plugin.name,
+                                    clean_lua_error(&e)
+                                );
                             }
 
                             self.plugins.push(plugin);
                         }
                         Err(e) => {
-                            eprintln!("Omitiendo carpeta {:?}: {}", path.file_name().unwrap(), e);
+                            eprintln!(
+                                "Omitiendo carpeta {:?}: {}",
+                                path.file_name().unwrap(),
+                                clean_lua_error(&e)
+                            );
                         }
                     }
                 }
@@ -62,8 +70,9 @@ impl PluginManager {
                 }
                 Err(e) => {
                     eprintln!(
-                        "[Plugin Error] {} falló en on_pre_upload: {}",
-                        plugin.name, e
+                        "[Plugin Error] '{}' falló en on_pre_upload: {}",
+                        plugin.name,
+                        clean_lua_error(&e)
                     );
                 }
             }
