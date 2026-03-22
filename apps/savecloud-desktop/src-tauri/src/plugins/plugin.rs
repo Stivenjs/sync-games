@@ -1,3 +1,11 @@
+//! Módulo para gestionar un plugin.
+//!
+//! Contiene las funciones para:
+//!
+//! - Cargar el plugin desde un directorio.
+//! - Ejecutar el hook de inicialización.
+//! - Ejecutar el hook de pre-subida (Pipeline).
+
 use super::api::register_savecloud_api;
 use mlua::{Function, Lua, Result};
 use std::path::Path;
