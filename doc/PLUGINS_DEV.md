@@ -8,7 +8,7 @@ Esta guia explica como escribir plugins para SaveCloud. Los plugins se escriben 
 
 SaveCloud escanea una carpeta llamada `plugins/` al iniciar. Cada subcarpeta dentro de ella es tratada como un plugin. Si la subcarpeta contiene un archivo llamado `init.lua`, SaveCloud lo carga y lo ejecuta dentro de un entorno Lua aislado.
 
-Tu plugin puede definir funciones hook que SaveCloud llama en momentos especificos (como cuando la app inicia, o antes de subir un archivo). Tambien puedes llamar la API de SaveCloud para registrar mensajes, emitir eventos de UI, o guardar operaciones en la base de datos.
+Tu plugin puede definir funciones hook que SaveCloud llama en momentos especificos (como cuando la app inicia, o antes de subir un archivo). Tambien puedes llamar la API de SaveCloud para registrar mensajes, emitir eventos de UI, guardar operaciones en la base de datos, o hacer peticiones HTTP a servicios externos.
 
 ---
 
@@ -75,7 +75,7 @@ SaveCloud expone una tabla global llamada `savecloud` con los siguientes modulos
 
 ### savecloud.log
 
-Usa esto para imprimir mensajes desde tu plugin.
+Usa esto para imprimir mensajes desde tu plugin. Los mensajes aparecen en el panel de logs de la app en tiempo real.
 
 ```lua
 savecloud.log.info("Todo esta bien")
@@ -103,6 +103,45 @@ savecloud.db.log_operation("mi-plugin", "comprimir", "archivo reducido un 40%")
 ```
 
 Los tres argumentos son: nombre del plugin, nombre de la accion, y un string de detalles.
+
+### savecloud.http
+
+Usa esto para hacer peticiones HTTP a servicios externos. Todas las funciones son bloqueantes y devuelven una tabla con el resultado.
+
+```lua
+local res = savecloud.http.get("https://api.example.com/status")
+local res = savecloud.http.post("https://api.example.com/data", '{"key":"value"}', {
+    ["Content-Type"] = "application/json"
+})
+local res = savecloud.http.put("https://api.example.com/resource/1", '{"name":"nuevo"}')
+local res = savecloud.http.delete("https://api.example.com/resource/1")
+```
+
+Todas las funciones devuelven una tabla con estos campos:
+
+```lua
+{
+    ok     = true,       -- true si el status esta entre 200 y 299
+    status = 200,        -- codigo de estado HTTP
+    body   = "...",      -- cuerpo de la respuesta como string
+    error  = nil,        -- mensaje de error de red (solo presente si ok es false y status es 0)
+}
+```
+
+El tercer argumento de `post` y `put`, y el segundo de `get` y `delete`, es una tabla de headers opcional.
+
+Siempre revisa `res.ok` antes de usar `res.body` para manejar errores de red correctamente:
+
+```lua
+local res = savecloud.http.get("https://api.example.com/ping")
+
+if not res.ok then
+    savecloud.log.error("Peticion fallida: " .. (res.error or tostring(res.status)))
+    return
+end
+
+savecloud.log.info("Respuesta: " .. res.body)
+```
 
 ---
 
@@ -134,6 +173,12 @@ SaveCloud configura automaticamente el `package.path` de Lua para buscar dentro 
 
 ---
 
+## Autocompletado en el editor
+
+SaveCloud incluye un archivo de definiciones Lua llamado `savecloud-api.lua` que puedes descargar desde la app en la seccion de desarrollo de plugins. Coloca este archivo en la misma carpeta que tu `init.lua` y tu editor (VS Code con la extension Lua de sumneko, o cualquier editor compatible con LuaLS) mostrara autocompletado y documentacion inline para toda la API.
+
+---
+
 ## Restricciones de seguridad
 
 Las siguientes librerias estandar de Lua estan deshabilitadas por seguridad:
@@ -141,7 +186,7 @@ Las siguientes librerias estandar de Lua estan deshabilitadas por seguridad:
 - `os` -- sin acceso al sistema operativo
 - `io` -- sin acceso al sistema de archivos
 
-Si tu plugin necesita leer o escribir archivos, debes solicitar esa capacidad a traves de la API de SaveCloud en lugar de usar las librerias de Lua directamente.
+Si tu plugin necesita hacer peticiones de red usa `savecloud.http`. Si necesita leer o escribir archivos, solicita esa capacidad a traves de la API de SaveCloud en lugar de usar las librerias de Lua directamente.
 
 ---
 
@@ -170,18 +215,40 @@ end
 ## Ejemplo completo
 
 ```lua
--- plugins/compresor/init.lua
+-- plugins/notificador/init.lua
+-- Envia una notificacion a un webhook cuando se sube un archivo.
+
+local WEBHOOK_URL = "https://hooks.example.com/mi-webhook"
 
 function on_init()
-    savecloud.log.info("Plugin compresor listo")
+    savecloud.log.info("Plugin notificador listo")
+
+    local res = savecloud.http.get(WEBHOOK_URL .. "/ping")
+    if res.ok then
+        savecloud.log.info("Webhook accesible")
+    else
+        savecloud.log.error("Webhook no responde: " .. tostring(res.status))
+    end
 end
 
 function on_pre_upload(data)
-    local tamano_original = #data
-    savecloud.log.info("Archivo recibido: " .. tamano_original .. " bytes")
+    local tamano = #data
+    savecloud.log.info("Archivo recibido: " .. tamano .. " bytes")
 
-    savecloud.db.log_operation("compresor", "pre_upload", "procesados " .. tamano_original .. " bytes")
-    savecloud.ui.emit("plugin_procesado", "compresor")
+    local res = savecloud.http.post(
+        WEBHOOK_URL,
+        '{"texto":"Subiendo archivo de ' .. tamano .. ' bytes"}',
+        { ["Content-Type"] = "application/json" }
+    )
+
+    if res.ok then
+        savecloud.log.info("Notificacion enviada")
+    else
+        savecloud.log.error("Error al notificar: " .. (res.error or tostring(res.status)))
+    end
+
+    savecloud.db.log_operation("notificador", "pre_upload", tamano .. " bytes")
+    savecloud.ui.emit("plugin_notificado", tostring(tamano))
 
     return data
 end

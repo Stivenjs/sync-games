@@ -5,6 +5,7 @@
 //! - Registrar el módulo de log.
 //! - Registrar el módulo de UI.
 //! - Registrar el módulo de DB.
+//! - Registrar el módulo de HTTP.
 
 use crate::plugins::log_buffer::{AppLogs, LogEntry};
 use mlua::{Lua, Result, Table};
@@ -23,6 +24,7 @@ pub fn register_savecloud_api(
     register_log_module(lua, &savecloud_table, app_handle.clone(), logs, plugin_name)?;
     register_ui_module(lua, &savecloud_table, app_handle.clone())?;
     register_db_module(lua, &savecloud_table)?;
+    register_http_module(lua, &savecloud_table)?;
 
     globals.set("savecloud", savecloud_table)?;
     //globals.set("os", mlua::Value::Nil)?;
@@ -130,6 +132,174 @@ fn register_db_module(lua: &Lua, parent_table: &Table) -> Result<()> {
 
     db_table.set("log_operation", log_operation)?;
     parent_table.set("db", db_table)?;
+
+    Ok(())
+}
+
+// Todas las funciones devuelven una tabla Lua con la forma:
+//
+//   { ok = true,  status = 200, body = "..." }
+//   { ok = false, status = 0,   body = "",  error = "mensaje" }
+//
+// Esto permite que el plugin maneje errores sin que un fallo de
+// red rompa el plugin completo.
+//
+// Headers opcionales se pasan como tabla Lua:
+//   { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer ..." }
+
+fn build_response_table(lua: &Lua, status: u16, body: String) -> Result<Table> {
+    let t = lua.create_table()?;
+    t.set("ok", status >= 200 && status < 300)?;
+    t.set("status", status)?;
+    t.set("body", body)?;
+    Ok(t)
+}
+
+fn build_error_table(lua: &Lua, mensaje: String) -> Result<Table> {
+    let t = lua.create_table()?;
+    t.set("ok", false)?;
+    t.set("status", 0u16)?;
+    t.set("body", "")?;
+    t.set("error", mensaje)?;
+    Ok(t)
+}
+
+fn headers_from_lua(tabla: Option<Table>) -> reqwest::header::HeaderMap {
+    let mut map = reqwest::header::HeaderMap::new();
+
+    if let Some(t) = tabla {
+        for pair in t.pairs::<String, String>() {
+            if let Ok((k, v)) = pair {
+                if let (Ok(name), Ok(value)) = (
+                    reqwest::header::HeaderName::from_bytes(k.as_bytes()),
+                    reqwest::header::HeaderValue::from_str(&v),
+                ) {
+                    map.insert(name, value);
+                }
+            }
+        }
+    }
+
+    map
+}
+
+fn register_http_module(lua: &Lua, parent_table: &Table) -> Result<()> {
+    let http_table = lua.create_table()?;
+
+    // savecloud.http.get(url, headers?)
+    // Realiza una petición GET. Headers es opcional.
+    //
+    // Ejemplo:
+    //   local res = savecloud.http.get("https://api.example.com/status")
+    //   local res = savecloud.http.get("https://api.example.com/me", {
+    //     ["Authorization"] = "Bearer token123"
+    //   })
+    let get = lua.create_function(|lua, (url, headers): (String, Option<Table>)| {
+        let client = reqwest::blocking::Client::new();
+
+        let result = client.get(&url).headers(headers_from_lua(headers)).send();
+
+        match result {
+            Ok(res) => {
+                let status = res.status().as_u16();
+                let body = res.text().unwrap_or_default();
+                Ok(build_response_table(lua, status, body)?)
+            }
+            Err(e) => Ok(build_error_table(lua, e.to_string())?),
+        }
+    })?;
+
+    // savecloud.http.post(url, body, headers?)
+    // Realiza una petición POST con body string.
+    //
+    // Ejemplo:
+    //   local res = savecloud.http.post(
+    //     "https://api.example.com/data",
+    //     '{"key":"value"}',
+    //     { ["Content-Type"] = "application/json" }
+    //   )
+    let post = lua.create_function(
+        |lua, (url, body, headers): (String, String, Option<Table>)| {
+            let client = reqwest::blocking::Client::new();
+
+            let result = client
+                .post(&url)
+                .headers(headers_from_lua(headers))
+                .body(body)
+                .send();
+
+            match result {
+                Ok(res) => {
+                    let status = res.status().as_u16();
+                    let body = res.text().unwrap_or_default();
+                    Ok(build_response_table(lua, status, body)?)
+                }
+                Err(e) => Ok(build_error_table(lua, e.to_string())?),
+            }
+        },
+    )?;
+
+    // savecloud.http.put(url, body, headers?)
+    // Realiza una petición PUT con body string.
+    //
+    // Ejemplo:
+    //   local res = savecloud.http.put(
+    //     "https://api.example.com/resource/1",
+    //     '{"name":"nuevo"}',
+    //     { ["Content-Type"] = "application/json" }
+    //   )
+    let put = lua.create_function(
+        |lua, (url, body, headers): (String, String, Option<Table>)| {
+            let client = reqwest::blocking::Client::new();
+
+            let result = client
+                .put(&url)
+                .headers(headers_from_lua(headers))
+                .body(body)
+                .send();
+
+            match result {
+                Ok(res) => {
+                    let status = res.status().as_u16();
+                    let body = res.text().unwrap_or_default();
+                    Ok(build_response_table(lua, status, body)?)
+                }
+                Err(e) => Ok(build_error_table(lua, e.to_string())?),
+            }
+        },
+    )?;
+
+    // savecloud.http.delete(url, headers?)
+    // Realiza una petición DELETE.
+    //
+    // Ejemplo:
+    //   local res = savecloud.http.delete(
+    //     "https://api.example.com/resource/1",
+    //     { ["Authorization"] = "Bearer token123" }
+    //   )
+    let delete = lua.create_function(|lua, (url, headers): (String, Option<Table>)| {
+        let client = reqwest::blocking::Client::new();
+
+        let result = client
+            .delete(&url)
+            .headers(headers_from_lua(headers))
+            .send();
+
+        match result {
+            Ok(res) => {
+                let status = res.status().as_u16();
+                let body = res.text().unwrap_or_default();
+                Ok(build_response_table(lua, status, body)?)
+            }
+            Err(e) => Ok(build_error_table(lua, e.to_string())?),
+        }
+    })?;
+
+    http_table.set("get", get)?;
+    http_table.set("post", post)?;
+    http_table.set("put", put)?;
+    http_table.set("delete", delete)?;
+    parent_table.set("http", http_table)?;
 
     Ok(())
 }
