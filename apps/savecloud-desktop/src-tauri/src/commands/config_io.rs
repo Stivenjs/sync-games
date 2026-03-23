@@ -9,7 +9,6 @@
 //! - Abrir la carpeta de guardados del juego en el explorador.
 //! - Backup de la configuración a la nube.
 
-use crate::commands::config::{ConfigDto, GameDto};
 use crate::commands::sync::api::{
     api_request, sync_list_remote_saves, sync_list_remote_saves_for_user,
 };
@@ -17,8 +16,36 @@ use crate::config;
 use crate::time;
 use chrono::Utc;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigDto {
+    pub api_base_url: Option<String>,
+    pub api_key: Option<String>,
+    pub user_id: Option<String>,
+    pub games: Vec<GameDto>,
+    pub custom_scan_paths: Vec<String>,
+    pub keep_backups_per_game: Option<u32>,
+    pub full_backup_streaming: Option<bool>,
+    pub full_backup_streaming_dry_run: Option<bool>,
+    pub total_playtime: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameDto {
+    pub id: String,
+    pub paths: Vec<String>,
+    pub steam_app_id: Option<String>,
+    pub image_url: Option<String>,
+    pub edition_label: Option<String>,
+    pub source_url: Option<String>,
+    pub magnet_link: Option<String>,
+    pub playtime_seconds: u64,
+}
 
 fn expand_path(raw: &str) -> Option<PathBuf> {
     let mut result = raw.to_string();
