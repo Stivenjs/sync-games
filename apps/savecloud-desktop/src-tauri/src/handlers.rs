@@ -72,5 +72,6 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::tray_tooltip::refresh_tray_tooltip,
         crate::commands::get_steam_app_names_batch,
         crate::commands::plugins::export_plugin_sdk,
+        crate::commands::command_logs::get_plugin_logs,
     ])
 }

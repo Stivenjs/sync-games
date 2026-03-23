@@ -5,13 +5,15 @@
 //! - Cargar todos los plugins.
 //! - Registrar el plugin.
 //! - Ejecutar el hook de inicialización.
+//! - Ejecutar el hook de pre-subida (Pipeline).
 
-use super::plugin::Plugin;
+use super::plugin::{clean_lua_error, Plugin};
+use crate::plugins::log_buffer::AppLogs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
 pub struct PluginManager {
-    plugins: Vec<Plugin>,
+    pub plugins: Vec<Plugin>,
 }
 
 impl PluginManager {
@@ -21,7 +23,11 @@ impl PluginManager {
         }
     }
 
-    pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle) {
+    pub fn _plugin_count(&self) -> usize {
+        self.plugins.len()
+    }
+
+    pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle, logs: AppLogs) {
         println!("Escaneando carpeta de plugins en: {:?}", plugins_dir);
 
         if let Ok(entries) = std::fs::read_dir(plugins_dir) {
@@ -29,22 +35,48 @@ impl PluginManager {
                 let path = entry.path();
 
                 if path.is_dir() {
-                    match Plugin::load_from_dir(&path, app_handle.clone()) {
+                    match Plugin::load_from_dir(&path, app_handle.clone(), logs.clone()) {
                         Ok(plugin) => {
                             println!("Plugin registrado exitosamente: {}", plugin.name);
 
                             if let Err(e) = plugin.trigger_on_init() {
-                                eprintln!("Error ejecutando on_init en {}: {}", plugin.name, e);
+                                eprintln!(
+                                    "Error en on_init de '{}': {}",
+                                    plugin.name,
+                                    clean_lua_error(&e)
+                                );
                             }
 
                             self.plugins.push(plugin);
                         }
                         Err(e) => {
-                            eprintln!("Omitiendo carpeta {:?}: {}", path.file_name().unwrap(), e);
+                            eprintln!(
+                                "Omitiendo carpeta {:?}: {}",
+                                path.file_name().unwrap(),
+                                clean_lua_error(&e)
+                            );
                         }
                     }
                 }
             }
         }
+    }
+
+    pub fn _execute_pre_upload(&self, mut data: Vec<u8>) -> Vec<u8> {
+        for plugin in &self.plugins {
+            match plugin._on_pre_upload(&data) {
+                Ok(modified_data) => {
+                    data = modified_data;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[Plugin Error] '{}' falló en on_pre_upload: {}",
+                        plugin.name,
+                        clean_lua_error(&e)
+                    );
+                }
+            }
+        }
+        data
     }
 }
