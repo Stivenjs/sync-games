@@ -65,7 +65,9 @@ pub fn get_config() -> ConfigDto {
 
     ConfigDto {
         api_base_url: cfg.api_base_url,
-        api_key: cfg.api_key,
+        api_key: cfg
+            .api_key
+            .map(|_| "******** (Protegida por el sistema)".to_string()),
         user_id: cfg.user_id,
         games: cfg
             .games
