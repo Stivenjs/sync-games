@@ -1,4 +1,4 @@
--- /assets/savecloud-api.lua
+-- /apps/savecloud-desktop/src-tauri/lua/savecloud-api.lua
 -- Archivo de definiciones de SaveCloud para autocompletado en el editor.
 -- Coloca este archivo en la misma carpeta que tu script 'init.lua'.
 
