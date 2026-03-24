@@ -23,13 +23,55 @@ use filters::{
 use rayon::prelude::*;
 use regex::Regex;
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 static ENV_VAR_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%([^%]+)%").unwrap());
 static NUMBER_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d+$").unwrap());
+
+static COMMON_ROOT_DIRS: LazyLock<HashSet<String>> = LazyLock::new(|| {
+    let user_profile = std::env::var("USERPROFILE")
+        .unwrap_or_default()
+        .to_lowercase();
+    let public = std::env::var("PUBLIC")
+        .unwrap_or_else(|_| "c:\\users\\public".to_string())
+        .to_lowercase();
+    let appdata = std::env::var("APPDATA").unwrap_or_default().to_lowercase();
+    let localappdata = std::env::var("LOCALAPPDATA")
+        .unwrap_or_default()
+        .to_lowercase();
+
+    [
+        user_profile.clone(),
+        appdata,
+        localappdata.clone(),
+        format!("{}\\locallow", user_profile),
+        format!("{}\\documents", user_profile),
+        format!("{}\\saved games", user_profile),
+        format!("{}\\packages", localappdata),
+        format!("{}\\steam", localappdata),
+        public.clone(),
+        format!("{}\\documents", public),
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    .collect()
+});
+
+struct EnvContext {
+    user_profile: String,
+    home: String,
+}
+
+impl EnvContext {
+    fn resolve() -> Self {
+        let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
+        let home = std::env::var("HOME").unwrap_or_default();
+        Self { user_profile, home }
+    }
+}
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -43,23 +85,34 @@ pub struct PathCandidateDto {
     pub paths: Option<Vec<String>>,
 }
 
+/// Colección de candidatos con dedup por path (case-insensitive) y ordenación
+/// implícita por `(base_path, folder_name)` mediante un `BTreeMap`.
+///
+/// Usar `BTreeMap` elimina el `sort_by()` final: cada inserción mantiene el
+/// orden, de modo que `into_vec()` devuelve la lista ya ordenada en O(1).
 struct CandidateList {
-    candidates: Vec<PathCandidateDto>,
+    map: BTreeMap<(String, String), PathCandidateDto>,
     seen: HashSet<String>,
 }
 
 impl CandidateList {
     fn new() -> Self {
         Self {
-            candidates: Vec::new(),
+            map: BTreeMap::new(),
             seen: HashSet::new(),
         }
     }
 
+    /// Inserta un candidato si su path no ha sido visto antes.
+    /// La clave del `BTreeMap` ordena automáticamente por `(base_path, folder_name)`.
     fn add(&mut self, candidate: PathCandidateDto) {
-        let key = candidate.path.to_lowercase();
-        if self.seen.insert(key) {
-            self.candidates.push(candidate);
+        let path_key = candidate.path.to_lowercase();
+        if self.seen.insert(path_key) {
+            let sort_key = (
+                candidate.base_path.to_lowercase(),
+                candidate.folder_name.to_lowercase(),
+            );
+            self.map.insert(sort_key, candidate);
         }
     }
 
@@ -69,49 +122,25 @@ impl CandidateList {
         }
     }
 
-    fn into_inner(self) -> (Vec<PathCandidateDto>, HashSet<String>) {
-        (self.candidates, self.seen)
+    fn into_vec(self) -> Vec<PathCandidateDto> {
+        self.map.into_values().collect()
     }
 }
 
-// Filtro de carpetas genéricas del sistema para evitar falsos positivos
+/// Devuelve `true` si el path es una raíz genérica del sistema.
 fn is_common_root_dir(path_str: &str) -> bool {
     let mut p = path_str.to_lowercase();
     p = p.trim_end_matches(&['\\', '/']).to_string();
 
-    // Filtra discos base (C:, D:, etc.)
+    // Discos base (C:, D:, …)
     if p.len() <= 3 && p.ends_with(':') {
         return true;
     }
 
-    let user_profile = std::env::var("USERPROFILE")
-        .unwrap_or_default()
-        .to_lowercase();
-    let public = std::env::var("PUBLIC")
-        .unwrap_or_else(|_| "c:\\users\\public".to_string())
-        .to_lowercase();
-    let appdata = std::env::var("APPDATA").unwrap_or_default().to_lowercase();
-    let localappdata = std::env::var("LOCALAPPDATA")
-        .unwrap_or_default()
-        .to_lowercase();
-
-    let common = vec![
-        user_profile.clone(),
-        appdata,
-        localappdata.clone(),
-        format!("{}\\locallow", user_profile),
-        format!("{}\\documents", user_profile),
-        format!("{}\\saved games", user_profile),
-        format!("{}\\packages", localappdata),
-        format!("{}\\steam", localappdata),
-        public.clone(),
-        format!("{}\\documents", public),
-    ];
-
-    common.contains(&p)
+    COMMON_ROOT_DIRS.contains(&p)
 }
 
-fn expand_path(raw: &str) -> Option<String> {
+fn expand_path(raw: &str, env: &EnvContext) -> Option<String> {
     let mut result = raw.to_string();
 
     for cap in ENV_VAR_REGEX.captures_iter(raw) {
@@ -123,13 +152,15 @@ fn expand_path(raw: &str) -> Option<String> {
     }
 
     if result.starts_with('~') {
-        let home = std::env::var("USERPROFILE")
-            .or_else(|_| std::env::var("HOME"))
-            .unwrap_or_default();
+        let home = if !env.user_profile.is_empty() {
+            &env.user_profile
+        } else {
+            &env.home
+        };
         if !home.is_empty() {
             let rest = result.trim_start_matches('~').trim_start_matches('/');
             result = if rest.is_empty() {
-                home
+                home.clone()
             } else {
                 format!("{}/{}", home.trim_end_matches(&['/', '\\']), rest)
             };
@@ -143,6 +174,7 @@ fn expand_path(raw: &str) -> Option<String> {
     }
 }
 
+/// Lista subdirectorios de `dir_path` excluyendo carpetas irrelevantes.
 fn list_subdirs(dir_path: &Path) -> Vec<(PathBuf, String)> {
     let Ok(entries) = fs::read_dir(dir_path) else {
         return vec![];
@@ -170,6 +202,8 @@ fn list_subdirs(dir_path: &Path) -> Vec<(PathBuf, String)> {
         .collect()
 }
 
+/// Escanea un directorio base en busca de candidatos con dos niveles de
+/// profundidad (L1 → L2), aplicando heurísticas de filtrado.
 fn scan_base_paths_into_vec(base_path: &str, base_label: &str) -> Vec<PathCandidateDto> {
     let base = Path::new(base_path);
     if !base.exists() || !base.is_dir() {
@@ -238,6 +272,7 @@ mod windows_scanners {
 
     const MAX_SCAN_DEPTH: usize = 5;
 
+    /// Devuelve todas las unidades lógicas disponibles (A:\ … Z:\).
     pub fn logical_drives() -> Vec<String> {
         (b'A'..=b'Z')
             .map(|c| format!("{}:\\", c as char))
@@ -245,6 +280,7 @@ mod windows_scanners {
             .collect()
     }
 
+    /// Extrae nombre, app_id y paths adicionales del índice del manifiesto.
     fn extract_manifest_data(
         app_id_or_name: &str,
         base_path: &str,
@@ -288,6 +324,7 @@ mod windows_scanners {
         )
     }
 
+    /// Escanea `<steam>/userdata/<user_id>/<app_id>/remote`.
     fn find_steam_userdata_candidates(
         steam_path: &str,
         manifest_index: &Option<manifest::ManifestIndex>,
@@ -330,6 +367,7 @@ mod windows_scanners {
         out
     }
 
+    /// Lee `libraryfolders.vdf` y devuelve las rutas de librerías adicionales.
     fn find_steam_library_paths(steam_path: &str) -> Vec<String> {
         let vdf = Path::new(steam_path)
             .join("steamapps")
@@ -358,6 +396,7 @@ mod windows_scanners {
             .collect()
     }
 
+    /// Escanea `<library>/steamapps/common` en busca de instalaciones de juegos.
     fn find_steam_library_candidates(
         library_path: &str,
         path_to_appid: &std::collections::HashMap<PathBuf, String>,
@@ -395,6 +434,9 @@ mod windows_scanners {
             .collect()
     }
 
+    /// Punto de entrada del scanner de Steam.
+    ///
+    /// Las librerías adicionales se escanean en paralelo con `par_iter()`
     pub fn scan_steam(
         candidate_list: &mut CandidateList,
         path_to_appid: &std::collections::HashMap<PathBuf, String>,
@@ -410,23 +452,29 @@ mod windows_scanners {
         let mut libraries = vec![steam_path.to_string()];
         libraries.extend(find_steam_library_paths(steam_path));
 
-        for lib in libraries {
-            for mut c in find_steam_library_candidates(&lib, path_to_appid) {
-                let app_id_opt = steam::resolve_steam_app_id_from_map(path_to_appid, &c.path);
-                c.steam_app_id = app_id_opt.clone();
+        let lib_candidates: Vec<PathCandidateDto> = libraries
+            .par_iter()
+            .flat_map(|lib| {
+                let mut results = find_steam_library_candidates(lib, path_to_appid);
+                for c in &mut results {
+                    let app_id_opt = steam::resolve_steam_app_id_from_map(path_to_appid, &c.path);
+                    c.steam_app_id = app_id_opt.clone();
 
-                if let Some(app_id) = app_id_opt {
-                    let (folder_name, _, paths, path_display) =
-                        extract_manifest_data(&app_id, &c.path, manifest_index);
-                    c.folder_name = folder_name;
-                    if paths.is_some() {
-                        c.paths = paths;
-                        c.path = path_display;
+                    if let Some(app_id) = app_id_opt {
+                        let (folder_name, _, paths, path_display) =
+                            extract_manifest_data(&app_id, &c.path, manifest_index);
+                        c.folder_name = folder_name;
+                        if paths.is_some() {
+                            c.paths = paths;
+                            c.path = path_display;
+                        }
                     }
                 }
-                candidate_list.add(c);
-            }
-        }
+                results
+            })
+            .collect();
+
+        candidate_list.extend(lib_candidates);
     }
 
     fn is_steam_app_id_folder(name: &str) -> bool {
@@ -452,12 +500,14 @@ mod windows_scanners {
         false
     }
 
+    /// Escanea ubicaciones de guardados de versiones "crackeadas" / emuladas.
     pub fn scan_cracks(
         candidate_list: &mut CandidateList,
         manifest_index: &Option<manifest::ManifestIndex>,
+        env: &EnvContext,
     ) {
         for entry in paths::crack_save_locations() {
-            let Some(base_path) = expand_path(&entry.path) else {
+            let Some(base_path) = expand_path(&entry.path, env) else {
                 continue;
             };
             let base = Path::new(&base_path);
@@ -516,10 +566,10 @@ mod windows_scanners {
     }
 }
 
-fn base_scan_jobs(cfg: &config::Config) -> Vec<(String, String)> {
+fn base_scan_jobs(cfg: &config::Config, env: &EnvContext) -> Vec<(String, String)> {
     let mut jobs: Vec<(String, String)> = paths::base_scan_templates()
         .into_iter()
-        .filter_map(|entry| expand_path(&entry.path).map(|exp| (exp, entry.label.clone())))
+        .filter_map(|entry| expand_path(&entry.path, env).map(|exp| (exp, entry.label.clone())))
         .collect();
 
     #[cfg(target_os = "windows")]
@@ -535,7 +585,7 @@ fn base_scan_jobs(cfg: &config::Config) -> Vec<(String, String)> {
         if trimmed.is_empty() {
             continue;
         }
-        let path = expand_path(trimmed).unwrap_or_else(|| trimmed.to_string());
+        let path = expand_path(trimmed, env).unwrap_or_else(|| trimmed.to_string());
         if !Path::new(&path).exists() {
             continue;
         }
@@ -600,19 +650,40 @@ fn read_registry_install_dir(full_path: &str) -> Option<String> {
     None
 }
 
+/// Construye un `HashSet` con todos los paths oficiales (y sus variantes en
+/// `paths`) normalizados a minúsculas.
+///
+/// Este índice permite que el filtro de redundancia opere en O(1) por
+/// candidato en lugar de iterar toda la lista en cada comprobación (O(n²)).
+#[cfg(target_os = "windows")]
+fn build_official_path_index(candidates: &[PathCandidateDto]) -> HashSet<String> {
+    let mut index = HashSet::new();
+    for c in candidates {
+        if c.base_path == "Base de Datos Oficial" {
+            index.insert(c.path.to_lowercase());
+            if let Some(extra_paths) = &c.paths {
+                for ep in extra_paths {
+                    index.insert(ep.to_lowercase());
+                }
+            }
+        }
+    }
+    index
+}
+
 fn scan_path_candidates_sync(
     #[cfg(target_os = "windows")] manifest_index: Option<crate::manifest::ManifestIndex>,
 ) -> Vec<PathCandidateDto> {
     let cfg = config::load_config();
+    let env = EnvContext::resolve();
     let mut list = CandidateList::new();
 
-    
     #[cfg(target_os = "windows")]
     if let Some(manifest) = &manifest_index {
         let mut unique_entries = Vec::new();
-        let mut seen = HashSet::new();
+        let mut seen_names = HashSet::new();
         for entry in manifest.values() {
-            if seen.insert(&entry.name) {
+            if seen_names.insert(&entry.name) {
                 unique_entries.push(entry);
             }
         }
@@ -652,7 +723,6 @@ fn scan_path_candidates_sync(
                         };
 
                         let path = Path::new(&clean_path_str);
-
                         if path.exists() {
                             let folder_path = if path.is_file() {
                                 path.parent().unwrap_or(path).to_string_lossy().to_string()
@@ -660,23 +730,20 @@ fn scan_path_candidates_sync(
                                 clean_path_str.clone()
                             };
 
-                            // Filtramos directorios genéricos vacíos (ej. C:\, AppData\Local, etc.)
-                            if Path::new(&folder_path).is_dir() && !is_common_root_dir(&folder_path)
-                            {
-                                if std::fs::read_dir(&folder_path)
+                            if Path::new(&folder_path).is_dir()
+                                && !is_common_root_dir(&folder_path)
+                                && fs::read_dir(&folder_path)
                                     .map(|mut i| i.next().is_some())
                                     .unwrap_or(false)
-                                {
-                                    if !valid_game_paths.contains(&folder_path) {
-                                        valid_game_paths.push(folder_path);
-                                    }
+                            {
+                                if !valid_game_paths.contains(&folder_path) {
+                                    valid_game_paths.push(folder_path);
                                 }
                             }
                         }
                     }
                 }
 
-            // Si un juego de Ludusavi tiene múltiples rutas, las agrupamos en un solo DTO.
                 if !valid_game_paths.is_empty() {
                     let display_path = valid_game_paths[0].clone();
                     let paths_opt = if valid_game_paths.len() > 1 {
@@ -701,7 +768,7 @@ fn scan_path_candidates_sync(
         list.extend(active_candidates);
     }
 
-    let parallel_candidates: Vec<PathCandidateDto> = base_scan_jobs(&cfg)
+    let parallel_candidates: Vec<PathCandidateDto> = base_scan_jobs(&cfg, &env)
         .par_iter()
         .flat_map(|(base_path, label)| scan_base_paths_into_vec(base_path, label))
         .collect();
@@ -712,49 +779,32 @@ fn scan_path_candidates_sync(
     {
         let path_to_appid = crate::steam::get_steam_path_to_appid_map();
         windows_scanners::scan_steam(&mut list, &path_to_appid, &manifest_index);
-        windows_scanners::scan_cracks(&mut list, &manifest_index);
+        windows_scanners::scan_cracks(&mut list, &manifest_index, &env);
     }
 
-    let (final_candidates, _) = list.into_inner();
+    let all_candidates = list.into_vec();
 
- 
-    let mut filtered_candidates = Vec::new();
-    for cand in &final_candidates {
-        if cand.base_path != "Base de Datos Oficial" {
-      
-            let is_redundant = final_candidates.iter().any(|official| {
-                if official.base_path == "Base de Datos Oficial" {
-                    let cand_path_lower = cand.path.to_lowercase();
+    #[cfg(target_os = "windows")]
+    let official_index = build_official_path_index(&all_candidates);
+    #[cfg(not(target_os = "windows"))]
+    let official_index: HashSet<String> = HashSet::new();
 
-                    let mut official_paths = vec![official.path.to_lowercase()];
-                    if let Some(extra_paths) = &official.paths {
-                        for ep in extra_paths {
-                            official_paths.push(ep.to_lowercase());
-                        }
-                    }
-
-                    official_paths.iter().any(|op| {
-                        op.starts_with(&cand_path_lower) && op.len() > cand_path_lower.len()
-                    })
-                } else {
-                    false
-                }
-            });
-
-            if is_redundant {
-                continue;
+    all_candidates
+        .into_iter()
+        .filter(|cand| {
+            if cand.base_path == "Base de Datos Oficial" {
+                return true;
             }
-        }
-        filtered_candidates.push(cand.clone());
-    }
 
-    filtered_candidates.sort_by(|a, b| {
-        a.base_path
-            .cmp(&b.base_path)
-            .then(a.folder_name.cmp(&b.folder_name))
-    });
+            let cand_path_lower = cand.path.to_lowercase();
 
-    filtered_candidates
+            let is_redundant = official_index
+                .iter()
+                .any(|op| op.starts_with(&cand_path_lower) && op.len() > cand_path_lower.len());
+
+            !is_redundant
+        })
+        .collect()
 }
 
 #[tauri::command]
