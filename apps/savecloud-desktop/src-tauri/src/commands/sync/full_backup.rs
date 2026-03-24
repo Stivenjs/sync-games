@@ -365,7 +365,10 @@ pub async fn create_and_upload_full_backup(
     tray_state.0.update_tooltip();
 
     let result = if use_streaming && dry_run {
-        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(source_dir, 8);
+        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(
+            source_dir,
+            streaming::tar_stream::TAR_CHANNEL_CAPACITY,
+        );
         let upload_res = streaming::multipart::upload_tar_stream_multipart_dry_run(
             rx,
             &game_id,
@@ -378,7 +381,10 @@ pub async fn create_and_upload_full_backup(
         let _ = tar_handle.await;
         upload_res
     } else if use_streaming {
-        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(source_dir, 8);
+        let (rx, tar_handle) = streaming::tar_stream::spawn_tar_stream(
+            source_dir,
+            streaming::tar_stream::TAR_CHANNEL_CAPACITY,
+        );
         let upload_res = streaming::multipart::upload_tar_stream_multipart(
             rx,
             &game_id,
