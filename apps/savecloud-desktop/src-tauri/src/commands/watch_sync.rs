@@ -188,7 +188,8 @@ pub fn spawn_watcher(app: AppHandle, tray_state: Arc<crate::tray_state::TrayStat
         let active_syncs: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
 
         // Periodo de gracia tras el último archivo modificado antes de efectuar la subida
-        let debounce_duration = Duration::from_secs(10);
+        let debounce_duration: Duration = Duration::from_secs(300);
+        let audit_interval: Duration = Duration::from_secs(10);
 
         loop {
             tokio::select! {
@@ -210,7 +211,7 @@ pub fn spawn_watcher(app: AppHandle, tray_state: Arc<crate::tray_state::TrayStat
                 }
 
                 // 2. Auditoría: Revisamos quiénes ya cumplieron su tiempo de espera
-                _ = tokio::time::sleep(Duration::from_secs(300)) => {
+                _ = tokio::time::sleep(audit_interval) => {
                     let now = Instant::now();
                     let mut games_to_process = Vec::new();
 
