@@ -1,6 +1,6 @@
 import type { SaveRepository } from "@domain/ports/SaveRepository";
 
-export const MAX_PARTS_INIT_WITH_URLS = 10000;
+export const MAX_PARTS_INIT_WITH_URLS = 200;
 
 export interface CreateMultipartUploadWithPartUrlsInput {
   userId: string;

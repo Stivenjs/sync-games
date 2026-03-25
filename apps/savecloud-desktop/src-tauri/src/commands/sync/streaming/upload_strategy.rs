@@ -221,20 +221,29 @@ impl ConcurrencyController {
     fn apply_adjustment(&mut self) {
         self.adjusted = true;
 
-        let total_bytes: u64 = self.samples.iter().map(|(b, _)| b).sum();
-        let total_ms: u128 = self.samples.iter().map(|(_, ms)| ms).sum();
-
-        if total_ms == 0 {
+        if self.samples.is_empty() {
             return;
         }
 
-        // Throughput en Mbps: (bytes * 8) / (ms / 1000) / 1_000_000
-        let throughput_mbps = (total_bytes as f64 * 8.0) / (total_ms as f64 / 1000.0) / 1_000_000.0;
+        let mut total_throughput_mbps = 0.0;
 
-        let new_concurrency = concurrency_for_throughput(throughput_mbps);
+        for &(bytes, ms) in &self.samples {
+            if ms > 0 {
+                // Throughput individual de esta tarea en Mbps
+                let task_mbps = (bytes as f64 * 8.0) / (ms as f64 / 1000.0) / 1_000_000.0;
+                total_throughput_mbps += task_mbps;
+            }
+        }
 
-        // Solo subimos la concurrencia, nunca la bajamos, para no interrumpir
-        // partes ya en vuelo que podrían estar cerca de completarse.
+        // El throughput promedio por hilo
+        let avg_task_mbps = total_throughput_mbps / self.samples.len() as f64;
+
+        // El throughput total estimado de la red es el promedio por hilo
+        // multiplicado por los hilos que estaban compitiendo por la red.
+        let estimated_network_mbps = avg_task_mbps * self.current as f64;
+
+        let new_concurrency = concurrency_for_throughput(estimated_network_mbps);
+
         if new_concurrency > self.current {
             self.current = new_concurrency;
         }
@@ -245,16 +254,22 @@ impl ConcurrencyController {
         if self.samples.is_empty() {
             return format!("concurrency={} (sin muestras)", self.current);
         }
-        let total_bytes: u64 = self.samples.iter().map(|(b, _)| b).sum();
-        let total_ms: u128 = self.samples.iter().map(|(_, ms)| ms).sum();
-        let mbps = if total_ms > 0 {
-            (total_bytes as f64 * 8.0) / (total_ms as f64 / 1000.0) / 1_000_000.0
-        } else {
-            0.0
-        };
+
+        let mut total_throughput_mbps = 0.0;
+
+        for &(bytes, ms) in &self.samples {
+            if ms > 0 {
+                let task_mbps = (bytes as f64 * 8.0) / (ms as f64 / 1000.0) / 1_000_000.0;
+                total_throughput_mbps += task_mbps;
+            }
+        }
+
+        let avg_task_mbps = total_throughput_mbps / self.samples.len() as f64;
+        let estimated_network_mbps = avg_task_mbps * self.current as f64;
+
         format!(
             "concurrency={} throughput_mbps={:.1} adjusted={}",
-            self.current, mbps, self.adjusted
+            self.current, estimated_network_mbps, self.adjusted
         )
     }
 }

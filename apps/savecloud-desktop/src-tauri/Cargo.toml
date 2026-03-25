@@ -48,6 +48,7 @@ librqbit = "8.1.1"
 tauri-plugin-single-instance = "2.4.0"
 filetime = "0.2.27"
 mlua = { version = "0.11", features = ["luajit", "vendored", "serialize", "send"] }
+tokio-stream = { version = "0.1.18", features = ["sync"] }
 
 
 [dev-dependencies]
