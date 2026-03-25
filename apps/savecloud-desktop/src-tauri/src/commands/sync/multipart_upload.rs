@@ -341,6 +341,53 @@ async fn multipart_abort(
     Ok(())
 }
 
+/// Función de ayuda que encapsula el hilo "Productor".
+/// Genera URLs en lotes y las inyecta en el canal (tx) para que los workers las consuman.
+fn spawn_url_prefetcher(
+    api_base: String,
+    user_id: String,
+    api_key: String,
+    key: String,
+    upload_id: String,
+    total_size: u64,
+    parts_to_fetch: Vec<u32>,
+    tx: mpsc::Sender<(u32, u64, u64, String)>,
+    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+) {
+    tokio::spawn(async move {
+        for chunk in parts_to_fetch.chunks(PARTS_PER_URL_BATCH as usize) {
+            if let Some(ref t) = cancel {
+                if t.upload_cancel_requested() || t.upload_pause_requested() {
+                    break;
+                }
+            }
+
+            let urls_result = with_retry(|| {
+                multipart_part_urls(&api_base, &user_id, &api_key, &key, &upload_id, chunk)
+            })
+            .await;
+
+            match urls_result {
+                Ok(urls) => {
+                    for (num, url) in urls {
+                        let start = (num - 1) as u64 * PART_SIZE;
+                        let part_len = std::cmp::min(PART_SIZE, total_size.saturating_sub(start));
+
+                        // Si el canal está lleno, `.send` esperará a que un worker termine
+                        if tx.send((num, start, part_len, url)).await.is_err() {
+                            return; // El consumidor (rx) se ha cerrado, abortamos la tarea
+                        }
+                    }
+                }
+                Err(e) => {
+                    sync_logger::log_operation("upload_prefetch_error", &e);
+                    break;
+                }
+            }
+        }
+    });
+}
+
 /// Sube un archivo mediante multipart. Emite progreso y respeta cancelación entre partes.
 pub(crate) async fn upload_one_file_multipart(
     absolute_path: &Path,
@@ -386,55 +433,19 @@ pub(crate) async fn upload_one_file_multipart(
     // Canal con capacidad limitada para aplicar contrapresión (Backpressure)
     let (tx, rx) = mpsc::channel::<(u32, u64, u64, String)>(MULTIPART_PUT_CONCURRENCY * 2);
 
-    let api_base_prod = api_base.to_string();
-    let user_id_prod = user_id.to_string();
-    let api_key_prod = api_key.to_string();
-    let key_prod = key.clone();
-    let upload_id_prod = upload_id.clone();
-    let cancel_prod = cancel.clone();
+    let parts_to_fetch: Vec<u32> = (1..=num_parts).collect();
 
-    // Tarea Productora: Pide URLs JIT (Just-In-Time)
-    tokio::spawn(async move {
-        let parts_to_fetch: Vec<u32> = (1..=num_parts).collect();
-
-        for chunk in parts_to_fetch.chunks(PARTS_PER_URL_BATCH as usize) {
-            if let Some(ref t) = cancel_prod {
-                if t.upload_cancel_requested() || t.upload_pause_requested() {
-                    break;
-                }
-            }
-
-            let urls_result = with_retry(|| {
-                multipart_part_urls(
-                    &api_base_prod,
-                    &user_id_prod,
-                    &api_key_prod,
-                    &key_prod,
-                    &upload_id_prod,
-                    chunk,
-                )
-            })
-            .await;
-
-            match urls_result {
-                Ok(urls) => {
-                    for (num, url) in urls {
-                        let start = (num - 1) as u64 * PART_SIZE;
-                        let part_len = std::cmp::min(PART_SIZE, total_size.saturating_sub(start));
-
-                        // Si el canal está lleno, `.send` esperará a que un worker termine
-                        if tx.send((num, start, part_len, url)).await.is_err() {
-                            return; // El consumidor (rx) se ha cerrado, abortamos la tarea
-                        }
-                    }
-                }
-                Err(e) => {
-                    sync_logger::log_operation("upload_prefetch_error", &e);
-                    break;
-                }
-            }
-        }
-    });
+    spawn_url_prefetcher(
+        api_base.to_string(),
+        user_id.to_string(),
+        api_key.to_string(),
+        key.clone(),
+        upload_id.clone(),
+        total_size,
+        parts_to_fetch,
+        tx,
+        cancel.clone(),
+    );
 
     let path_buf = absolute_path.to_path_buf();
     let game_id_owned = game_id.to_string();
@@ -614,46 +625,17 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
     // Productor-Consumidor para la reanudación
     let (tx, rx) = mpsc::channel::<(u32, u64, u64, String)>(MULTIPART_PUT_CONCURRENCY * 2);
 
-    let api_base_prod = api_base.to_string();
-    let user_id_prod = user_id.to_string();
-    let api_key_prod = api_key.to_string();
-    let key_prod = state.key.clone();
-    let upload_id_prod = state.upload_id.clone();
-    let total_size_prod = state.total_size;
-
-    tokio::spawn(async move {
-        for chunk in remaining.chunks(PARTS_PER_URL_BATCH as usize) {
-            let urls_result = with_retry(|| {
-                multipart_part_urls(
-                    &api_base_prod,
-                    &user_id_prod,
-                    &api_key_prod,
-                    &key_prod,
-                    &upload_id_prod,
-                    chunk,
-                )
-            })
-            .await;
-
-            match urls_result {
-                Ok(urls) => {
-                    for (num, url) in urls {
-                        let start = (num - 1) as u64 * PART_SIZE;
-                        let part_len =
-                            std::cmp::min(PART_SIZE, total_size_prod.saturating_sub(start));
-
-                        if tx.send((num, start, part_len, url)).await.is_err() {
-                            return;
-                        }
-                    }
-                }
-                Err(e) => {
-                    sync_logger::log_operation("resume_prefetch_error", &e);
-                    break;
-                }
-            }
-        }
-    });
+    spawn_url_prefetcher(
+        api_base.to_string(),
+        user_id.to_string(),
+        api_key.to_string(),
+        state.key.clone(),
+        state.upload_id.clone(),
+        state.total_size,
+        remaining,
+        tx,
+        None,
+    );
 
     let mut all_parts: Vec<(u32, String)> = state
         .completed_parts
