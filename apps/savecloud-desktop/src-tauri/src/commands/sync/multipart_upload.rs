@@ -18,7 +18,7 @@
 //! - Se aplican reintentos con backoff en todas las fases críticas del flujo.
 //! - Se configuran timeouts de conexión y de request en el cliente HTTP.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -26,10 +26,12 @@ use std::sync::LazyLock;
 use super::api;
 use super::models::SyncProgressPayload;
 use super::sync_logger;
-use futures_util::stream::{self, StreamExt};
+use futures_util::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub const PAUSED_ERR_MSG: &str = "PAUSED";
 
@@ -94,11 +96,8 @@ pub(crate) const PART_SIZE: u64 = 10 * 1024 * 1024;
 /// Umbral: archivos mayores usan multipart; menores usan PUT simple.
 pub(crate) const MULTIPART_THRESHOLD: u64 = 5 * 1024 * 1024;
 
-/// Cuántas partes pedir por llamada a part-urls (resume o fallback cuando init-with-part-urls no se usa).
-const PARTS_PER_URL_BATCH: u32 = 100;
-
-/// Máximo de partes que la API devuelve en init-with-part-urls (una sola invocación).
-const MAX_PARTS_INIT_WITH_URLS: u32 = 10000;
+/// Cuántas partes pedir por llamada a part-urls.
+const PARTS_PER_URL_BATCH: u32 = 32;
 
 /// Reintentos para operaciones que pueden fallar por red o 5xx (init, part-urls, complete, PUT parte).
 const MAX_RETRIES: u32 = 3;
@@ -140,14 +139,6 @@ where
 struct MultipartInitResponse {
     upload_id: String,
     key: String,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct InitWithPartUrlsResponse {
-    upload_id: String,
-    key: String,
-    part_urls: Vec<PartUrlItem>,
 }
 
 #[derive(serde::Serialize)]
@@ -220,61 +211,6 @@ async fn multipart_init(
     Ok((parsed.upload_id, parsed.key))
 }
 
-/// Inicia multipart y obtiene todas las URLs de partes en una sola llamada.
-async fn multipart_init_with_part_urls(
-    api_base: &str,
-    user_id: &str,
-    api_key: &str,
-    game_id: &str,
-    filename: &str,
-    part_count: u32,
-) -> Result<Option<(String, String, HashMap<u32, String>)>, String> {
-    let body = serde_json::json!({
-        "gameId": game_id,
-        "filename": filename,
-        "partCount": part_count
-    });
-    let res = api::api_request(
-        api_base,
-        user_id,
-        api_key,
-        "POST",
-        "/multipart/init-with-part-urls",
-        Some(body.to_string().as_bytes()),
-    )
-    .await
-    .map_err(|e| format!("multipart/init-with-part-urls: {}", e))?;
-
-    if res.status().as_u16() == 404 {
-        return Ok(None);
-    }
-    if !res.status().is_success() {
-        let status = res.status();
-        let text = res.text().await.unwrap_or_default();
-        sync_logger::log_api(
-            "multipart/init-with-part-urls",
-            "/multipart/init-with-part-urls",
-            status.as_u16(),
-            &text,
-        );
-        return Err(format!(
-            "API multipart/init-with-part-urls: {} {}",
-            status, text
-        ));
-    }
-
-    let parsed: InitWithPartUrlsResponse = res
-        .json()
-        .await
-        .map_err(|e| format!("parse init-with-part-urls: {}", e))?;
-    let map: HashMap<u32, String> = parsed
-        .part_urls
-        .into_iter()
-        .map(|p| (p.part_number, p.url))
-        .collect();
-    Ok(Some((parsed.upload_id, parsed.key, map)))
-}
-
 async fn multipart_part_urls(
     api_base: &str,
     user_id: &str,
@@ -325,39 +261,6 @@ async fn multipart_part_urls(
         .into_iter()
         .map(|p| (p.part_number, p.url))
         .collect())
-}
-
-/// Pide URLs de partes en lotes.
-async fn fetch_part_urls_in_batches(
-    api_base: &str,
-    user_id: &str,
-    api_key: &str,
-    key: &str,
-    upload_id: &str,
-    num_parts: u32,
-    cancel: Option<&crate::tray_state::TrayStateInner>,
-) -> Result<HashMap<u32, String>, String> {
-    let mut map = HashMap::with_capacity(num_parts as usize);
-    let mut batch_start = 1u32;
-    while batch_start <= num_parts {
-        if let Some(t) = cancel {
-            if t.upload_cancel_requested() {
-                let _ = multipart_abort(api_base, user_id, api_key, key, upload_id).await;
-                return Err("Subida cancelada".to_string());
-            }
-        }
-        let batch_end = std::cmp::min(batch_start + PARTS_PER_URL_BATCH - 1, num_parts);
-        let part_numbers: Vec<u32> = (batch_start..=batch_end).collect();
-        let urls = with_retry(|| {
-            multipart_part_urls(api_base, user_id, api_key, key, upload_id, &part_numbers)
-        })
-        .await?;
-        for (num, url) in urls {
-            map.insert(num, url);
-        }
-        batch_start = batch_end + 1;
-    }
-    Ok(map)
 }
 
 async fn multipart_complete(
@@ -460,7 +363,7 @@ pub(crate) async fn upload_one_file_multipart(
         ((total_size + PART_SIZE - 1) / PART_SIZE) as u32
     };
 
-    let (upload_id, key, part_urls): (String, String, HashMap<u32, String>) = if num_parts == 0 {
+    let (upload_id, key) = if num_parts == 0 {
         let (uid, k) =
             with_retry(|| multipart_init(api_base, user_id, api_key, game_id, relative_filename))
                 .await?;
@@ -475,80 +378,73 @@ pub(crate) async fn upload_one_file_multipart(
             },
         );
         return Ok(());
-    } else if num_parts <= MAX_PARTS_INIT_WITH_URLS {
-        if let Some(ref t) = cancel {
-            if t.upload_cancel_requested() {
-                return Err("Subida cancelada".to_string());
-            }
-        }
-        match with_retry(|| {
-            multipart_init_with_part_urls(
-                api_base,
-                user_id,
-                api_key,
-                game_id,
-                relative_filename,
-                num_parts,
-            )
-        })
-        .await?
-        {
-            Some((uid, k, map)) => (uid, k, map),
-            None => {
-                let (uid, k) = with_retry(|| {
-                    multipart_init(api_base, user_id, api_key, game_id, relative_filename)
-                })
-                .await?;
-                let map = fetch_part_urls_in_batches(
-                    api_base,
-                    user_id,
-                    api_key,
-                    &k,
-                    &uid,
-                    num_parts,
-                    cancel.as_deref(),
-                )
-                .await?;
-                (uid, k, map)
-            }
-        }
     } else {
-        let (uid, k) =
-            with_retry(|| multipart_init(api_base, user_id, api_key, game_id, relative_filename))
-                .await?;
-        let map = fetch_part_urls_in_batches(
-            api_base,
-            user_id,
-            api_key,
-            &k,
-            &uid,
-            num_parts,
-            cancel.as_deref(),
-        )
-        .await?;
-        (uid, k, map)
+        with_retry(|| multipart_init(api_base, user_id, api_key, game_id, relative_filename))
+            .await?
     };
+
+    // Canal con capacidad limitada para aplicar contrapresión (Backpressure)
+    let (tx, rx) = mpsc::channel::<(u32, u64, u64, String)>(MULTIPART_PUT_CONCURRENCY * 2);
+
+    let api_base_prod = api_base.to_string();
+    let user_id_prod = user_id.to_string();
+    let api_key_prod = api_key.to_string();
+    let key_prod = key.clone();
+    let upload_id_prod = upload_id.clone();
+    let cancel_prod = cancel.clone();
+
+    // Tarea Productora: Pide URLs JIT (Just-In-Time)
+    tokio::spawn(async move {
+        let parts_to_fetch: Vec<u32> = (1..=num_parts).collect();
+
+        for chunk in parts_to_fetch.chunks(PARTS_PER_URL_BATCH as usize) {
+            if let Some(ref t) = cancel_prod {
+                if t.upload_cancel_requested() || t.upload_pause_requested() {
+                    break;
+                }
+            }
+
+            let urls_result = with_retry(|| {
+                multipart_part_urls(
+                    &api_base_prod,
+                    &user_id_prod,
+                    &api_key_prod,
+                    &key_prod,
+                    &upload_id_prod,
+                    chunk,
+                )
+            })
+            .await;
+
+            match urls_result {
+                Ok(urls) => {
+                    for (num, url) in urls {
+                        let start = (num - 1) as u64 * PART_SIZE;
+                        let part_len = std::cmp::min(PART_SIZE, total_size.saturating_sub(start));
+
+                        // Si el canal está lleno, `.send` esperará a que un worker termine
+                        if tx.send((num, start, part_len, url)).await.is_err() {
+                            return; // El consumidor (rx) se ha cerrado, abortamos la tarea
+                        }
+                    }
+                }
+                Err(e) => {
+                    sync_logger::log_operation("upload_prefetch_error", &e);
+                    break;
+                }
+            }
+        }
+    });
 
     let path_buf = absolute_path.to_path_buf();
     let game_id_owned = game_id.to_string();
     let filename_owned = relative_filename.to_string();
 
-    let jobs: Vec<(u32, u64, u64, String)> = (1..=num_parts)
-        .map(|part_number| {
-            let start = (part_number - 1) as u64 * PART_SIZE;
-            let part_len = std::cmp::min(PART_SIZE, total_size.saturating_sub(start));
-            let url = part_urls
-                .get(&part_number)
-                .cloned()
-                .ok_or_else(|| format!("Falta URL para parte {}", part_number))?;
-            Ok((part_number, start, part_len, url))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-
     let mut completed_parts: Vec<(u32, String)> = Vec::with_capacity(num_parts as usize);
     let mut loaded: u64 = 0;
 
-    let mut stream = stream::iter(jobs)
+    // Tarea Consumidora: Workers procesando el flujo de URLs
+    let mut stream = ReceiverStream::new(rx)
         .map(|(part_number, start, part_len, url)| {
             let path = path_buf.clone();
             async move {
@@ -570,6 +466,7 @@ pub(crate) async fn upload_one_file_multipart(
                     .send()
                     .await
                     .map_err(|e| format!("PUT parte {}: {}", part_number, e))?;
+
                 if !res.status().is_success() {
                     return Err(format!("parte {}: S3 PUT {}", part_number, res.status()));
                 }
@@ -631,6 +528,11 @@ pub(crate) async fn upload_one_file_multipart(
         );
     }
 
+    if completed_parts.len() < num_parts as usize {
+        let _ = multipart_abort(api_base, user_id, api_key, &key, &upload_id).await;
+        return Err("Error: La subida finalizó de forma incompleta (posible fallo de red)".into());
+    }
+
     completed_parts.sort_by_key(|p| p.0);
 
     with_retry(|| {
@@ -671,7 +573,7 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         ((state.total_size + PART_SIZE - 1) / PART_SIZE) as u32
     };
 
-    let completed_set: std::collections::HashSet<u32> = state
+    let completed_set: HashSet<u32> = state
         .completed_parts
         .iter()
         .map(|p| p.part_number)
@@ -709,28 +611,49 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         return Ok(());
     }
 
-    // Pedir URLs de las partes restantes en lotes
-    let part_urls: HashMap<u32, String> = {
-        let mut map = HashMap::with_capacity(remaining.len());
+    // Productor-Consumidor para la reanudación
+    let (tx, rx) = mpsc::channel::<(u32, u64, u64, String)>(MULTIPART_PUT_CONCURRENCY * 2);
+
+    let api_base_prod = api_base.to_string();
+    let user_id_prod = user_id.to_string();
+    let api_key_prod = api_key.to_string();
+    let key_prod = state.key.clone();
+    let upload_id_prod = state.upload_id.clone();
+    let total_size_prod = state.total_size;
+
+    tokio::spawn(async move {
         for chunk in remaining.chunks(PARTS_PER_URL_BATCH as usize) {
-            let part_numbers: Vec<u32> = chunk.to_vec();
-            let urls = with_retry(|| {
+            let urls_result = with_retry(|| {
                 multipart_part_urls(
-                    api_base,
-                    user_id,
-                    api_key,
-                    &state.key,
-                    &state.upload_id,
-                    &part_numbers,
+                    &api_base_prod,
+                    &user_id_prod,
+                    &api_key_prod,
+                    &key_prod,
+                    &upload_id_prod,
+                    chunk,
                 )
             })
-            .await?;
-            for (num, url) in urls {
-                map.insert(num, url);
+            .await;
+
+            match urls_result {
+                Ok(urls) => {
+                    for (num, url) in urls {
+                        let start = (num - 1) as u64 * PART_SIZE;
+                        let part_len =
+                            std::cmp::min(PART_SIZE, total_size_prod.saturating_sub(start));
+
+                        if tx.send((num, start, part_len, url)).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+                Err(e) => {
+                    sync_logger::log_operation("resume_prefetch_error", &e);
+                    break;
+                }
             }
         }
-        map
-    };
+    });
 
     let mut all_parts: Vec<(u32, String)> = state
         .completed_parts
@@ -742,20 +665,7 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
     let mut loaded = (all_parts.len() as u64) * PART_SIZE;
 
     // Concurrencia para la reanudación
-    let jobs: Vec<(u32, u64, u64, String)> = remaining
-        .into_iter()
-        .map(|part_number| {
-            let start = (part_number - 1) as u64 * PART_SIZE;
-            let part_len = std::cmp::min(PART_SIZE, state.total_size.saturating_sub(start));
-            let url = part_urls
-                .get(&part_number)
-                .cloned()
-                .expect("Falta URL de parte en resume");
-            (part_number, start, part_len, url)
-        })
-        .collect();
-
-    let mut stream = stream::iter(jobs)
+    let mut stream = ReceiverStream::new(rx)
         .map(|(part_number, start, part_len, url)| {
             let path = path_buf.clone();
             async move {
@@ -792,6 +702,8 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
         })
         .buffer_unordered(MULTIPART_PUT_CONCURRENCY);
 
+    let required_parts_len = num_parts as usize;
+
     while let Some(result) = stream.next().await {
         let (part_number, etag, part_len) = result?;
         all_parts.push((part_number, etag));
@@ -806,6 +718,10 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
                 total: state.total_size,
             },
         );
+    }
+
+    if all_parts.len() < required_parts_len {
+        return Err("Error: La reanudación finalizó de forma incompleta".into());
     }
 
     all_parts.sort_by_key(|p| p.0);

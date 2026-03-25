@@ -78,7 +78,7 @@ export interface SaveRepository {
   createMultipartUpload(userId: string, gameId: string, filename: string): Promise<CreateMultipartUploadResult>;
   /**
    * Inicia multipart y devuelve además las URLs de todas las partes en una sola llamada (menos invocaciones Lambda).
-   * partCount: número de partes (1-based), máx. recomendado ~10000 por límites de tiempo/respuesta.
+   * partCount: número de partes (1-based), máx. recomendado ~200 por límites de tiempo/respuesta.
    */
   createMultipartUploadWithPartUrls(
     userId: string,

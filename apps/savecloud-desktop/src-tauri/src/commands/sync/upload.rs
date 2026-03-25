@@ -331,6 +331,23 @@ pub(crate) async fn sync_upload_game_impl(
         }
     }
 
+    if let Some(ref t) = tray_inner {
+        if t.upload_pause_requested() || t.upload_cancel_requested() {
+            let result = SyncResultDto {
+                ok_count,
+                err_count,
+                errors,
+            };
+            let _ = crate::config::append_operation_log(
+                "upload",
+                &game_id,
+                result.ok_count,
+                result.err_count,
+            );
+            return Ok(result);
+        }
+    }
+
     const UPLOAD_URLS_BATCH_SIZE: usize = 500;
     if !simple_files.is_empty() {
         let total_simple = simple_files.len();

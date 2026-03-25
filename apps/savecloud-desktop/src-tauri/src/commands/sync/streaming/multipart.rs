@@ -24,7 +24,7 @@ use super::tar_stream::TarStreamMsg;
 use super::upload_strategy::{ConcurrencyController, UploadStrategy};
 
 /// Número de URLs solicitadas en cada batch al API cuando no están en caché.
-const PART_URL_BATCH: u32 = 100;
+const PART_URL_BATCH: u32 = 32;
 
 const MAX_RETRIES: u32 = 3;
 const RETRY_DELAY_SECS: u64 = 1;
