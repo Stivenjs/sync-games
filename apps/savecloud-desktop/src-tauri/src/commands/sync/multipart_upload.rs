@@ -98,7 +98,7 @@ pub(crate) const MULTIPART_THRESHOLD: u64 = 5 * 1024 * 1024;
 const PARTS_PER_URL_BATCH: u32 = 100;
 
 /// Máximo de partes que la API devuelve en init-with-part-urls (una sola invocación).
-const MAX_PARTS_INIT_WITH_URLS: u32 = 2000;
+const MAX_PARTS_INIT_WITH_URLS: u32 = 10000;
 
 /// Reintentos para operaciones que pueden fallar por red o 5xx (init, part-urls, complete, PUT parte).
 const MAX_RETRIES: u32 = 3;
