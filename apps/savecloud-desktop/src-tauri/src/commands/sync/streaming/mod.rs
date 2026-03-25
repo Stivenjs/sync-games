@@ -2,4 +2,4 @@
 
 pub(crate) mod multipart;
 pub(crate) mod tar_stream;
-
+pub(crate) mod upload_strategy;

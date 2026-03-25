@@ -339,7 +339,7 @@ export async function registerSavesRoutes(
         message: "gameId and filename are required",
       });
     }
-    const count = typeof partCount === "number" && partCount >= 1 ? Math.min(Math.floor(partCount), 2000) : 1;
+    const count = typeof partCount === "number" && partCount >= 1 ? Math.min(Math.floor(partCount), 10000) : 1;
     const result = await deps.createMultipartUploadWithPartUrlsUseCase.execute({
       userId,
       gameId: gameId.trim(),

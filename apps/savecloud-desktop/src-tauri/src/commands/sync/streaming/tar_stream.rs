@@ -3,28 +3,14 @@
 //! Implementa la transferencia de archivos en modo streaming,
 //! sin necesidad de almacenamiento temporal en disco.
 //!
-//! El tamaño de chunk (`TAR_STREAM_CHUNK_BYTES`) está alineado intencionalmente
-//! con el rango de 2–4 MB para reducir la impedancia con el consumidor multipart,
-//! que acumula partes de 32 MB antes de subirlas. Con chunks de 2 MB se necesitan
-//! ~16 iteraciones por parte en lugar de las ~128 que generaban chunks de 256 KB.
+//! El tamaño de chunk está definido en `upload_strategy::TAR_STREAM_CHUNK_BYTES`
+//! y es compartido con el consumidor multipart para que la capacidad del canal
+//! se derive correctamente del tamaño de parte elegido en tiempo de ejecución.
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-/// Tamaño de chunk emitido al canal.
-///
-/// Elegido para minimizar llamadas a `extend_from_slice` en el consumidor multipart
-/// (PART_SIZE / TAR_STREAM_CHUNK_BYTES = ~16 iteraciones por parte de 32 MB).
-/// Si el crate tar envía un bloque más grande, se envía completo sin copia adicional.
-const TAR_STREAM_CHUNK_BYTES: usize = 2 * 1024 * 1024;
-
-/// Capacidad del canal entre el hilo TAR y el consumidor multipart.
-///
-/// Calculada como PART_SIZE / TAR_STREAM_CHUNK_BYTES para que el buffer
-/// en tránsito no supere una parte completa (~32 MB), aplicando backpressure
-/// natural cuando la red no puede seguir el ritmo del disco.
-/// PART_SIZE se define en multipart.rs (32 MiB).
-pub(crate) const TAR_CHANNEL_CAPACITY: usize = 32 * 1024 * 1024 / TAR_STREAM_CHUNK_BYTES;
+use super::upload_strategy::TAR_STREAM_CHUNK_BYTES;
 
 #[derive(Debug)]
 pub(crate) enum TarStreamMsg {
@@ -75,7 +61,7 @@ impl Write for ChannelWriter {
         self.buf.extend_from_slice(data);
 
         // Cuando el buffer alcanza el umbral se vacía completo en O(1).
-        // Se pre-reserva capacidad para el ciclo siguiente y evitar
+        // Se pre-reserva capacidad para el ciclo siguiente para evitar
         // reubicaciones de memoria en la próxima escritura.
         if self.buf.len() >= TAR_STREAM_CHUNK_BYTES {
             let chunk = std::mem::take(&mut self.buf);
@@ -95,12 +81,9 @@ impl Write for ChannelWriter {
 
 /// Spawnea la creación del TAR en un hilo blocking y devuelve un receptor de mensajes.
 ///
-/// El canal tiene capacidad acotada para aplicar backpressure natural: si el consumidor
-/// multipart no retira chunks (por ejemplo, porque la red es lenta), el hilo blocking
-/// se bloqueará en `blocking_send` en lugar de acumular memoria sin límite.
-///
-/// La capacidad recomendada es `PART_SIZE / TAR_STREAM_CHUNK_BYTES` (ver multipart.rs),
-/// lo que limita el buffer en tránsito a aproximadamente una parte de 32 MB.
+/// La capacidad del canal debe ser `strategy.tar_channel_capacity` (ver `UploadStrategy`),
+/// no un literal hardcodeado. Esto garantiza que el buffer en tránsito no supere
+/// una parte completa, aplicando backpressure natural cuando la red es más lenta que el disco.
 pub(crate) fn spawn_tar_stream(
     source_dir: PathBuf,
     channel_capacity: usize,
