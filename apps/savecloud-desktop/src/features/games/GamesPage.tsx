@@ -100,15 +100,8 @@ export function GamesPage() {
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
   const handleShare = async (game: ConfiguredGame) => {
-    const base = config?.apiBaseUrl?.trim();
-    const uid = config?.userId?.trim();
-    const key = config?.apiKey?.trim();
-    if (!base || !uid || !key) {
-      toastError("Falta configuración", "Configura API URL, User ID y API Key en Configuración para compartir.");
-      return;
-    }
     try {
-      const { shareUrl } = await createShareLink(base, uid, key, game.id);
+      const { shareUrl } = await createShareLink(game.id);
       await navigator.clipboard.writeText(shareUrl);
       toastSuccess("Link copiado", "El link para compartir este juego está en el portapapeles. Válido 7 días.");
     } catch (e) {
