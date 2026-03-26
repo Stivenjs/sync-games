@@ -51,7 +51,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::sync::full_backup::rename_cloud_backup,
         crate::commands::sync::preview::preview_upload,
         crate::commands::sync::preview::preview_download,
-        crate::commands::get_game_stats,
+        crate::commands::stats::game_stats::get_game_stats,
         crate::commands::sync::check_game_running,
         crate::commands::sync::check_games_running,
         crate::commands::sync::get_sync_debug_log_path,
@@ -71,6 +71,6 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::tray::tray_tooltip::refresh_tray_tooltip,
         crate::steam::steam_search::get_steam_app_names_batch,
         crate::plugins::plugin_sdk::export_plugin_sdk,
-        crate::commands::command_logs::get_plugin_logs,
+        crate::commands::logs::command_logs::get_plugin_logs,
     ])
 }
