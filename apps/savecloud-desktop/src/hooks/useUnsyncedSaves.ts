@@ -28,6 +28,7 @@ export function useUnsyncedSaves() {
     queryFn: syncCheckUnsyncedGames,
     enabled: hasSyncConfig,
     staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const unsyncedGameIds = useMemo(() => unsyncedList.map((g: UnsyncedGame) => g.gameId), [unsyncedList]);

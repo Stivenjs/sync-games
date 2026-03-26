@@ -293,20 +293,14 @@ pub async fn sync_check_download_conflicts_batch(
 #[tauri::command]
 pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String> {
     let cfg = crate::config::load_config();
+    let tolerance_secs = UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS;
 
-    let _ = cfg
-        .api_base_url
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .ok_or("Configura apiBaseUrl en Configuración")?;
-    let _ = cfg
-        .user_id
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .ok_or("Configura userId en Configuración")?;
+    let remote_files = api::sync_list_remote_saves().await?;
 
-    let remote = api::sync_list_remote_saves().await?;
-    let remote_map: HashMap<(String, String), DateTime<Utc>> = remote
+    let game_ids: Vec<String> = cfg.games.iter().map(|g| g.id.clone()).collect();
+    let remote_backups_map = super::full_backup::list_full_backups_batch(game_ids).await?;
+
+    let remote_file_map: HashMap<(String, String), DateTime<Utc>> = remote_files
         .into_iter()
         .filter_map(|s| {
             let dt = DateTime::parse_from_rfc3339(&s.last_modified)
@@ -319,17 +313,30 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         })
         .collect();
 
-    let tolerance = chrono::Duration::seconds(UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS);
+    let tolerance = chrono::Duration::seconds(tolerance_secs);
     let mut unsynced = Vec::new();
 
     for game in &cfg.games {
-        // La enumeración de archivos hace I/O síncrono de disco; se delega a
-        // un thread de bloqueo para no interferir con el scheduler de Tokio.
+        let game_id_low = game.id.to_lowercase();
+
+        let last_backup_dt = remote_backups_map.get(&game.id).and_then(|backups| {
+            backups
+                .iter()
+                .filter_map(|b| {
+                    DateTime::parse_from_rfc3339(&b.last_modified)
+                        .or_else(|_| DateTime::parse_from_rfc2822(&b.last_modified))
+                        .ok()
+                })
+                .map(|dt| dt.with_timezone(&Utc))
+                .max()
+        });
+
         let paths = game.paths.clone();
+
         let local_files =
             tokio::task::spawn_blocking(move || path_utils::list_all_files_with_mtime(&paths))
                 .await
-                .map_err(|e| format!("spawn_blocking list_files: {}", e))?;
+                .map_err(|e| format!("Error en scan local: {}", e))?;
 
         let mut has_unsynced = false;
 
@@ -343,18 +350,34 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
                 continue;
             };
             let local_dt = local_dt.with_timezone(&Utc);
-            let key = (game.id.to_lowercase(), rel.clone());
 
-            match remote_map.get(&key) {
+            let key = (game_id_low.clone(), rel.clone());
+
+            match remote_file_map.get(&key) {
+                Some(&cloud_dt) => {
+                    if local_dt > cloud_dt + tolerance {
+                        if let Some(backup_dt) = last_backup_dt {
+                            if local_dt > backup_dt + tolerance {
+                                has_unsynced = true;
+                                break 'files;
+                            }
+                        } else {
+                            has_unsynced = true;
+                            break 'files;
+                        }
+                    }
+                }
                 None => {
-                    has_unsynced = true;
-                    break 'files;
+                    if let Some(backup_dt) = last_backup_dt {
+                        if local_dt > backup_dt + tolerance {
+                            has_unsynced = true;
+                            break 'files;
+                        }
+                    } else {
+                        has_unsynced = true;
+                        break 'files;
+                    }
                 }
-                Some(&cloud_dt) if local_dt > cloud_dt + tolerance => {
-                    has_unsynced = true;
-                    break 'files;
-                }
-                _ => {}
             }
         }
 

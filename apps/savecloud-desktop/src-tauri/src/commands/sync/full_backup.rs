@@ -429,13 +429,15 @@ pub async fn create_and_upload_full_backup(
 
     tray_state.0.syncing_dec();
     tray_state.0.update_tooltip();
+
     let _ = app.emit("full-backup-done", ());
+
     if result.is_ok() {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let _ = app.emit("sync-upload-done", ());
     }
 
-    result?;
-    Ok(relative_filename)
+    result.map(|_| relative_filename)
 }
 
 #[tauri::command]
