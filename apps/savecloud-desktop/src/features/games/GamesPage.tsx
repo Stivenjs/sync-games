@@ -27,7 +27,8 @@ import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
 
 export function GamesPage() {
-  const { pushLayer, popLayer } = useNavigationStore();
+  const pushLayer = useNavigationStore((state) => state.pushLayer);
+  const popLayer = useNavigationStore((state) => state.popLayer);
   const {
     config,
     loading,

@@ -13,7 +13,9 @@ export function useInputManager() {
 
   useEffect(() => {
     const handleMouseMove = () => {
-      setInputMode("mouse");
+      if (useNavigationStore.getState().inputMode !== "mouse") {
+        setInputMode("mouse");
+      }
       if (mouseTimeout.current) clearTimeout(mouseTimeout.current);
     };
 
@@ -27,7 +29,9 @@ export function useInputManager() {
         lastKeyInput.current = now;
       }
 
-      setInputMode("gamepad");
+      if (useNavigationStore.getState().inputMode !== "gamepad") {
+        setInputMode("gamepad");
+      }
 
       switch (e.key) {
         case "ArrowUp":
@@ -59,7 +63,9 @@ export function useInputManager() {
       if (now - lastGamepadInput.current < NAVIGATION_THROTTLE_MS) return;
       lastGamepadInput.current = now;
 
-      setInputMode("gamepad");
+      if (useNavigationStore.getState().inputMode !== "gamepad") {
+        setInputMode("gamepad");
+      }
 
       switch (event.payload.action) {
         case "navigate_up":
