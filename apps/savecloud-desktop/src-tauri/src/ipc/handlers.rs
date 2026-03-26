@@ -70,7 +70,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::list_operation_history,
         crate::tray::tray_tooltip::refresh_tray_tooltip,
         crate::steam::steam_search::get_steam_app_names_batch,
-        crate::commands::plugins::export_plugin_sdk,
+        crate::plugins::plugin_sdk::export_plugin_sdk,
         crate::commands::command_logs::get_plugin_logs,
     ])
 }

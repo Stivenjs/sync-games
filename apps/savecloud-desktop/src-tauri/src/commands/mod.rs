@@ -2,7 +2,6 @@
 
 pub(crate) mod command_logs;
 pub mod sync;
-pub mod plugins;
 mod config_cmds;
 mod game_stats;
 mod scan;
