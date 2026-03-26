@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::LazyLock;
 use std::time::{Duration, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
@@ -25,20 +24,9 @@ use super::models::{
 };
 use super::path_utils;
 use super::sync_logger;
+use crate::network::DATA_CLIENT;
 use crate::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
-
-/// Cliente HTTP reutilizable para todas las descargas.
-///
-/// Se inicializa una sola vez de forma lazy con un `user-agent` identificativo
-/// y un timeout generoso para archivos de guardado grandes.
-static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .expect("Fallo al construir el cliente HTTP de descargas")
-});
 
 /// Número máximo de reintentos al intentar crear un archivo bloqueado.
 const FILE_CREATE_MAX_RETRIES: u32 = 3;
@@ -448,7 +436,7 @@ async fn download_one_file(
         }
     }
 
-    let res = DOWNLOAD_CLIENT
+    let res = DATA_CLIENT
         .get(download_url)
         .send()
         .await

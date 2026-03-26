@@ -17,7 +17,6 @@
 use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
 
 use futures_util::StreamExt;
 use tokio::io::AsyncWriteExt;
@@ -27,19 +26,12 @@ use super::models::SyncProgressPayload;
 use super::multipart_upload;
 use super::streaming;
 use crate::config;
+use crate::network::DATA_CLIENT;
 use crate::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
 
 /// Prefijo S3 para backups (key = userId/gameId/backups/<filename>.tar).
 const BACKUPS_PREFIX: &str = "backups/";
-
-static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .expect("Fallo al construir el cliente HTTP de descargas")
-});
 
 struct ApiContext {
     base_url: String,
@@ -215,7 +207,7 @@ pub async fn download_and_restore_full_backup_impl(
 
     let _temp_guard = TempFileGuard(tar_path.clone());
 
-    let res = DOWNLOAD_CLIENT
+    let res = DATA_CLIENT
         .get(download_url)
         .send()
         .await

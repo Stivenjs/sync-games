@@ -9,18 +9,11 @@
 
 use super::models::SyncResultDto;
 use super::models::{RemoteSaveDto, RemoteSaveInfoDto};
+use crate::network::API_CLIENT;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
 const S3_ACCELERATE_HOST: &str = "s3-accelerate.amazonaws.com";
-
-static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .expect("Fallo al construir el cliente HTTP estático")
-});
 
 static S3_ENDPOINT_CACHE: LazyLock<std::sync::RwLock<Option<String>>> =
     LazyLock::new(|| std::sync::RwLock::new(None));
@@ -119,7 +112,7 @@ pub(crate) async fn api_request(
 ) -> Result<reqwest::Response, String> {
     let url = format!("{}/saves{}", base_url.trim_end_matches('/'), path);
 
-    let mut req = HTTP_CLIENT
+    let mut req = API_CLIENT
         .request(method.parse().unwrap(), &url)
         .header("x-user-id", user_id)
         .header("x-api-key", api_key);
@@ -422,7 +415,7 @@ async fn copy_friend_saves_with_plan_impl(
                 None => return (item, false, Some("Sin URL de subida".to_string())),
             };
 
-            let bytes = match HTTP_CLIENT.get(&d_url).send().await {
+            let bytes = match API_CLIENT.get(&d_url).send().await {
                 Ok(resp) if resp.status().is_success() => match resp.bytes().await {
                     Ok(b) => b,
                     Err(e) => return (item, false, Some(format!("error leyendo descarga: {}", e))),
@@ -444,7 +437,7 @@ async fn copy_friend_saves_with_plan_impl(
             };
 
             let content_length = bytes.len();
-            match HTTP_CLIENT
+            match API_CLIENT
                 .put(&u_url)
                 .body(bytes)
                 .header("Content-Type", "application/octet-stream")

@@ -13,6 +13,7 @@ mod tray;
 mod tray_state;
 use tauri::Manager;
 mod plugins;
+mod network;
 
 fn load_dotenv() {
     let _ = dotenvy::dotenv();

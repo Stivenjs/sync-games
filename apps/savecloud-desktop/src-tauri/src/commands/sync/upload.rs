@@ -18,18 +18,17 @@
 //!   la cantidad de solicitudes al backend.
 //! - Se aplican reintentos con backoff en operaciones críticas.
 //! - Se configuran timeouts a nivel de conexión y de request en el cliente HTTP.
-use std::collections::HashMap;
-use std::fs;
-use std::io::{BufReader, Read};
-use std::sync::LazyLock;
-
 use super::api;
 use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
 use super::multipart_upload;
 use super::path_utils;
+use crate::network::DATA_CLIENT;
 use crate::tray_state::TrayState;
 use bytes::Bytes;
 use futures_util::stream::{self, Stream, StreamExt};
+use std::collections::HashMap;
+use std::fs;
+use std::io::{BufReader, Read};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc;
 
@@ -44,14 +43,6 @@ const SIMPLE_PUT_CONCURRENCY: usize = 24;
 /// el usuario debe usar "Empaquetar y subir" obligatoriamente.
 const LARGE_GAME_BLOCK_FILE_COUNT: usize = 200;
 const LARGE_GAME_BLOCK_SIZE_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
-
-static UPLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .expect("Fallo al construir cliente HTTP de subidas")
-});
 
 /// Stream que recibe chunks de un canal (llenado por un hilo que lee el archivo).
 #[allow(dead_code)]
@@ -402,7 +393,7 @@ pub(crate) async fn sync_upload_game_impl(
                     }
                 };
 
-                let put_res = match UPLOAD_CLIENT
+                let put_res = match DATA_CLIENT
                     .put(&upload_url)
                     .body(body)
                     .header("Content-Type", "application/octet-stream")

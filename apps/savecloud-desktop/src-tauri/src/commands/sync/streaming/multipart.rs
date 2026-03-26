@@ -12,9 +12,9 @@
 //! de las primeras partes completadas y actualiza el número de slots.
 
 use std::collections::HashMap;
-use std::sync::LazyLock;
 use std::time::Instant;
 
+use crate::network::DATA_CLIENT;
 use tauri::Emitter;
 
 use super::super::api;
@@ -28,15 +28,6 @@ const PART_URL_BATCH: u32 = 32;
 
 const MAX_RETRIES: u32 = 3;
 const RETRY_DELAY_SECS: u64 = 1;
-
-static S3_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .timeout(std::time::Duration::from_secs(600))
-        .build()
-        .expect("Fallo al construir cliente HTTP S3")
-});
 
 // Contexto compartido para las operaciones del API.
 // Evita repetir los mismos parámetros en cada función auxiliar.
@@ -730,7 +721,7 @@ async fn put_part(
     let len = bytes.len() as u64;
     let start = Instant::now();
 
-    let res = S3_CLIENT
+    let res = DATA_CLIENT
         .put(&url)
         .body(bytes)
         .header("Content-Type", "application/octet-stream")

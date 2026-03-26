@@ -9,18 +9,11 @@
 //! Facilita la integración con servicios que requieren identificación
 //! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
+use crate::network::STEAM_CLIENT;
 use futures_util::StreamExt;
 use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
 use std::sync::{LazyLock, RwLock};
-
-static STEAM_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .expect("Fallo al construir el cliente HTTP de Steam")
-});
 
 static APP_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"/app/(\d{4,10})/"#).unwrap());
 static SUGGEST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
