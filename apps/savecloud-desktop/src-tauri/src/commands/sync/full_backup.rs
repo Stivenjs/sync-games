@@ -171,7 +171,7 @@ pub async fn download_and_restore_full_backup_impl(
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
     let dest_dir =
-        super::path_utils::expand_path(game.paths.first().map(|s| s.as_str()).unwrap_or(""))
+        crate::utils::path_utils::expand_path(game.paths.first().map(|s| s.as_str()).unwrap_or(""))
             .ok_or("No se pudo expandir la ruta del juego")?;
     let dest_dir = PathBuf::from(dest_dir);
 
@@ -301,7 +301,7 @@ pub async fn create_and_upload_full_backup(
 
     let raw_path = game.paths.first().map(|s| s.as_str()).unwrap_or("");
     let source_dir =
-        super::path_utils::expand_path(raw_path).ok_or("No se pudo expandir la ruta")?;
+        crate::utils::path_utils::expand_path(raw_path).ok_or("No se pudo expandir la ruta")?;
     let source_dir = PathBuf::from(&source_dir);
 
     if !source_dir.exists() || !source_dir.is_dir() {

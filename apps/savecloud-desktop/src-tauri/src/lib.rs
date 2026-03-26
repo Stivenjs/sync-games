@@ -12,6 +12,7 @@ mod steam;
 mod time;
 mod torrent;
 mod tray;
+mod utils;
 use tauri::Manager;
 
 fn load_dotenv() {

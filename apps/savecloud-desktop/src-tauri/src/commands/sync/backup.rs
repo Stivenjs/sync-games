@@ -15,7 +15,7 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use super::models::{BackupInfoDto, CleanupBackupsResultDto, SyncResultDto};
-use super::path_utils;
+use crate::utils::path_utils;
 
 fn count_files_recursive(dir: &Path) -> u32 {
     let Ok(entries) = fs::read_dir(dir) else {

@@ -15,7 +15,6 @@ pub(crate) mod download;
 pub(crate) mod full_backup;
 mod models;
 pub(crate) mod multipart_upload;
-mod path_utils;
 pub(crate) mod preview;
 pub(crate) mod streaming;
 pub(crate) mod upload;
@@ -34,7 +33,7 @@ pub async fn list_save_files(game_id: String) -> Result<Vec<SaveFileDto>, String
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    let files = path_utils::list_all_files_from_paths(&game.paths);
+    let files = crate::utils::path_utils::list_all_files_from_paths(&game.paths);
     Ok(files
         .into_iter()
         .map(|(absolute, relative)| SaveFileDto { absolute, relative })

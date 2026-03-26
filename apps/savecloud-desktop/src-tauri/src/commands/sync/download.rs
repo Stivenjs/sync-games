@@ -22,7 +22,7 @@ use super::models::{
     DownloadConflictDto, DownloadConflictsResultDto, GameConflictsResultDto, GameSyncResultDto,
     RemoteSaveInfoDto, SyncProgressPayload, SyncResultDto, UnsyncedGameDto,
 };
-use super::path_utils;
+use crate::utils::path_utils;
 use crate::commands::logs::sync_logger;
 use crate::network::DATA_CLIENT;
 use crate::tray::tray_state::TrayState;
@@ -337,7 +337,7 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
 
         let paths = game.paths.clone();
         let local_files =
-            tokio::task::spawn_blocking(move || path_utils::list_all_files_with_mtime(&paths))
+            tokio::task::spawn_blocking(move || crate::utils::path_utils::list_all_files_with_mtime(&paths))
                 .await
                 .map_err(|e| format!("Error en scan local: {}", e))?;
 

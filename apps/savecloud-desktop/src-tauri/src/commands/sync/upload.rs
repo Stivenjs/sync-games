@@ -21,7 +21,7 @@
 use super::api;
 use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
 use super::multipart_upload;
-use super::path_utils;
+use crate::utils::path_utils;
 use crate::network::DATA_CLIENT;
 use crate::tray::tray_state::TrayState;
 use bytes::Bytes;
