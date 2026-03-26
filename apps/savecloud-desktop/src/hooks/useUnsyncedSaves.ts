@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { syncCheckUnsyncedGames, syncUploadGame, type UnsyncedGame } from "@services/tauri";
 import { useConfig, CONFIG_QUERY_KEY } from "@hooks/useConfig";
@@ -11,6 +11,8 @@ const UNSYNCED_QUERY_KEY = ["unsynced-games"] as const;
 export function useUnsyncedSaves() {
   const queryClient = useQueryClient();
   const { config } = useConfig();
+
+  const [isDismissed, setIsDismissed] = useState(false);
 
   const hasSyncConfig = useMemo(
     () => !!(config?.apiBaseUrl?.trim() && config?.userId?.trim() && config?.apiKey?.trim()),
@@ -29,6 +31,12 @@ export function useUnsyncedSaves() {
   });
 
   const unsyncedGameIds = useMemo(() => unsyncedList.map((g: UnsyncedGame) => g.gameId), [unsyncedList]);
+
+  useEffect(() => {
+    if (unsyncedGameIds.length === 0) {
+      setIsDismissed(false);
+    }
+  }, [unsyncedGameIds.length]);
 
   const { mutateAsync: uploadAll, isPending: isUploading } = useMutation({
     mutationKey: ["upload-all-unsynced"],
@@ -60,14 +68,14 @@ export function useUnsyncedSaves() {
   });
 
   const closeModal = useCallback(() => {
-    queryClient.setQueryData(UNSYNCED_QUERY_KEY, []);
-  }, [queryClient]);
+    setIsDismissed(true);
+  }, []);
 
   return {
     unsyncedGameIds,
     isChecking,
     isUploading,
-    showUnsyncedModal: unsyncedGameIds.length > 0,
+    showUnsyncedModal: unsyncedGameIds.length > 0 && !isDismissed,
     closeModal,
     uploadAll,
     refetchUnsynced,

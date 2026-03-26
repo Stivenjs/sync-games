@@ -1,15 +1,12 @@
-//! Módulo para inicializar los estados y las tareas en segundo plano.
+//! Módulo de inicialización central de la aplicación.
 //!
-//! Contiene las funciones para:
-//!
-//! - Inicializar los estados y las tareas en segundo plano.
-//! - Inicializar el motor de torrenting.
-//! - Inicializar el sistema de plugins y crear sus directorios.
-//! - Inicializar el tray.
-//! - Inicializar el watcher de procesos.
-//! - Inicializar el bucle de eventos del Gamepad.
+//! Orquesta el arranque de todos los subsistemas en segundo plano necesarios
+//! para el funcionamiento de SaveCloud, incluyendo la gestión de plugins,
+//! el motor de descargas P2P (Torrent), la vigilancia de procesos y los
+//! demonios de sincronización automática.
 
 use crate::commands::game_exit_sync;
+use crate::commands::watch_sync;
 use crate::controller::start_gamepad_loop;
 use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
 use crate::process_check::start_process_watcher;
@@ -20,7 +17,14 @@ use std::sync::Arc;
 use tauri::{App, Manager};
 use tokio::sync::Mutex;
 
+/// Ejecuta la secuencia de arranque de los demonios y vincula los estados globales.
+///
+/// # Arguments
+///
+/// * `app` - Referencia mutable a la instancia principal de la aplicación Tauri.
 pub fn init_states_and_background_tasks(app: &mut App) {
+    // 1. Herramientas de desarrollo
+    // Habilitar DevTools automáticamente en el frontend si compilamos en modo debug.
     #[cfg(debug_assertions)]
     {
         if let Some(window) = app.get_webview_window("main") {
@@ -28,6 +32,7 @@ pub fn init_states_and_background_tasks(app: &mut App) {
         }
     }
 
+    // 2. Inicialización del sistema de Plugins
     let plugins_dir = app
         .path()
         .data_dir()
@@ -48,6 +53,8 @@ pub fn init_states_and_background_tasks(app: &mut App) {
     let tokio_handle = tauri::async_runtime::handle();
     let handle = app.handle().clone();
 
+    // La carga de plugins se delega a un hilo de fondo para no bloquear
+    // el renderizado inicial de la interfaz de usuario.
     std::thread::spawn(move || {
         let mut manager = crate::plugins::manager::PluginManager::new();
         manager.load_all(plugins_dir, handle, logs);
@@ -57,6 +64,7 @@ pub fn init_states_and_background_tasks(app: &mut App) {
         });
     });
 
+    // 3. Inicialización del motor P2P (BitTorrent)
     app.manage(TorrentState {
         engine: std::sync::Arc::new(tokio::sync::Mutex::new(tauri::async_runtime::block_on(
             TorrentEngine::new(std::env::temp_dir().join("SaveCloud-torrents")),
@@ -64,9 +72,21 @@ pub fn init_states_and_background_tasks(app: &mut App) {
         app_handle: app.handle().clone(),
     });
 
+    // 4. Extracción de estados compartidos
     let tray_state = app.state::<TrayState>();
 
+    // 5. Arranque de los observadores y demonios en segundo plano
+
+    // Sincronización Reactiva: Sube archivos cuando detecta que el proceso de un juego termina.
     game_exit_sync::spawn_exit_watcher(app.handle().clone(), tray_state.inner().0.clone());
+
+    // Sincronización Activa (Nuestro nuevo módulo): Vigila cambios en el disco duro
+    // y los encola con un debounce de 5 minutos para subidas silenciosas.
+    watch_sync::spawn_watcher(app.handle().clone(), tray_state.inner().0.clone());
+
+    // Observador de Procesos: Audita la memoria del SO y emite eventos IPC al frontend.
     start_process_watcher(app.handle().clone());
+
+    // Bucle del Controlador: Inicia la escucha activa de inputs de mandos/gamepads.
     start_gamepad_loop(app.handle().clone());
 }

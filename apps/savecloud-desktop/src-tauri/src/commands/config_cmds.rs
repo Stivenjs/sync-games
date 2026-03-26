@@ -1,0 +1,811 @@
+//! Comandos Tauri expuestos hacia el frontend de la aplicación.
+//!
+//! Contiene el mapeo de llamadas IPC responsables de la orquestación del
+//! almacenamiento S3, importación/exportación de estado y manipulaciones
+//! del árbol de juegos.
+
+use crate::commands::sync::api::{
+    api_request, sync_list_remote_saves, sync_list_remote_saves_for_user,
+};
+use crate::config::{self, Config, ConfigDto, ConfiguredGame, GameDto, OperationLogEntryDto};
+use crate::steam;
+use crate::time;
+use base64::Engine;
+use chrono::Utc;
+use regex::Regex;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+/// Resuelve interpolaciones del sistema y variables de entorno dentro de una ruta.
+///
+/// # Arguments
+///
+/// * `raw` - Ruta original conteniendo posibles variables (ej. `%APPDATA%` o `~`).
+///
+/// # Returns
+///
+/// Devuelve el `PathBuf` resuelto si la transformación resulta en una ruta válida.
+fn expand_path(raw: &str) -> Option<PathBuf> {
+    let mut result = raw.to_string();
+    let re = Regex::new(r"%([^%]+)%").ok()?;
+    for cap in re.captures_iter(raw) {
+        let var = cap.get(1)?.as_str();
+        let val = std::env::var(var).unwrap_or_default();
+        result = result.replace(&format!("%{}%", var), &val);
+    }
+    if result.starts_with('~') {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_default();
+        if !home.is_empty() {
+            let rest = result.trim_start_matches('~').trim_start_matches('/');
+            result = if rest.is_empty() {
+                home
+            } else {
+                format!("{}/{}", home.trim_end_matches(&['/', '\\']), rest)
+            };
+        }
+    }
+    if result.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(result))
+    }
+}
+
+/// Extrae y compone el objeto de configuración principal para ser entregado a la UI.
+///
+/// Resuelve de forma asíncrona la correspondencia de Steam App IDs para rellenar
+/// metadatos de juegos faltantes sin bloquear la carga principal.
+#[tauri::command]
+pub fn get_config() -> ConfigDto {
+    let combined = config::get_combined_config();
+
+    #[cfg(target_os = "windows")]
+    let steam_map = steam::get_steam_path_to_appid_map();
+    #[cfg(not(target_os = "windows"))]
+    let steam_map = std::collections::HashMap::new();
+
+    ConfigDto {
+        api_base_url: combined.api_base_url,
+        api_key: combined.api_key.map(|_| config::MASKED_API_KEY.to_string()),
+        user_id: combined.user_id,
+        custom_scan_paths: combined.custom_scan_paths,
+        keep_backups_per_game: combined.keep_backups_per_game,
+        full_backup_streaming: combined.full_backup_streaming,
+        full_backup_streaming_dry_run: combined.full_backup_streaming_dry_run,
+        total_playtime: time::get_total_playtime(),
+        games: combined
+            .games
+            .into_iter()
+            .map(|g| {
+                let steam_app_id = g.steam_app_id.clone().or_else(|| {
+                    if g.image_url.is_none() {
+                        steam::resolve_app_id_for_game(&g.paths, &steam_map)
+                    } else {
+                        None
+                    }
+                });
+                GameDto {
+                    id: g.id,
+                    paths: g.paths,
+                    steam_app_id,
+                    image_url: g.image_url,
+                    edition_label: g.edition_label,
+                    source_url: g.source_url,
+                    magnet_link: g.magnet_link,
+                    playtime_seconds: g.playtime_seconds,
+                }
+            })
+            .collect(),
+    }
+}
+
+/// Devuelve la ubicación absoluta del directorio de configuración de la app en disco.
+#[tauri::command]
+pub fn get_config_path() -> String {
+    config::paths::data_dir()
+        .and_then(|p| p.into_os_string().into_string().ok())
+        .unwrap_or_default()
+}
+
+/// Expone el listado cronológico de operaciones históricas hacia el dashboard de la UI.
+#[tauri::command]
+pub fn list_operation_history() -> Vec<OperationLogEntryDto> {
+    config::load_history()
+        .entries
+        .into_iter()
+        .map(|e| OperationLogEntryDto {
+            timestamp: e.timestamp,
+            kind: e.kind,
+            game_id: e.game_id,
+            file_count: e.file_count,
+            err_count: e.err_count,
+        })
+        .collect()
+}
+
+/// Establece las variables principales de entorno de red y usuario.
+///
+/// # Errors
+///
+/// Devuelve `Err` si la serialización falla o el SO deniega la escritura en disco.
+#[tauri::command]
+pub fn create_config_file(
+    api_base_url: Option<String>,
+    api_key: Option<String>,
+    user_id: Option<String>,
+) -> Result<String, String> {
+    let mut settings = config::load_settings();
+
+    if let Some(url) = api_base_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        settings.api_base_url = Some(url.to_string());
+    }
+
+    if let Some(key) = api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|k| *k != config::MASKED_API_KEY && !k.is_empty())
+    {
+        settings.api_key = Some(key.to_string());
+    }
+
+    if let Some(id) = user_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        settings.user_id = Some(id.to_string());
+    }
+
+    config::save_settings(&settings)?;
+    Ok(get_config_path())
+}
+
+/// Modifica la política local de retención máxima de respaldos por juego.
+#[tauri::command]
+pub fn set_keep_backups_per_game(keep_last_n: u32) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.keep_backups_per_game = Some(keep_last_n);
+    config::save_settings(&settings)
+}
+
+/// Activa o desactiva la compresión on-the-fly para el empaquetado TAR.
+#[tauri::command]
+pub fn set_full_backup_streaming(enabled: bool) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.full_backup_streaming = Some(enabled);
+    config::save_settings(&settings)
+}
+
+/// Ajusta la configuración de ejecución de pruebas (Dry Run) de flujos.
+#[tauri::command]
+pub fn set_full_backup_streaming_dry_run(enabled: bool) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.full_backup_streaming_dry_run = Some(enabled);
+    config::save_settings(&settings)
+}
+
+/// Registra un nuevo juego dentro del manifiesto local.
+///
+/// Agrupa rutas de guardado bajo un único identificador lógico, ignorando la
+/// petición de duplicidad si el ID ya existe, pero adjuntando la ruta si esta es nueva.
+///
+/// # Errors
+///
+/// Devuelve `Err` si el ID proporcionado o la ruta enviada desde UI son nulas.
+#[tauri::command]
+pub fn add_game(
+    game_id: String,
+    path: String,
+    edition_label: Option<String>,
+    source_url: Option<String>,
+    steam_app_id: Option<String>,
+    image_url: Option<String>,
+) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim().to_string();
+    let path = path.trim().to_string();
+
+    if game_id.is_empty() || path.is_empty() {
+        return Err("Identificador o ruta ausente".to_string());
+    }
+
+    let trim_opt =
+        |opt: Option<String>| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+
+    if let Some(g) = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+    {
+        if !g.paths.contains(&path) {
+            g.paths.push(path);
+        }
+        if let Some(label) = trim_opt(edition_label) {
+            g.edition_label = Some(label);
+        }
+        if let Some(url) = trim_opt(source_url) {
+            g.source_url = Some(url);
+        }
+        if let Some(app_id) = trim_opt(steam_app_id) {
+            g.steam_app_id = Some(app_id);
+        }
+        if let Some(img) = trim_opt(image_url) {
+            g.image_url = Some(img);
+        }
+    } else {
+        library.games.push(ConfiguredGame {
+            id: game_id,
+            paths: vec![path],
+            steam_app_id: trim_opt(steam_app_id),
+            image_url: trim_opt(image_url),
+            executable_names: None,
+            edition_label: trim_opt(edition_label),
+            source_url: trim_opt(source_url),
+            magnet_link: None,
+            playtime_seconds: 0,
+        });
+    }
+    config::save_library(&library)
+}
+
+/// Transacciona metadatos de un nodo de juego preexistente.
+///
+/// # Errors
+///
+/// Devuelve `Err` si el identificador lógico provisto no coincide con la base local.
+#[tauri::command]
+pub fn update_game(
+    game_id: String,
+    paths: Vec<String>,
+    edition_label: Option<String>,
+    source_url: Option<String>,
+    steam_app_id: Option<String>,
+    image_url: Option<String>,
+) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    if game_id.is_empty() {
+        return Err("Requiere un identificador de juego".to_string());
+    }
+
+    let paths: Vec<String> = paths
+        .into_iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if paths.is_empty() {
+        return Err("Se requiere al menos un vector de ruta".to_string());
+    }
+
+    let trim_opt =
+        |opt: Option<String>| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Nodo huérfano: {}", game_id))?;
+
+    g.paths = paths;
+    g.edition_label = trim_opt(edition_label);
+    g.source_url = trim_opt(source_url);
+    g.steam_app_id = trim_opt(steam_app_id);
+    g.image_url = trim_opt(image_url);
+
+    config::save_library(&library)
+}
+
+/// Altera el identificador lógico de una entidad de guardado.
+#[tauri::command]
+pub fn rename_game(old_game_id: String, new_game_id: String) -> Result<(), String> {
+    let mut library = config::load_library();
+    let old_id = old_game_id.trim();
+    let new_id = new_game_id.trim().to_string();
+
+    if old_id.is_empty() || new_id.is_empty() {
+        return Err("Requiere argumentos mutables plenos".to_string());
+    }
+    if old_id.eq_ignore_ascii_case(&new_id) {
+        return Ok(());
+    }
+    if library
+        .games
+        .iter()
+        .any(|g| g.id.eq_ignore_ascii_case(&new_id))
+    {
+        return Err(format!("Colisión de clave primaria '{}'", new_id));
+    }
+
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(old_id))
+        .ok_or_else(|| format!("No localizable: {}", old_id))?;
+    g.id = new_id;
+    config::save_library(&library)
+}
+
+/// Elimina un nodo de la biblioteca o expulsa una ruta de su lista de monitoreo.
+#[tauri::command]
+pub fn remove_game(game_id: String, path: Option<String>) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    let path = path.as_deref().map(|s| s.trim());
+
+    let idx = library
+        .games
+        .iter()
+        .position(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Nodo ausente: {}", game_id))?;
+
+    if let Some(p) = path {
+        library.games[idx].paths.retain(|x| x != p);
+        if library.games[idx].paths.is_empty() {
+            library.games.remove(idx);
+        }
+    } else {
+        library.games.remove(idx);
+    }
+
+    config::save_library(&library)
+}
+
+/// Deriva el path físico final a partir de la primera entrada enmascarada del registro.
+#[tauri::command]
+pub fn get_game_save_path(game_id: String) -> Result<String, String> {
+    let library = config::load_library();
+    let game = library
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(&game_id))
+        .ok_or_else(|| format!("Registro nulo: {}", game_id))?;
+    let first = game.paths.first().ok_or("Entidad sin rutas vinculadas")?;
+
+    expand_path(first.trim())
+        .ok_or("Expansión topológica fallida".to_string())?
+        .into_os_string()
+        .into_string()
+        .map_err(|_| "Formato codificado inválido".to_string())
+}
+
+/// Dispara el administrador de archivos predeterminado del sistema operativo hacia
+/// la carpeta que contiene los datos del identificador.
+#[tauri::command]
+pub fn open_save_folder(game_id: String) -> Result<(), String> {
+    let path = get_game_save_path(game_id)?;
+    #[cfg(windows)]
+    std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+const MAX_IMAGE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Serializa el stream de bytes de un archivo de imagen estática local a un Data URI (Base64).
+///
+/// # Errors
+///
+/// Devuelve `Err` si el path no puede ser leído o excede el límite permisible
+/// designado en memoria (2MB).
+#[tauri::command]
+pub fn read_image_as_data_url(path: String) -> Result<String, String> {
+    let path = Path::new(path.trim());
+    if !path.exists() {
+        return Err("Recurso inaccesible o no existente".to_string());
+    }
+
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_IMAGE_BYTES {
+        return Err("Asignación de buffer denegada por límite superado".to_string());
+    }
+
+    let bytes = fs::read(path).map_err(|e| e.to_string())?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => "image/jpeg",
+    };
+
+    Ok(format!(
+        "data:{};base64,{}",
+        mime,
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
+/// Genera un dump local de la estructura monolítica hacia la ruta del argumento.
+#[tauri::command]
+pub fn export_config_to_file(path: String) -> Result<String, String> {
+    let combined = config::get_combined_config();
+    let json = serde_json::to_string_pretty(&combined).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
+/// Ingiere un blob JSON externo parseándolo sobre la topología de la aplicación.
+///
+/// # Arguments
+///
+/// * `path` - Ubicación de origen del archivo.
+/// * `mode` - Instrucción de sobreescritura (`replace` para drop & insert, `merge` para upsert pacífico).
+#[tauri::command]
+pub fn import_config_from_file(path: String, mode: String) -> Result<(), String> {
+    let contents = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let imported: Config =
+        serde_json::from_str(&contents).map_err(|e| format!("Estructura JSON corrupta: {}", e))?;
+
+    if mode == "replace" {
+        return config::apply_combined_config(&imported);
+    }
+
+    if mode == "merge" {
+        let mut current = config::get_combined_config();
+
+        for imp_game in imported.games {
+            if let Some(existing) = current
+                .games
+                .iter_mut()
+                .find(|g| g.id.eq_ignore_ascii_case(&imp_game.id))
+            {
+                for p in imp_game.paths {
+                    if !existing.paths.contains(&p) {
+                        existing.paths.push(p);
+                    }
+                }
+                if imp_game.steam_app_id.is_some() && existing.steam_app_id.is_none() {
+                    existing.steam_app_id = imp_game.steam_app_id;
+                }
+                if imp_game.image_url.is_some() && existing.image_url.is_none() {
+                    existing.image_url = imp_game.image_url;
+                }
+            } else {
+                current.games.push(imp_game);
+            }
+        }
+        for p in imported.custom_scan_paths {
+            if !current.custom_scan_paths.contains(&p) {
+                current.custom_scan_paths.push(p);
+            }
+        }
+        return config::apply_combined_config(&current);
+    }
+
+    Err("Instrucción de modo de ingesta no reconocida".into())
+}
+
+/// Negocia transacciones HTTP hacia el Cloud Storage prescrito.
+///
+/// # Arguments
+///
+/// * `api_base` - Host URI.
+/// * `user_id` - Clave partitiva de la instancia de nube.
+/// * `api_key` - Token de autorización pre-empaquetado.
+/// * `filename_or_key` - ID lógico o presignado del objeto remoto.
+/// * `bytes` - Opcional. Blob de datos de subida (excluyente si `is_upload` es falso).
+/// * `is_upload` - Determinador direccional de stream.
+///
+/// # Errors
+///
+/// Devuelve `Err` en colisiones HTTP u obstáculos I/O remotos.
+async fn s3_transfer(
+    api_base: &str,
+    user_id: &str,
+    api_key: &str,
+    filename_or_key: &str,
+    bytes: Option<Vec<u8>>,
+    is_upload: bool,
+) -> Result<Vec<u8>, String> {
+    let endpoint = if is_upload {
+        "/upload-url"
+    } else {
+        "/download-url"
+    };
+    let body = if is_upload {
+        serde_json::json!({ "gameId": "__config__", "filename": filename_or_key })
+    } else {
+        serde_json::json!({ "gameId": "__config__", "key": filename_or_key })
+    };
+
+    let res = api_request(
+        api_base,
+        user_id,
+        api_key,
+        "POST",
+        endpoint,
+        Some(body.to_string().as_bytes()),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Socket API rechazó handshake: {}", res.status()));
+    }
+
+    let url_key = if is_upload {
+        "uploadUrl"
+    } else {
+        "downloadUrl"
+    };
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let url = json
+        .get(url_key)
+        .and_then(|v| v.as_str())
+        .ok_or("Payload API sin puntero URL")?;
+
+    let client = reqwest::Client::builder()
+        .user_agent("SaveCloud-desktop/1.0")
+        .build()
+        .unwrap();
+    if is_upload {
+        let b = bytes.unwrap();
+        let put_res = client
+            .put(url)
+            .body(b.clone())
+            .header("Content-Type", "application/json")
+            .header("Content-Length", b.len().to_string())
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !put_res.status().is_success() {
+            return Err(format!("Bucket abortó el frame PUT: {}", put_res.status()));
+        }
+        Ok(vec![])
+    } else {
+        client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .bytes()
+            .await
+            .map(|b| b.to_vec())
+            .map_err(|e| e.to_string())
+    }
+}
+
+/// Extrae la imagen en memoria hacia un flujo que termina escrito en S3, simulando el nodo `__config__`.
+#[tauri::command]
+pub async fn backup_config_to_cloud() -> Result<(), String> {
+    let settings = config::load_settings();
+    let api_base = settings
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro URI omitido")?;
+    let user_id = settings
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro UserID omitido")?;
+    let api_key = settings.api_key.as_deref().unwrap_or("");
+
+    let combined = config::get_combined_config();
+    let bytes = serde_json::to_vec_pretty(&combined).unwrap();
+    s3_transfer(api_base, user_id, api_key, "config.json", Some(bytes), true)
+        .await
+        .map(|_| ())
+}
+
+/// Extrae el archivo estático de S3 y lo reparte dinámicamente sobre la arquitectura de persistencia.
+///
+/// El flujo es el siguiente:
+/// 1. Emite un volcado del último timestamp a disco por salvaguarda.
+/// 2. Evalúa lista de objetos alojados, buscando el archivo JSON más reciente.
+/// 3. Inicia stream remoto para consumirlo sobre una estructura monolítica pre-allocada.
+/// 4. Distribuye la ingesta atómicamente por cada subsistema.
+#[tauri::command]
+pub async fn restore_config_from_cloud() -> Result<(), String> {
+    let settings = config::load_settings();
+    let api_base = settings
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro URI omitido")?
+        .to_string();
+    let user_id = settings
+        .user_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro UserID omitido")?
+        .to_string();
+    let api_key = settings.api_key.as_deref().unwrap_or("").to_string();
+
+    let saves = sync_list_remote_saves().await?;
+    let mut config_saves: Vec<_> = saves
+        .into_iter()
+        .filter(|s| s.game_id == "__config__" && s.filename.ends_with("config.json"))
+        .collect();
+    if config_saves.is_empty() {
+        return Err("Incapacidad de resolver nodo remoto de config".into());
+    }
+    config_saves.sort_by(|a, b| a.last_modified.cmp(&b.last_modified));
+    let latest = config_saves.pop().unwrap();
+
+    let bytes = s3_transfer(&api_base, &user_id, &api_key, &latest.key, None, false).await?;
+    let imported: Config = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("Incapacidad de mutar buffer: {}", e))?;
+
+    if let Some(data_dir) = config::paths::data_dir() {
+        if let Some(parent) = data_dir.parent() {
+            let backup_dir = parent.join("config-backups");
+            let _ = fs::create_dir_all(&backup_dir);
+            let ts = Utc::now().format("%Y-%m-%d_%H-%M-%S");
+            let backup_path = backup_dir.join(format!("config-{}.json", ts));
+            let old_combined = config::get_combined_config();
+            let _ = fs::write(
+                &backup_path,
+                serde_json::to_string_pretty(&old_combined).unwrap_or_default(),
+            );
+        }
+    }
+
+    config::apply_combined_config(&imported)
+}
+
+/// Realiza una solicitud pasiva para parsear el bloque público alojado por otro usuario.
+#[tauri::command]
+pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, String> {
+    let friend_id = friend_user_id.trim();
+    if friend_id.is_empty() {
+        return Err("Puntero ID Foráneo inexistente".into());
+    }
+
+    let settings = config::load_settings();
+    let api_base = settings
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro URI omitido")?;
+    let api_key = settings.api_key.as_deref().unwrap_or("");
+
+    let saves = sync_list_remote_saves_for_user(friend_id.to_string()).await?;
+    let mut config_saves: Vec<_> = saves
+        .into_iter()
+        .filter(|s| s.game_id == "__config__" && s.filename.ends_with("config.json"))
+        .collect();
+    if config_saves.is_empty() {
+        return Err("Puntero foráneo declinó contener persistencia compatible".into());
+    }
+
+    config_saves.sort_by(|a, b| a.last_modified.cmp(&b.last_modified));
+    let latest = config_saves.pop().unwrap();
+
+    let bytes = s3_transfer(
+        api_base,
+        settings.user_id.as_deref().unwrap_or(""),
+        api_key,
+        &latest.key,
+        None,
+        false,
+    )
+    .await?;
+    let imported: Config = serde_json::from_slice(&bytes)
+        .map_err(|_| "La memoria transferida por el host fue parseada como errónea")?;
+
+    Ok(ConfigDto {
+        api_base_url: None,
+        api_key: None,
+        user_id: Some(friend_id.to_string()),
+        custom_scan_paths: vec![],
+        keep_backups_per_game: None,
+        full_backup_streaming: None,
+        full_backup_streaming_dry_run: None,
+        total_playtime: 0,
+        games: imported
+            .games
+            .into_iter()
+            .map(|g| GameDto {
+                id: g.id,
+                paths: g.paths,
+                steam_app_id: g.steam_app_id,
+                image_url: g.image_url,
+                edition_label: g.edition_label,
+                source_url: g.source_url,
+                magnet_link: g.magnet_link,
+                playtime_seconds: g.playtime_seconds,
+            })
+            .collect(),
+    })
+}
+
+/// Anexa en bucle una matriz serializada enviada por la interfaz correspondiente al perfil amigo.
+#[tauri::command]
+pub fn add_games_from_friend(friend_games: Vec<GameDto>) -> Result<usize, String> {
+    let mut library = config::load_library();
+    let mut existing_ids: std::collections::HashSet<String> =
+        library.games.iter().map(|g| g.id.to_lowercase()).collect();
+    let mut added = 0usize;
+
+    for g in friend_games {
+        if g.id.trim().is_empty() || existing_ids.contains(&g.id.to_lowercase()) {
+            continue;
+        }
+        library.games.push(ConfiguredGame {
+            id: g.id.trim().to_string(),
+            paths: if g.paths.is_empty() {
+                vec!["(editar ruta en Configuración)".to_string()]
+            } else {
+                g.paths
+            },
+            steam_app_id: g.steam_app_id,
+            image_url: g.image_url,
+            executable_names: None,
+            edition_label: g.edition_label,
+            source_url: g.source_url,
+            magnet_link: None,
+            playtime_seconds: 0,
+        });
+        existing_ids.insert(g.id.to_lowercase());
+        added += 1;
+    }
+
+    if added > 0 {
+        config::save_library(&library)?;
+    }
+    Ok(added)
+}
+
+/// Secuestra el snapshot en la nube adjunto a un Target ID y asume control lógico mutando el root ID local.
+#[tauri::command]
+pub async fn import_friend_config(friend_user_id: String) -> Result<(), String> {
+    let friend_id = friend_user_id.trim();
+    if friend_id.is_empty() {
+        return Err("Target ID nulo".into());
+    }
+
+    let settings = config::load_settings();
+    let api_base = settings
+        .api_base_url
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("Parámetro URI omitido")?
+        .to_string();
+    let api_key = settings.api_key.as_deref().unwrap_or("").to_string();
+
+    let saves = sync_list_remote_saves_for_user(friend_id.to_string()).await?;
+    let mut config_saves: Vec<_> = saves
+        .into_iter()
+        .filter(|s| s.game_id == "__config__" && s.filename.ends_with("config.json"))
+        .collect();
+    if config_saves.is_empty() {
+        return Err("Bloque Target remoto vacío".into());
+    }
+
+    config_saves.sort_by(|a, b| a.last_modified.cmp(&b.last_modified));
+    let latest = config_saves.pop().unwrap();
+
+    let bytes = s3_transfer(
+        &api_base,
+        settings.user_id.as_deref().unwrap_or(""),
+        &api_key,
+        &latest.key,
+        None,
+        false,
+    )
+    .await?;
+    let mut imported: Config =
+        serde_json::from_slice(&bytes).map_err(|e| format!("Volcado estático inválido: {}", e))?;
+
+    imported.user_id = Some(friend_id.to_string());
+
+    config::apply_combined_config(&imported)
+}

@@ -4,7 +4,7 @@
 //! gestionando la transferencia, validación y almacenamiento local.
 //!
 //! Incluye soporte para seguimiento de progreso, manejo de errores
-//! y reintentos en caso de fallos de red.
+//! y reintentos con backoff exponencial en caso de fallos de acceso.
 
 use std::collections::HashMap;
 use std::fs;
@@ -24,9 +24,14 @@ use super::models::{
     RemoteSaveInfoDto, SyncProgressPayload, SyncResultDto, UnsyncedGameDto,
 };
 use super::path_utils;
+use super::sync_logger;
 use crate::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
 
+/// Cliente HTTP reutilizable para todas las descargas.
+///
+/// Se inicializa una sola vez de forma lazy con un `user-agent` identificativo
+/// y un timeout generoso para archivos de guardado grandes.
 static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
         .user_agent("SaveCloud-desktop/1.0")
@@ -35,27 +40,131 @@ static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .expect("Fallo al construir el cliente HTTP de descargas")
 });
 
-/// Calcula los conflictos de descarga para un juego dado su ruta base y la lista de saves remotos.
+/// Número máximo de reintentos al intentar crear un archivo bloqueado.
+const FILE_CREATE_MAX_RETRIES: u32 = 3;
+
+/// Milisegundos base para el backoff exponencial al reintentar apertura de archivo.
+///
+/// El tiempo de espera real en el intento `n` es `FILE_CREATE_BACKOFF_BASE_MS * (n + 1)`.
+const FILE_CREATE_BACKOFF_BASE_MS: u64 = 200;
+
+/// Umbral en bytes entre emisiones sucesivas de eventos de progreso de descarga.
+const DOWNLOAD_PROGRESS_EMIT_BYTES: u64 = 256 * 1024;
+
+/// Número máximo de descargas de archivos individuales en paralelo por juego.
+const DOWNLOAD_FILE_CONCURRENCY: usize = 16;
+
+/// Número máximo de juegos descargándose en paralelo en una operación batch.
+const DOWNLOAD_BATCH_CONCURRENCY: usize = 4;
+
+/// Número máximo de restauraciones de backups empaquetados en paralelo.
+const RESTORE_PACKAGED_CONCURRENCY: usize = 2;
+
+/// Tamaño del buffer de escritura a disco, en bytes.
+const WRITE_BUF_SIZE: usize = 512 * 1024;
+
+/// Tamaño máximo de un lote al solicitar URLs de descarga a la API.
+const DOWNLOAD_URLS_BATCH_SIZE: usize = 500;
+
+/// Tolerancia en segundos al comparar timestamps local vs. nube en la detección
+/// de archivos sin sincronizar.
+///
+/// Solo se considera "pendiente de subir" si el archivo local es más reciente
+/// que la versión en la nube por más de este margen, evitando falsos positivos
+/// por diferencias de reloj o precisión de filesystem.
+const UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS: i64 = 2;
+
+/// Determina si un error de I/O corresponde a acceso denegado o archivo en uso.
+///
+/// En Windows el código de error nativo 5 indica `ERROR_ACCESS_DENIED`,
+/// que también aparece cuando otra aplicación mantiene un bloqueo exclusivo.
+fn is_access_denied(e: &std::io::Error) -> bool {
+    e.kind() == ErrorKind::PermissionDenied || e.raw_os_error() == Some(5)
+}
+
+/// Construye un mensaje de error legible cuando no se puede escribir un archivo.
+///
+/// Diferencia entre acceso denegado (archivo en uso o sin permisos) y otros
+/// errores de I/O para orientar al usuario sobre cómo resolverlo.
+fn file_write_error_message(filename: &str, e: &std::io::Error) -> String {
+    if is_access_denied(e) {
+        format!(
+            "{}: archivo en uso o sin permisos (cierra el juego u otra app que lo use)",
+            filename
+        )
+    } else {
+        format!("{}: {}", filename, e)
+    }
+}
+
+/// Intenta crear (o truncar) un archivo, reintentando con backoff exponencial
+/// si el error indica que el archivo está bloqueado por otro proceso.
+///
+/// Se realizan hasta [`FILE_CREATE_MAX_RETRIES`] intentos. El tiempo de espera
+/// entre intentos aumenta linealmente: `FILE_CREATE_BACKOFF_BASE_MS * (intento + 1)`.
+///
+/// # Errors
+///
+/// Devuelve `Err` con un mensaje legible si todos los reintentos fallan o si
+/// el error no es de tipo acceso denegado.
+async fn create_file_with_retry(path: &std::path::Path) -> Result<tokio::fs::File, std::io::Error> {
+    let mut last_err: Option<std::io::Error> = None;
+
+    for attempt in 0..FILE_CREATE_MAX_RETRIES {
+        match tokio::fs::File::create(path).await {
+            Ok(f) => return Ok(f),
+            Err(e) => {
+                let io_err = std::io::Error::from(e);
+                if is_access_denied(&io_err) && attempt + 1 < FILE_CREATE_MAX_RETRIES {
+                    let wait_ms = FILE_CREATE_BACKOFF_BASE_MS * (attempt as u64 + 1);
+                    tokio::time::sleep(Duration::from_millis(wait_ms)).await;
+                    last_err = Some(io_err);
+                } else {
+                    return Err(io_err);
+                }
+            }
+        }
+    }
+
+    // Se llega aquí solo si todos los reintentos esperaron pero el último
+    // intento no se ejecutó por la condición del bucle; devolvemos el último error.
+    Err(last_err.expect("al menos un intento debe haberse realizado"))
+}
+
+/// Calcula los conflictos de descarga para un juego dado su ruta base y la lista
+/// de guardados remotos.
+///
+/// Un conflicto ocurre cuando el archivo local existe y su fecha de modificación
+/// es posterior a la del archivo en la nube, lo que indica que hay cambios locales
+/// que se perderían al descargar.
+///
+/// # Arguments
+///
+/// * `dest_base` - Directorio raíz donde residen los archivos de guardado locales.
+/// * `saves` - Lista de metadatos de archivos disponibles en la nube para este juego.
 fn check_conflicts_for_game(
-    _game_id: &str,
     dest_base: &std::path::Path,
     saves: &[RemoteSaveInfoDto],
 ) -> Vec<DownloadConflictDto> {
     let mut conflicts = Vec::new();
+
     for save in saves {
         let dest_path = dest_base.join(&save.filename);
+
         let Ok(meta) = fs::metadata(&dest_path) else {
             continue;
         };
         let Ok(local_mtime) = meta.modified() else {
             continue;
         };
+
         let cloud_dt: DateTime<Utc> = match DateTime::parse_from_rfc3339(&save.last_modified)
             .or_else(|_| DateTime::parse_from_rfc2822(&save.last_modified))
         {
             Ok(dt) => dt.with_timezone(&Utc),
             Err(_) => continue,
         };
+
         let Ok(duration) = local_mtime.duration_since(UNIX_EPOCH) else {
             continue;
         };
@@ -64,6 +173,7 @@ fn check_conflicts_for_game(
         else {
             continue;
         };
+
         if local_dt > cloud_dt {
             conflicts.push(DownloadConflictDto {
                 filename: save.filename.clone(),
@@ -72,9 +182,20 @@ fn check_conflicts_for_game(
             });
         }
     }
+
     conflicts
 }
 
+/// Comprueba si existen conflictos de descarga para un juego concreto.
+///
+/// Obtiene la lista completa de guardados remotos, la filtra por `game_id` y
+/// compara cada archivo con su versión local para detectar posibles pérdidas
+/// de datos antes de proceder con la descarga.
+///
+/// # Errors
+///
+/// Devuelve `Err` si el juego no existe en la configuración, si la ruta no
+/// puede expandirse o si la llamada a la API falla.
 #[tauri::command]
 pub async fn sync_check_download_conflicts(
     game_id: String,
@@ -97,11 +218,24 @@ pub async fn sync_check_download_conflicts(
         .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
         .collect();
 
-    let conflicts = check_conflicts_for_game(&game_id, &dest_base, &saves);
+    let conflicts = check_conflicts_for_game(&dest_base, &saves);
     Ok(DownloadConflictsResultDto { conflicts })
 }
 
-/// Comprueba conflictos de descarga para varios juegos en una sola llamada (una sola lista remota).
+/// Comprueba conflictos de descarga para varios juegos en una sola llamada a la API.
+///
+/// Realiza una única petición remota para obtener todos los guardados y luego
+/// evalúa cada juego de la lista `game_ids` de forma local, evitando el
+/// problema N+1 de peticiones que tendría llamar a [`sync_check_download_conflicts`]
+/// de forma repetida.
+///
+/// Los juegos que no se encuentren en la configuración se incluyen en el
+/// resultado con una lista de conflictos vacía.
+///
+/// # Errors
+///
+/// Devuelve `Err` si la llamada a la API falla. Los errores de expansión de
+/// ruta por juego se tratan de forma individual y no abortan el proceso completo.
 #[tauri::command]
 pub async fn sync_check_download_conflicts_batch(
     game_ids: Vec<String>,
@@ -109,6 +243,7 @@ pub async fn sync_check_download_conflicts_batch(
     if game_ids.is_empty() {
         return Ok(Vec::new());
     }
+
     let cfg = crate::config::load_config();
     let all = api::sync_list_remote_saves().await?;
     let mut results = Vec::with_capacity(game_ids.len());
@@ -122,44 +257,55 @@ pub async fn sync_check_download_conflicts_batch(
             Some(g) => g,
             None => {
                 results.push(GameConflictsResultDto {
-                    game_id: game_id.clone(),
+                    game_id,
                     conflicts: Vec::new(),
                 });
                 continue;
             }
         };
+
         let dest_base = match path_utils::expand_path(game.paths[0].trim()) {
             Some(p) => PathBuf::from(p),
             None => {
                 results.push(GameConflictsResultDto {
-                    game_id: game_id.clone(),
+                    game_id,
                     conflicts: Vec::new(),
                 });
                 continue;
             }
         };
+
         let saves: Vec<RemoteSaveInfoDto> = all
             .iter()
             .filter(|s| s.game_id.eq_ignore_ascii_case(&game_id))
             .cloned()
             .collect();
 
-        let conflicts = check_conflicts_for_game(&game_id, &dest_base, &saves);
-        results.push(GameConflictsResultDto {
-            game_id: game_id.clone(),
-            conflicts,
-        });
+        let conflicts = check_conflicts_for_game(&dest_base, &saves);
+        results.push(GameConflictsResultDto { game_id, conflicts });
     }
+
     Ok(results)
 }
 
-/// Tolerancia (segundos) al comparar local vs nube: solo consideramos "pendiente subir" si
-/// el archivo local es claramente más reciente. Evita falsos positivos.
-const UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS: i64 = 2;
-
+/// Devuelve los juegos que tienen al menos un archivo local más reciente que
+/// su contraparte en la nube (o que no existe en la nube), indicando que
+/// hay cambios pendientes de subir.
+///
+/// La comparación aplica una tolerancia de [`UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS`]
+/// para evitar falsos positivos por diferencias menores de reloj.
+///
+/// La enumeración de archivos locales se ejecuta en un thread de bloqueo
+/// dedicado para no bloquear el runtime asíncrono de Tokio.
+///
+/// # Errors
+///
+/// Devuelve `Err` si `apiBaseUrl` o `userId` no están configurados, o si
+/// la llamada a la API falla.
 #[tauri::command]
 pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String> {
     let cfg = crate::config::load_config();
+
     let _ = cfg
         .api_base_url
         .as_deref()
@@ -172,7 +318,7 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         .ok_or("Configura userId en Configuración")?;
 
     let remote = api::sync_list_remote_saves().await?;
-    let remote_map: std::collections::HashMap<(String, String), DateTime<Utc>> = remote
+    let remote_map: HashMap<(String, String), DateTime<Utc>> = remote
         .into_iter()
         .filter_map(|s| {
             let dt = DateTime::parse_from_rfc3339(&s.last_modified)
@@ -185,14 +331,21 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         })
         .collect();
 
-    let mut unsynced = Vec::new();
     let tolerance = chrono::Duration::seconds(UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS);
+    let mut unsynced = Vec::new();
 
     for game in &cfg.games {
-        let local_files = path_utils::list_all_files_with_mtime(&game.paths);
+        // La enumeración de archivos hace I/O síncrono de disco; se delega a
+        // un thread de bloqueo para no interferir con el scheduler de Tokio.
+        let paths = game.paths.clone();
+        let local_files =
+            tokio::task::spawn_blocking(move || path_utils::list_all_files_with_mtime(&paths))
+                .await
+                .map_err(|e| format!("spawn_blocking list_files: {}", e))?;
+
         let mut has_unsynced = false;
 
-        for (_abs, rel, mtime, _size) in local_files {
+        'files: for (_abs, rel, mtime, _size) in local_files {
             let Ok(duration) = mtime.duration_since(UNIX_EPOCH) else {
                 continue;
             };
@@ -202,18 +355,18 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
                 continue;
             };
             let local_dt = local_dt.with_timezone(&Utc);
-
             let key = (game.id.to_lowercase(), rel.clone());
+
             match remote_map.get(&key) {
-                None => has_unsynced = true,
-                Some(&cloud_dt) => {
-                    if local_dt > cloud_dt + tolerance {
-                        has_unsynced = true;
-                    }
+                None => {
+                    has_unsynced = true;
+                    break 'files;
                 }
-            }
-            if has_unsynced {
-                break;
+                Some(&cloud_dt) if local_dt > cloud_dt + tolerance => {
+                    has_unsynced = true;
+                    break 'files;
+                }
+                _ => {}
             }
         }
 
@@ -227,23 +380,37 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
     Ok(unsynced)
 }
 
-const DOWNLOAD_PROGRESS_EMIT_BYTES: u64 = 256 * 1024;
-const DOWNLOAD_FILE_CONCURRENCY: usize = 16;
-
-/// Mensaje claro cuando no se puede escribir (archivo en uso o sin permisos).
-fn file_write_error_message(filename: &str, e: &std::io::Error) -> String {
-    let is_access_denied = e.kind() == ErrorKind::PermissionDenied || e.raw_os_error() == Some(5);
-    if is_access_denied {
-        format!(
-            "{}: archivo en uso o sin permisos (cierra el juego u otra app que lo use)",
-            filename
-        )
-    } else {
-        format!("{}: {}", filename, e)
-    }
-}
-
-/// Descarga un solo archivo usando el DOWNLOAD_CLIENT estático.
+/// Descarga un único archivo desde la nube y lo escribe en el filesystem local.
+///
+/// El flujo es el siguiente:
+/// 1. Crea los directorios padre si no existen.
+/// 2. Si el archivo destino ya existe, realiza una copia de seguridad antes de
+///    sobreescribirlo. La copia se hace con `fs::copy` directo; si el archivo
+///    no existía en el momento de copiar (`NotFound`), se ignora silenciosamente.
+/// 3. Descarga el contenido con streaming, emitiendo eventos de progreso cada
+///    [`DOWNLOAD_PROGRESS_EMIT_BYTES`] bytes.
+/// 4. Escribe con un [`BufWriter`] de [`WRITE_BUF_SIZE`] bytes para reducir
+///    las llamadas de sistema.
+/// 5. Ajusta la fecha de modificación del archivo al timestamp de la nube para
+///    que las comparaciones posteriores sean coherentes.
+///
+/// La creación del archivo se reintenta con backoff exponencial si el sistema
+/// reporta acceso denegado (archivo en uso por otro proceso).
+///
+/// # Arguments
+///
+/// * `dest_base` - Directorio raíz de guardados del juego.
+/// * `backup_dir` - Directorio donde almacenar la copia previa, si se desea.
+/// * `save` - Metadatos del archivo remoto a descargar.
+/// * `download_url` - URL presignada para la descarga del contenido.
+/// * `game_id` - Identificador del juego, usado en los eventos de progreso.
+/// * `app` - Handle de la aplicación Tauri para emitir eventos al frontend.
+///
+/// # Errors
+///
+/// Devuelve `Err` con un mensaje legible si la petición HTTP falla, si no se
+/// puede crear el archivo destino después de los reintentos, o si ocurre un
+/// error de escritura durante la transferencia.
 async fn download_one_file(
     dest_base: &std::path::Path,
     backup_dir: Option<&std::path::Path>,
@@ -253,19 +420,30 @@ async fn download_one_file(
     app: &AppHandle,
 ) -> Result<(), String> {
     let dest_path = dest_base.join(&save.filename);
+
     if let Some(parent) = dest_path.parent() {
         let _ = fs::create_dir_all(parent);
     }
 
-    // Backup local antes de sobrescribir
-    if dest_path.exists() {
-        if let Some(backup_base) = backup_dir {
-            if let Ok(rel) = dest_path.strip_prefix(dest_base) {
-                let backup_path = backup_base.join(rel);
-                if let Some(bp) = backup_path.parent() {
-                    let _ = fs::create_dir_all(bp);
+    // Copia de seguridad previa a la sobreescritura.
+    // Se usa fs::copy directamente en lugar de exists() + copy() para evitar
+    // una condición de carrera entre la comprobación y la copia.
+    if let Some(backup_base) = backup_dir {
+        if let Ok(rel) = dest_path.strip_prefix(dest_base) {
+            let backup_path = backup_base.join(rel);
+            if let Some(bp) = backup_path.parent() {
+                let _ = fs::create_dir_all(bp);
+            }
+            match fs::copy(&dest_path, &backup_path) {
+                Ok(_) => {}
+                Err(e) if e.kind() == ErrorKind::NotFound => {}
+                Err(e) => {
+                    sync_logger::log_error(
+                        "sync_download_game",
+                        "download_one_file",
+                        &format!("No se pudo hacer backup de '{}': {}", save.filename, e),
+                    );
                 }
-                let _ = fs::copy(&dest_path, &backup_path);
             }
         }
     }
@@ -280,43 +458,23 @@ async fn download_one_file(
     let mut loaded: u64 = 0;
     let mut last_emit: u64 = 0;
 
-    let file = match tokio::fs::File::create(&dest_path).await {
-        Ok(f) => f,
-        Err(e) => {
-            let e = std::io::Error::from(e);
-            if (e.kind() == ErrorKind::PermissionDenied || e.raw_os_error() == Some(5))
-                && dest_path.exists()
-            {
-                tokio::time::sleep(Duration::from_millis(400)).await;
-                match tokio::fs::File::create(&dest_path).await {
-                    Ok(f) => f,
-                    Err(e2) => {
-                        return Err(file_write_error_message(
-                            &save.filename,
-                            &std::io::Error::from(e2),
-                        ))
-                    }
-                }
-            } else {
-                return Err(file_write_error_message(&save.filename, &e));
-            }
-        }
-    };
+    let file = create_file_with_retry(&dest_path)
+        .await
+        .map_err(|e| file_write_error_message(&save.filename, &e))?;
 
-    const WRITE_BUF_SIZE: usize = 512 * 1024;
     let mut writer = BufWriter::with_capacity(WRITE_BUF_SIZE, file);
-
     let mut stream = res.bytes_stream();
     let mut write_err: Option<String> = None;
 
     while let Some(chunk_result) = stream.next().await {
         match chunk_result {
             Ok(chunk) => {
-                let n = chunk.len() as u64;
-                loaded += n;
-                if loaded - last_emit >= DOWNLOAD_PROGRESS_EMIT_BYTES
-                    || (total > 0 && loaded >= total)
-                {
+                loaded += chunk.len() as u64;
+
+                let should_emit = loaded - last_emit >= DOWNLOAD_PROGRESS_EMIT_BYTES
+                    || (total > 0 && loaded >= total);
+
+                if should_emit {
                     last_emit = loaded;
                     let _ = app.emit(
                         "sync-download-progress",
@@ -328,6 +486,7 @@ async fn download_one_file(
                         },
                     );
                 }
+
                 if let Err(e) = writer.write_all(&chunk).await {
                     write_err = Some(file_write_error_message(
                         &save.filename,
@@ -343,7 +502,9 @@ async fn download_one_file(
         }
     }
 
-    if total > 0 && loaded < total {
+    // Emite el 100 % si la transferencia terminó correctamente pero el último
+    // chunk no lo alcanzó exactamente por el umbral de emisión.
+    if write_err.is_none() && total > 0 && loaded < total {
         let _ = app.emit(
             "sync-download-progress",
             SyncProgressPayload {
@@ -364,6 +525,8 @@ async fn download_one_file(
         }
     }
 
+    // Libera el writer (y el file handle subyacente) antes de modificar
+    // la fecha de modificación, para evitar conflictos en algunos sistemas.
     drop(writer);
 
     if write_err.is_none() {
@@ -373,9 +536,21 @@ async fn download_one_file(
             let unix_secs = dt.timestamp();
             let unix_nanos = dt.timestamp_subsec_nanos();
             let ft = filetime::FileTime::from_unix_time(unix_secs, unix_nanos);
+            let path_clone = dest_path.clone();
 
-            // Forzamos al disco duro a ponerle la fecha de S3
-            let _ = filetime::set_file_mtime(&dest_path, ft);
+            // filetime::set_file_mtime es una llamada de sistema síncrona;
+            // se delega a un thread de bloqueo para no interferir con Tokio.
+            let set_result =
+                tokio::task::spawn_blocking(move || filetime::set_file_mtime(&path_clone, ft))
+                    .await;
+
+            if let Err(e) = set_result {
+                sync_logger::log_error(
+                    "sync_download_game",
+                    "download_one_file",
+                    &format!("No se pudo ajustar mtime de '{}': {}", save.filename, e),
+                );
+            }
         }
     }
 
@@ -385,6 +560,14 @@ async fn download_one_file(
     }
 }
 
+/// Descarga todos los archivos de guardado de un juego desde la nube.
+///
+/// Comando Tauri que envuelve [`sync_download_game_impl`] con gestión del
+/// estado del tray y emisión del evento `sync-download-done` al finalizar.
+///
+/// # Errors
+///
+/// Propaga los errores de [`sync_download_game_impl`].
 #[tauri::command]
 pub async fn sync_download_game(
     game_id: String,
@@ -394,17 +577,34 @@ pub async fn sync_download_game(
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    // Como es un solo juego, le pasamos None para que obtenga la lista él mismo
     let result = sync_download_game_impl(game_id.clone(), app.clone(), None).await;
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
-
     let _ = app.emit("sync-download-done", ());
+
     result
 }
 
-// Ahora acepta prefetched_saves para evitar el problema N+1 en las llamadas batch
+/// Implementación interna de la descarga de un juego.
+///
+/// Acepta una lista de guardados pre-obtenida (`prefetched_saves`) para
+/// evitar el problema N+1 cuando se llama desde una operación batch: en ese
+/// caso el llamador ya dispone de la lista completa y no es necesario hacer
+/// una petición extra a la API por cada juego.
+///
+/// Si `prefetched_saves` es `None`, la función obtiene la lista por sí misma.
+///
+/// # Arguments
+///
+/// * `game_id` - Identificador del juego a descargar.
+/// * `app` - Handle de la aplicación para emitir eventos de progreso.
+/// * `prefetched_saves` - Lista de guardados remotos ya obtenida, o `None`.
+///
+/// # Errors
+///
+/// Devuelve `Err` si el juego está en ejecución, si la configuración es
+/// incompleta, si la API falla o si no se pueden obtener las URLs de descarga.
 pub(crate) async fn sync_download_game_impl(
     game_id: String,
     app: AppHandle,
@@ -441,7 +641,7 @@ pub(crate) async fn sync_download_game_impl(
         None => return Err("No se pudo expandir la ruta de destino".into()),
     };
 
-    // Usamos la lista proveída por el lote, o la descargamos si es una descarga individual
+    // Usa la lista provista por el llamador o la descarga si es una llamada individual.
     let saves: Vec<_> = match prefetched_saves {
         Some(s) => s,
         None => {
@@ -472,9 +672,7 @@ pub(crate) async fn sync_download_game_impl(
         .map(|s| (game_id.clone(), s.key.clone()))
         .collect();
 
-    const DOWNLOAD_URLS_BATCH_SIZE: usize = 500;
     let mut download_urls = Vec::with_capacity(saves.len());
-
     for chunk in items.chunks(DOWNLOAD_URLS_BATCH_SIZE) {
         let batch = api::get_download_urls(api_base, user_id, api_key, chunk)
             .await
@@ -550,15 +748,35 @@ pub(crate) async fn sync_download_game_impl(
     Ok(result)
 }
 
-const DOWNLOAD_BATCH_CONCURRENCY: usize = 4;
-const RESTORE_PACKAGED_CONCURRENCY: usize = 2;
-
+/// Descarga los guardados de todos los juegos configurados desde la nube.
+///
+/// La estrategia es la siguiente:
+/// 1. Los juegos actualmente en ejecución se marcan con error directamente,
+///    sin intentar la descarga.
+/// 2. Para los juegos restantes se comprueba si existe un backup empaquetado
+///    reciente en la nube; si lo hay, se restaura (más eficiente para juegos
+///    con muchos archivos). Si no, se descargan los archivos individuales.
+/// 3. Las restauraciones de backups y las descargas individuales se realizan
+///    en paralelo con concurrencias configuradas por [`RESTORE_PACKAGED_CONCURRENCY`]
+///    y [`DOWNLOAD_BATCH_CONCURRENCY`] respectivamente.
+/// 4. La lista de guardados individuales se obtiene una sola vez y se
+///    distribuye entre los juegos que la necesitan, evitando N peticiones.
+///
+/// Al finalizar se actualiza el tray, se emite `sync-download-done` y se
+/// limpian backups antiguos según la política de retención configurada.
+///
+/// # Errors
+///
+/// Devuelve `Err` si `apiBaseUrl` o `userId` no están configurados.
+/// Los errores individuales por juego se incluyen en el resultado sin abortar
+/// la operación completa.
 #[tauri::command]
 pub async fn sync_download_all_games(
     app: AppHandle,
     tray_state: State<'_, TrayState>,
 ) -> Result<Vec<GameSyncResultDto>, String> {
     let cfg = crate::config::load_config();
+
     let api_base = cfg
         .api_base_url
         .as_deref()
@@ -574,26 +792,26 @@ pub async fn sync_download_all_games(
     tray_state.0.syncing_inc();
     tray_state.0.update_tooltip();
 
-    let mut results_by_id: HashMap<String, GameSyncResultDto> = HashMap::new();
-    for game in &cfg.games {
-        if crate::process_check::is_game_running(&game.id, &game.paths) {
-            let game_id = game.id.clone();
-            results_by_id.insert(
-                game_id.clone(),
-                GameSyncResultDto {
-                    game_id,
-                    result: SyncResultDto {
-                        ok_count: 0,
-                        err_count: 1,
-                        errors: vec![format!(
-                            "{} está en ejecución. Ciérralo antes de descargar.",
-                            game.id
-                        )],
-                    },
+    // Marca como error los juegos que están en ejecución antes de intentar nada.
+    let mut results_by_id: HashMap<String, GameSyncResultDto> = cfg
+        .games
+        .iter()
+        .filter(|g| crate::process_check::is_game_running(&g.id, &g.paths))
+        .map(|g| {
+            let dto = GameSyncResultDto {
+                game_id: g.id.clone(),
+                result: SyncResultDto {
+                    ok_count: 0,
+                    err_count: 1,
+                    errors: vec![format!(
+                        "{} está en ejecución. Ciérralo antes de descargar.",
+                        g.id
+                    )],
                 },
-            );
-        }
-    }
+            };
+            (g.id.clone(), dto)
+        })
+        .collect();
 
     let to_process: Vec<String> = cfg
         .games
@@ -605,6 +823,7 @@ pub async fn sync_download_all_games(
     let api_base_owned = api_base.to_string();
     let user_id_owned = user_id.to_string();
 
+    // Consulta en paralelo si existe un backup empaquetado para cada juego.
     let backups_fetched: Vec<(String, Option<String>)> = stream::iter(to_process.clone())
         .map(|game_id| {
             let api_base = api_base_owned.clone();
@@ -620,6 +839,7 @@ pub async fn sync_download_all_games(
                     list.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
                     list.into_iter().next().map(|b| b.key)
                 });
+
                 (game_id, backup_key)
             }
         })
@@ -631,15 +851,15 @@ pub async fn sync_download_all_games(
     let mut to_download_normal = Vec::new();
 
     for (id, key_opt) in backups_fetched {
-        if let Some(k) = key_opt {
-            to_restore.push((id, k));
-        } else {
-            to_download_normal.push(id);
+        match key_opt {
+            Some(k) => to_restore.push((id, k)),
+            None => to_download_normal.push(id),
         }
     }
 
     let tray_inner = tray_state.0.clone();
 
+    // Restaura backups empaquetados en paralelo.
     let restore_results: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_restore)
         .map(|(game_id, backup_key)| {
             let app = app.clone();
@@ -682,6 +902,7 @@ pub async fn sync_download_all_games(
         results_by_id.insert(game_id.clone(), GameSyncResultDto { game_id, result });
     }
 
+    // Obtiene la lista remota una sola vez para todos los juegos de descarga normal.
     let all_saves = if !to_download_normal.is_empty() {
         match api::sync_list_remote_saves().await {
             Ok(s) => s,
@@ -699,6 +920,10 @@ pub async fn sync_download_all_games(
                         },
                     );
                 }
+                // Devuelve los resultados en el orden original de la configuración.
+                tray_state.0.syncing_dec();
+                tray_state.0.clone().refresh_unsynced_async();
+                let _ = app.emit("sync-download-done", ());
                 return Ok(cfg
                     .games
                     .iter()
@@ -710,6 +935,8 @@ pub async fn sync_download_all_games(
         Vec::new()
     };
 
+    // Descarga archivos individuales en paralelo, distribuyendo la lista remota
+    // ya obtenida para evitar una petición extra por juego.
     let completed: Vec<(String, Result<SyncResultDto, String>)> = stream::iter(to_download_normal)
         .map(|game_id| {
             let app = app.clone();
@@ -737,6 +964,7 @@ pub async fn sync_download_all_games(
         results_by_id.insert(game_id.clone(), GameSyncResultDto { game_id, result });
     }
 
+    // Reordena los resultados según el orden de la configuración para consistencia.
     let results: Vec<GameSyncResultDto> = cfg
         .games
         .iter()
@@ -745,7 +973,6 @@ pub async fn sync_download_all_games(
 
     tray_state.0.syncing_dec();
     tray_state.0.clone().refresh_unsynced_async();
-
     let _ = app.emit("sync-download-done", ());
 
     let keep = cfg
