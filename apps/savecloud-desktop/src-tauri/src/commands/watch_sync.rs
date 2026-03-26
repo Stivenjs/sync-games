@@ -109,7 +109,7 @@ fn path_to_game_id(path: &Path, watch_roots: &[(PathBuf, String)]) -> Option<Str
 ///
 /// * `app` - Handle principal de Tauri para despachar notificaciones a la interfaz.
 /// * `tray_state` - Referencia atómica al estado del ícono de bandeja del sistema.
-pub fn spawn_watcher(app: AppHandle, tray_state: Arc<crate::tray_state::TrayStateInner>) {
+pub fn spawn_watcher(app: AppHandle, tray_state: Arc<crate::tray::tray_state::TrayStateInner>) {
     let cfg = config::load_config();
 
     if cfg

@@ -27,7 +27,7 @@ use super::multipart_upload;
 use super::streaming;
 use crate::config;
 use crate::network::DATA_CLIENT;
-use crate::tray_state::TrayState;
+use crate::tray::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
 
 /// Prefijo S3 para backups (key = userId/gameId/backups/<filename>.tar).
@@ -158,7 +158,7 @@ pub async fn download_and_restore_full_backup_impl(
     game_id: String,
     backup_key: String,
     app: AppHandle,
-    tray_state: std::sync::Arc<crate::tray_state::TrayStateInner>,
+    tray_state: std::sync::Arc<crate::tray::tray_state::TrayStateInner>,
     emit_done: bool,
 ) -> Result<(), String> {
     let ctx = get_api_context()?;

@@ -23,7 +23,7 @@ use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
 use super::multipart_upload;
 use super::path_utils;
 use crate::network::DATA_CLIENT;
-use crate::tray_state::TrayState;
+use crate::tray::tray_state::TrayState;
 use bytes::Bytes;
 use futures_util::stream::{self, Stream, StreamExt};
 use std::collections::HashMap;
@@ -208,7 +208,7 @@ pub async fn sync_upload_game(
 pub(crate) async fn sync_upload_game_impl(
     game_id: String,
     app: AppHandle,
-    tray_inner: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    tray_inner: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg

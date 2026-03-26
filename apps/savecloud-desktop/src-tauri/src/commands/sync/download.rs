@@ -25,7 +25,7 @@ use super::models::{
 use super::path_utils;
 use super::sync_logger;
 use crate::network::DATA_CLIENT;
-use crate::tray_state::TrayState;
+use crate::tray::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
 
 /// Número máximo de reintentos al intentar crear un archivo bloqueado.

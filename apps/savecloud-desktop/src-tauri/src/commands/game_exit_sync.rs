@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Listener};
 
 /// Inicia la escucha de eventos de procesos en segundo plano para
 /// subir los guardados automáticamente cuando un juego se cierra.
-pub fn spawn_exit_watcher(app: AppHandle, tray_state: Arc<crate::tray_state::TrayStateInner>) {
+pub fn spawn_exit_watcher(app: AppHandle, tray_state: Arc<crate::tray::tray_state::TrayStateInner>) {
     let was_running: Arc<Mutex<HashMap<String, bool>>> = Arc::new(Mutex::new(HashMap::new()));
 
     let app_clone = app.clone();

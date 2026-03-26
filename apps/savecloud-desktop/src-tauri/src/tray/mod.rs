@@ -9,12 +9,13 @@
 //! - Backup completo (primer juego).
 //! - Salir.    
 
-use crate::tray_state::TrayState;
+pub mod tray_state;
+pub mod tray_tooltip;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{App, Emitter, Manager};
+use tray_state::TrayState;
 
-/// Crea el tray.
 pub fn create_tray(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let icon_bytes = include_bytes!("../../icons/icon.ico");
     let icon = tauri::image::Image::from_bytes(icon_bytes)

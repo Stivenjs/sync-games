@@ -337,7 +337,7 @@ fn spawn_url_prefetcher(
     total_size: u64,
     parts_to_fetch: Vec<u32>,
     tx: mpsc::Sender<(u32, u64, u64, String)>,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) {
     tokio::spawn(async move {
         for chunk in parts_to_fetch.chunks(PARTS_PER_URL_BATCH as usize) {
@@ -383,7 +383,7 @@ pub(crate) async fn upload_one_file_multipart(
     user_id: &str,
     api_key: &str,
     app: tauri::AppHandle,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
     let ctx =
         sync_logger::upload_context(game_id, relative_filename, &absolute_path.to_string_lossy());

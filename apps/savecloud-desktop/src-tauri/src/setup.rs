@@ -11,7 +11,7 @@ use crate::controller::start_gamepad_loop;
 use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
 use crate::process_check::start_process_watcher;
 use crate::torrent::{engine::TorrentEngine, state::TorrentState};
-use crate::tray_state::TrayState;
+use crate::tray::tray_state::TrayState;
 
 use std::sync::Arc;
 use tauri::{App, Manager};

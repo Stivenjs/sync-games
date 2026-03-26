@@ -403,7 +403,7 @@ pub(crate) async fn upload_tar_stream_multipart(
     user_id: &str,
     api_key: &str,
     app: tauri::AppHandle,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
     let strategy = UploadStrategy::for_file(estimated_total);
     let mut concurrency = ConcurrencyController::new(&strategy);
@@ -623,7 +623,7 @@ pub(crate) async fn upload_tar_stream_multipart_dry_run(
     relative_filename: &str,
     estimated_total: u64,
     app: tauri::AppHandle,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
     let strategy = UploadStrategy::for_file(estimated_total);
 

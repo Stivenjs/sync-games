@@ -4,16 +4,15 @@ mod controller;
 mod handlers;
 #[cfg(target_os = "windows")]
 mod manifest;
+mod network;
+mod plugins;
 mod process_check;
 mod setup;
 mod steam;
 mod time;
 mod torrent;
 mod tray;
-mod tray_state;
 use tauri::Manager;
-mod plugins;
-mod network;
 
 fn load_dotenv() {
     let _ = dotenvy::dotenv();

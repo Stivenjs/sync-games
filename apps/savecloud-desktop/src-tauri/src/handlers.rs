@@ -69,7 +69,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::sync::api::copy_friend_saves_with_plan,
         crate::commands::sync::api::get_s3_transfer_endpoint_type,
         crate::commands::list_operation_history,
-        crate::commands::tray_tooltip::refresh_tray_tooltip,
+        crate::tray::tray_tooltip::refresh_tray_tooltip,
         crate::commands::get_steam_app_names_batch,
         crate::commands::plugins::export_plugin_sdk,
         crate::commands::command_logs::get_plugin_logs,
