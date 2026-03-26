@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 use super::api;
 use super::models::SyncProgressPayload;
-use super::sync_logger;
+use crate::commands::logs::sync_logger;
 use crate::network::DATA_CLIENT;
 use futures_util::stream::StreamExt;
 use serde::{Deserialize, Serialize};

@@ -18,7 +18,6 @@ pub(crate) mod multipart_upload;
 mod path_utils;
 pub(crate) mod preview;
 pub(crate) mod streaming;
-pub(crate) mod sync_logger;
 pub(crate) mod upload;
 
 use models::SaveFileDto;
@@ -66,5 +65,5 @@ pub fn check_games_running(game_ids: Vec<String>) -> std::collections::HashMap<S
 /// Útil para abrirlo cuando hay errores 500 u otros fallos y ver qué ocurrió.
 #[tauri::command]
 pub fn get_sync_debug_log_path() -> Option<String> {
-    sync_logger::log_file_path()
+    crate::commands::logs::sync_logger::log_file_path()
 }

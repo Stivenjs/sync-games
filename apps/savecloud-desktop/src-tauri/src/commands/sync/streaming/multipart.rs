@@ -19,9 +19,9 @@ use tauri::Emitter;
 
 use super::super::api;
 use super::super::models::SyncProgressPayload;
-use super::super::sync_logger;
 use super::tar_stream::TarStreamMsg;
 use super::upload_strategy::{ConcurrencyController, UploadStrategy};
+use crate::commands::logs::sync_logger;
 
 /// Número de URLs solicitadas en cada batch al API cuando no están en caché.
 const PART_URL_BATCH: u32 = 32;

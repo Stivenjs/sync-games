@@ -23,7 +23,7 @@ use super::models::{
     RemoteSaveInfoDto, SyncProgressPayload, SyncResultDto, UnsyncedGameDto,
 };
 use super::path_utils;
-use super::sync_logger;
+use crate::commands::logs::sync_logger;
 use crate::network::DATA_CLIENT;
 use crate::tray::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};

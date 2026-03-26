@@ -310,9 +310,11 @@ pub(crate) async fn sync_upload_game_impl(
                     );
                     break;
                 } else {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_multipart",
-                        &super::sync_logger::upload_context(&game_id, &relative, &absolute),
+                        &crate::commands::logs::sync_logger::upload_context(
+                            &game_id, &relative, &absolute,
+                        ),
                         &e,
                     );
                     errors.push(format!("{}: {}", relative, e));
@@ -342,7 +344,7 @@ pub(crate) async fn sync_upload_game_impl(
     const UPLOAD_URLS_BATCH_SIZE: usize = 500;
     if !simple_files.is_empty() {
         let total_simple = simple_files.len();
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_batch",
             &format!("gameId={} file_count={}", game_id, total_simple),
         );
@@ -354,7 +356,7 @@ pub(crate) async fn sync_upload_game_impl(
             let batch = api::get_upload_urls(api_base, user_id, api_key, &game_id, chunk)
                 .await
                 .map_err(|e| {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_urls",
                         &format!("gameId={}", game_id),
                         &e,
@@ -372,7 +374,7 @@ pub(crate) async fn sync_upload_game_impl(
             ));
         }
 
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_urls_ok",
             &format!("gameId={} total={}", game_id, total_simple),
         );
@@ -427,7 +429,7 @@ pub(crate) async fn sync_upload_game_impl(
 
             put_count += 1;
             if put_count % 500 == 0 {
-                super::sync_logger::log_operation(
+                crate::commands::logs::sync_logger::log_operation(
                     "upload_simple_progress",
                     &format!("gameId={} done={}/{}", game_id, put_count, total_simple),
                 );
@@ -436,9 +438,13 @@ pub(crate) async fn sync_upload_game_impl(
             match result {
                 Ok(()) => ok_count += 1,
                 Err((relative, absolute, err_msg)) => {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_put",
-                        &super::sync_logger::upload_context(game_id.as_str(), &relative, &absolute),
+                        &crate::commands::logs::sync_logger::upload_context(
+                            game_id.as_str(),
+                            &relative,
+                            &absolute,
+                        ),
                         &err_msg,
                     );
                     errors.push(err_msg);
@@ -447,7 +453,7 @@ pub(crate) async fn sync_upload_game_impl(
             }
         }
 
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_done",
             &format!("gameId={} files={}", game_id, total_simple),
         );
