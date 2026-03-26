@@ -8,7 +8,7 @@
 //!
 //! Deshabilitado temporalmente vía macro en entornos específicos; remover
 //! `#![allow(dead_code)]` cuando se integre al flujo principal.
-
+#![allow(dead_code)]
 use crate::commands::sync::{self, sync_logger};
 use crate::config;
 use notify::{RecursiveMode, Watcher};
