@@ -7,10 +7,8 @@ mod config_cmds;
 mod game_stats;
 mod manifest_search;
 mod scan;
-mod steam_search;
 
 pub use config_cmds::*;
 pub use game_stats::*;
 pub use manifest_search::*;
 pub use scan::*;
-pub use steam_search::*;
