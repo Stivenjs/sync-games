@@ -10,9 +10,9 @@ import { GameCardSyncProgress } from "@features/games/GameCardSyncProgress";
 import { LARGE_GAME_BLOCK_SIZE_BYTES } from "@utils/packageRecommendation";
 import { GameCardActions } from "@features/games/GameCardActions";
 import { useGameMedia } from "@hooks/useGameMedia";
+import { useSyncStore } from "@store/SyncStore";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
-import type { SyncProgressState } from "@/store/SyncStore";
 import type { SteamAppdetailsMediaResult } from "@services/tauri";
 
 export interface GameCardProps {
@@ -52,7 +52,6 @@ export interface GameCardProps {
   /** Número de backups completos (empaquetados) en la nube para este juego. Se muestra un badge si > 0. */
   cloudBackupCount?: number;
   /** Progreso de subida/descarga de un solo juego (muestra barra inline en la tarjeta). */
-  syncProgress?: SyncProgressState | null;
   /** Medios por Steam App ID (de una petición batch). Si se pasa, no se hace useQuery individual. */
   mediaBySteamAppId?: Record<string, SteamAppdetailsMediaResult> | null;
   /** Si true, los medios vienen solo del batch (no hacer useQuery individual aunque el batch siga cargando). */
@@ -68,10 +67,16 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     isLoading: externalLoading,
     syncStatus,
     cloudBackupCount = 0,
-    syncProgress,
     mediaBySteamAppId,
     mediaFromBatch = false,
   } = props;
+
+  const syncProgress = useSyncStore((state) => {
+    if (state.syncOperation?.mode === "single" && state.syncOperation.gameId === game.id) {
+      return state.progress;
+    }
+    return null;
+  });
 
   const {
     displayImageUrl,
