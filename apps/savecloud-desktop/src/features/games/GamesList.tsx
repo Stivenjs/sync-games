@@ -121,6 +121,10 @@ export function GamesList({
   const gameRunningStatus = useGameRunningStatus(games.map((g) => g.id));
   const syncOperation = useSyncStore((state) => state.syncOperation);
   const progress = useSyncStore((state) => state.progress);
+  const stableListKey = useMemo(
+    () => [animationKey ?? "", games.map((g) => g.id).join(",")].join("|"),
+    [animationKey, games.map((g) => g.id).join(",")]
+  );
 
   if (games.length === 0) {
     const isEmptyState = !emptyFilterMessage;
@@ -167,10 +171,7 @@ export function GamesList({
       </Card>
     );
   }
-  const stableListKey = useMemo(
-    () => [animationKey ?? "", games.map((g) => g.id).join(",")].join("|"),
-    [animationKey, games.map((g) => g.id).join(",")]
-  );
+
   return (
     <GamesListMotionContainer
       className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5"
