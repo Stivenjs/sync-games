@@ -476,19 +476,25 @@ mod tests {
     fn controller_can_decrease_concurrency() {
         let strategy = UploadStrategy::for_file(512 * 1024 * 1024);
         let mut ctrl = ConcurrencyController::new(&strategy);
+
         // Quemar calentamiento
         for _ in 0..WARMUP_PARTS {
             ctrl.record_part(8 * 1024 * 1024, 100);
         }
+
         // Subir la concurrencia con throughput alto
         for _ in 0..ADJUST_INTERVAL {
             ctrl.record_part(64 * 1024 * 1024, 800);
         }
+
         let high = ctrl.current();
+
         // Simular degradación de red severa
-        for _ in 0..ADJUST_INTERVAL {
+        // de la ventana (WINDOW_SIZE = 6) y forzar un nuevo ajuste puro.
+        for _ in 0..(ADJUST_INTERVAL * 2) {
             ctrl.record_part(8 * 1024 * 1024, 10_000); // ~6 Mbps
         }
+
         assert!(
             ctrl.current() < high,
             "la concurrencia deberia bajar con throughput bajo"
