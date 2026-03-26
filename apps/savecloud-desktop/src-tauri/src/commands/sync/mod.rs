@@ -9,15 +9,15 @@
 //! - `upload`: Subida de guardados
 //! - `download`: Descarga y conflictos
 
-pub(crate) mod api;
-pub(crate) mod backup;
-pub(crate) mod download;
-pub(crate) mod full_backup;
+pub mod api;
+pub mod backup;
+pub mod download;
+pub mod full_backup;
 mod models;
-pub(crate) mod multipart_upload;
-pub(crate) mod preview;
-pub(crate) mod streaming;
-pub(crate) mod upload;
+pub mod multipart_upload;
+pub mod preview;
+pub mod streaming;
+pub mod upload;
 
 use models::SaveFileDto;
 
