@@ -1,7 +1,7 @@
 mod commands;
 mod config;
 mod controller;
-mod handlers;
+mod ipc;
 #[cfg(target_os = "windows")]
 mod manifest;
 mod network;
@@ -34,7 +34,7 @@ pub fn run() {
         }));
     }
 
-    builder = handlers::register_all_commands(builder);
+    builder = ipc::handlers::register_all_commands(builder);
 
     builder
         .plugin(tauri_plugin_process::init())
