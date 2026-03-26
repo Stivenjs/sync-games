@@ -1,8 +1,7 @@
 //! Comandos Tauri expuestos al frontend.
 
-pub mod stats;
-pub mod scan;
-pub mod sync;
 pub mod logs;
-
-
+pub mod scan;
+pub mod share;
+pub mod stats;
+pub mod sync;

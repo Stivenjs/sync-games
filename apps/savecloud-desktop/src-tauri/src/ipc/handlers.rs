@@ -72,5 +72,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::steam::steam_search::get_steam_app_names_batch,
         crate::plugins::plugin_sdk::export_plugin_sdk,
         crate::commands::logs::command_logs::get_plugin_logs,
+        crate::commands::share::share::resolve_remote_share_token,
+        crate::commands::share::share::create_remote_share_link,
     ])
 }
