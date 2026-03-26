@@ -317,7 +317,7 @@ export function GamesPage() {
           hasSyncConfig={hasSyncConfig}
         />
       </section>
-      //{" "}
+
       {/* operationResult && operationResult.result.errors.length > 0 && (
         <OperationErrorCard
           operationResult={operationResult}
