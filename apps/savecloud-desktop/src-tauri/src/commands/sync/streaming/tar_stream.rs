@@ -23,19 +23,15 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use bytes::{BufMut, BytesMut};
+use walkdir::WalkDir;
 
 use super::upload_strategy::TAR_STREAM_CHUNK_BYTES;
 
 /// Mensajes que el hilo TAR envía al consumidor async.
-///
-/// El canal se cierra con [`TarStreamMsg::Done`] en el camino feliz o con
-/// [`TarStreamMsg::Err`] ante cualquier fallo de I/O. El consumidor debe tratar
-/// ambos como señal de fin de stream y actuar en consecuencia.
 #[derive(Debug)]
 pub(crate) enum TarStreamMsg {
     /// Chunk de bytes listos para subir. El tamaño es exactamente
-    /// [`TAR_STREAM_CHUNK_BYTES`] salvo para el último chunk del stream,
-    /// que puede ser menor.
+    /// [`TAR_STREAM_CHUNK_BYTES`] salvo para el último chunk del stream.
     Chunk(bytes::Bytes),
     /// El TAR se generó y todos los bytes fueron enviados correctamente.
     Done,
@@ -46,29 +42,15 @@ pub(crate) enum TarStreamMsg {
 /// Implementa [`Write`] sobre un canal [`tokio::sync::mpsc`], acumulando bytes
 /// en un [`BytesMut`] y enviando chunks al alcanzar el umbral configurado.
 ///
-/// # Diseño sin copias extra
-///
-/// `BytesMut` es un buffer de bytes con conteo de referencias interno. La operación
-/// `split_to(n)` devuelve los primeros `n` bytes como un [`BytesMut`] independiente
-/// en O(1) sin mover los bytes subyacentes: sólo incrementa el contador de referencia
-/// y ajusta los punteros de inicio y fin. Llamar a `.freeze()` sobre ese fragmento
-/// produce un [`bytes::Bytes`] inmutable listo para enviar por el canal, también O(1).
-///
-/// El buffer principal continúa apuntando al espacio restante del mismo bloque de
-/// memoria, evitando reallocaciones hasta que ese espacio se agota.
+/// Ver el módulo raíz para la explicación del diseño sin copias.
 struct ChannelWriter {
     tx: tokio::sync::mpsc::Sender<TarStreamMsg>,
-    /// Buffer de acumulación. Se mantiene siempre pre-reservado con al menos
-    /// `TAR_STREAM_CHUNK_BYTES` de capacidad disponible para evitar reallocaciones
-    /// en el camino caliente.
+    /// Buffer pre-reservado con capacidad para al menos un chunk completo.
     buf: BytesMut,
 }
 
 impl ChannelWriter {
-    /// Crea un nuevo `ChannelWriter` conectado al [`Sender`] proporcionado.
-    ///
-    /// El buffer se inicializa con capacidad exacta para un chunk completo,
-    /// eliminando cualquier reallocación durante la primera escritura.
+    /// Crea un nuevo `ChannelWriter` con buffer pre-reservado para un chunk.
     fn new(tx: tokio::sync::mpsc::Sender<TarStreamMsg>) -> Self {
         Self {
             tx,
@@ -78,46 +60,31 @@ impl ChannelWriter {
 
     /// Envía el contenido actual del buffer como un chunk y resetea el buffer.
     ///
-    /// Usa `split_to` en vez de `mem::take` para evitar mover los bytes: el chunk
-    /// resultante comparte la misma región de memoria que el buffer hasta que el
-    /// receptor lo dropea. El buffer queda apuntando al espacio contiguo restante.
-    ///
-    /// Si tras el split el buffer no tiene capacidad suficiente para el siguiente
-    /// ciclo, se reserva aquí para que la próxima escritura nunca provoque una
-    /// reallocación.
+    /// `split_to(len).freeze()` es O(1): no copia bytes, solo ajusta los punteros
+    /// internos del `BytesMut`. El buffer principal queda apuntando al espacio
+    /// contiguo restante del mismo bloque de memoria.
     fn flush_chunk(&mut self) -> io::Result<()> {
         if self.buf.is_empty() {
             return Ok(());
         }
-
-        // `split_to` es O(1): no copia bytes, sólo ajusta los punteros internos
-        // del `BytesMut` y devuelve una vista independiente del mismo bloque.
-        // `.freeze()` convierte ese fragmento en `Bytes` inmutable, también O(1).
         let chunk = self.buf.split_to(self.buf.len()).freeze();
-
         self.tx
             .blocking_send(TarStreamMsg::Chunk(chunk))
             .map_err(|_| io::Error::new(io::ErrorKind::BrokenPipe, "receptor descartado"))?;
-
-        // Pre-reservar capacidad para el siguiente ciclo de escritura.
-        // Si `split_to` dejó capacidad contigua disponible, `reserve` es un no-op.
+        // Pre-reservar para el siguiente ciclo. No-op si `split_to` dejó
+        // capacidad contigua disponible en el bloque existente.
         if self.buf.capacity() < TAR_STREAM_CHUNK_BYTES {
             self.buf.reserve(TAR_STREAM_CHUNK_BYTES);
         }
-
         Ok(())
     }
 }
 
 impl Write for ChannelWriter {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        // Fast path: buffer vacío y bloque entrante supera o iguala el umbral.
-        //
-        // Se evita pasar el slice por el buffer intermedio. `copy_from_slice`
-        // realiza una única copia directa al heap del `Bytes` final, mientras
-        // que el path anterior hacía `data.to_vec()` (copia al Vec) seguido de
-        // `blocking_send` (movimiento del Vec), sumando dos operaciones de memoria
-        // donde ahora hay una sola.
+        // Fast path: buffer vacío y bloque entrante supera el umbral.
+        // Una única copia directa al heap del `Bytes` final, sin pasar por
+        // el buffer intermedio.
         if self.buf.is_empty() && data.len() >= TAR_STREAM_CHUNK_BYTES {
             let chunk = bytes::Bytes::copy_from_slice(data);
             self.tx
@@ -127,25 +94,16 @@ impl Write for ChannelWriter {
         }
 
         // Path normal: acumular en el buffer pre-reservado.
-        //
-        // `put_slice` en `BytesMut` opera directamente sobre la capacidad disponible
-        // sin verificar el tipo de colección subyacente, evitando la indirección de
-        // `Vec::extend_from_slice`.
         self.buf.put_slice(data);
 
-        // Flush cuando el buffer alcanza o supera el umbral.
         if self.buf.len() >= TAR_STREAM_CHUNK_BYTES {
             self.flush_chunk()?;
         }
-
         Ok(data.len())
     }
 
-    /// Vacía cualquier byte pendiente en el buffer hacia el canal.
-    ///
-    /// Llamado por `tar-rs` durante `finish` e `into_inner` para garantizar que
-    /// los bytes finales del TAR (bloques de terminación de 1024 bytes) llegan
-    /// al consumidor antes de que el hilo termine.
+    /// Vacía bytes pendientes hacia el canal.
+    /// Llamado por `tar-rs` durante `into_inner` para los bloques de terminación.
     fn flush(&mut self) -> io::Result<()> {
         self.flush_chunk()
     }
@@ -153,25 +111,18 @@ impl Write for ChannelWriter {
 
 /// Lanza la generación del TAR en un hilo blocking y devuelve el receptor de chunks.
 ///
-/// `tar-rs` realiza I/O síncrona sobre el sistema de archivos. Ejecutarlo en un
-/// hilo blocking dedicado via [`tokio::task::spawn_blocking`] es el patrón correcto:
-/// evita bloquear los hilos del executor async sin introducir la complejidad de un
-/// wrapper async sobre operaciones de disco inherentemente secuenciales.
+/// Usa un pipeline manual con `walkdir` en lugar de `append_dir_all` para tener
+/// control fino sobre el flujo de archivos y puntos de backpressure entre entradas.
 ///
 /// # Parameters
 ///
-/// - `source_dir`: directorio raíz a empaquetar. Se toma posesión para que el
-///   closure sea `'static`.
-/// - `channel_capacity`: capacidad del canal mpsc. Debe derivarse de
-///   `UploadStrategy::tar_channel_capacity` para que el backpressure esté
-///   calibrado con el tamaño de parte elegido en tiempo de ejecución. No usar
-///   literales hardcodeados aquí.
+/// - `source_dir`: directorio raíz a empaquetar. Se toma posesión para `'static`.
+/// - `channel_capacity`: capacidad del canal mpsc. Debe ser `strategy.tar_channel_capacity`.
 ///
 /// # Return
 ///
-/// `(Receiver<TarStreamMsg>, JoinHandle<()>)`. El receptor produce chunks hasta
-/// recibir [`TarStreamMsg::Done`] o [`TarStreamMsg::Err`]. El `JoinHandle` puede
-/// ignorarse si no se necesita esperar la finalización del hilo blocking.
+/// `(Receiver<TarStreamMsg>, JoinHandle<()>)`. El canal se cierra con
+/// [`TarStreamMsg::Done`] en el camino feliz o [`TarStreamMsg::Err`] ante fallo.
 pub(crate) fn spawn_tar_stream(
     source_dir: PathBuf,
     channel_capacity: usize,
@@ -182,65 +133,107 @@ pub(crate) fn spawn_tar_stream(
     let (tx, rx) = tokio::sync::mpsc::channel::<TarStreamMsg>(channel_capacity);
 
     let handle = tokio::task::spawn_blocking(move || {
-        match run_tar_to_channel(&source_dir, tx.clone()) {
+        match run_tar_pipeline(&source_dir, tx.clone()) {
             Ok(()) => {
                 let _ = tx.blocking_send(TarStreamMsg::Done);
             }
             Err(e) => {
-                // El error se envía antes del cierre implícito del canal para que
-                // el consumidor pueda distinguir un fin limpio de un fallo de I/O.
                 let _ = tx.blocking_send(TarStreamMsg::Err(e));
             }
         }
-        // `tx` se dropea al salir del scope. El canal queda cerrado desde el lado
-        // productor, liberando al consumidor de `recv` si aún está bloqueado en él.
+        // `tx` se dropea aquí, cerrando el canal desde el lado productor.
     });
 
     (rx, handle)
 }
 
-/// Empaqueta `source_dir` en formato TAR escribiendo los chunks en el canal.
+/// Empaqueta `source_dir` en formato TAR mediante un pipeline manual con `walkdir`.
 ///
-/// Crea un [`ChannelWriter`] y se lo pasa al [`tar::Builder`]. Al llamar a
-/// `into_inner`, `tar-rs` invoca `finish` internamente (escribe los dos bloques
-/// de 512 bytes de terminación) y devuelve el writer. El flush explícito final
-/// garantiza que cualquier byte residual en el buffer llega al canal.
+/// En vez de delegar el recorrido a `append_dir_all`, itera explícitamente sobre
+/// las entradas del directorio y llama a `append_file` o `append_dir` según el tipo
+/// de cada entrada. Esto permite:
 ///
-/// # Errors
+/// - Registrar por separado en el log cada archivo procesado (útil para diagnóstico).
+/// - Introducir puntos de backpressure entre archivos sin bloquear en mitad de uno.
+/// - Manejar errores por entrada individualmente sin abortar todo el TAR.
 ///
-/// Devuelve `Err(String)` ante cualquier fallo de I/O al leer el directorio
-/// o al escribir sobre el canal (receptor descartado prematuramente).
-fn run_tar_to_channel(
+/// Los symlinks se preservan como entradas TAR de tipo enlace simbólico en vez de
+/// seguirlos, reduciendo el tamaño del TAR en directorios con muchos enlaces.
+fn run_tar_pipeline(
     source_dir: &Path,
     tx: tokio::sync::mpsc::Sender<TarStreamMsg>,
 ) -> Result<(), String> {
     let writer = ChannelWriter::new(tx);
     let mut builder = tar::Builder::new(writer);
-
-    // Preservar symlinks como entradas TAR de tipo enlace simbólico en vez de
-    // seguirlos y copiar el contenido del destino. Reduce el tamaño del TAR
-    // generado y el tiempo de I/O en directorios con muchos enlaces simbólicos.
     builder.follow_symlinks(false);
 
-    builder
-        .append_dir_all(".", source_dir)
-        .map_err(|e| format!("error empaquetando '{}': {}", source_dir.display(), e))?;
+    // `WalkDir` itera en orden DFS. `min_depth(0)` incluye el directorio raíz
+    // como primera entrada, necesario para que el TAR tenga la entrada de directorio
+    // antes que sus contenidos (comportamiento equivalente a `append_dir_all`).
+    let walker = WalkDir::new(source_dir)
+        .follow_links(false)
+        .same_file_system(true) // evitar cruzar puntos de montaje (ej. particiones distintas)
+        .into_iter();
 
-    // `into_inner` llama a `finish` internamente antes de devolver el writer.
-    // `finish` escribe los bloques de terminación del TAR (1024 bytes de ceros)
-    // e invoca `flush` sobre el writer, lo que llama a `ChannelWriter::flush_chunk`
-    // y envía el último chunk pendiente al canal.
-    let mut channel_writer = builder.into_inner().map_err(|e| {
-        format!(
-            "error finalizando tar para '{}': {}",
-            source_dir.display(),
-            e
-        )
-    })?;
+    for entry_result in walker {
+        let entry = entry_result.map_err(|e| format!("error recorriendo directorio: {}", e))?;
 
-    // Flush explícito de defensa: garantiza que cualquier byte que `into_inner`
-    // no haya drenado por algún codepath de `finish` llegue al canal antes de
-    // que el hilo termine. Es un no-op si el buffer ya está vacío.
+        // Ruta relativa a la raíz del TAR. `strip_prefix` elimina el prefijo del
+        // directorio fuente, dejando solo la ruta dentro del archivo TAR.
+        let relative = entry
+            .path()
+            .strip_prefix(source_dir)
+            .map_err(|e| format!("error calculando ruta relativa: {}", e))?;
+
+        // Saltar la entrada raíz "." para evitar una entrada de directorio vacía
+        // al inicio del TAR que algunos extractores interpretan de forma distinta.
+        if relative == Path::new("") || relative == Path::new(".") {
+            continue;
+        }
+
+        let file_type = entry.file_type();
+
+        if file_type.is_dir() {
+            // Las entradas de directorio solo escriben la cabecera TAR (512 bytes).
+            // No hay datos que leer del disco, así que el backpressure solo aplica
+            // cuando el buffer del `ChannelWriter` se llena con muchas cabeceras.
+            builder
+                .append_dir(relative, entry.path())
+                .map_err(|e| format!("error empaquetando dir '{}': {}", relative.display(), e))?;
+        } else if file_type.is_file() {
+            // `append_path_with_name` lee el archivo desde la ruta del sistema de
+            // archivos y lo escribe en el TAR con la ruta relativa calculada arriba.
+            // Esta es la operación costosa en I/O: lee el archivo en bloques y los
+            // pasa a `ChannelWriter::write`, que aplica backpressure si el canal está lleno.
+            let mut file = std::fs::File::open(entry.path())
+                .map_err(|e| format!("error abriendo '{}': {}", entry.path().display(), e))?;
+
+            builder
+                .append_file(relative, &mut file)
+                .map_err(|e| format!("error empaquetando '{}': {}", relative.display(), e))?;
+        } else if file_type.is_symlink() {
+            // Los symlinks se preservan usando `append_path` con `follow_symlinks(false)`.
+            // `tar-rs` leerá el destino del enlace con `std::fs::read_link` y escribirá
+            // una cabecera TAR de tipo enlace simbólico sin leer el archivo destino.
+            builder
+                .append_path_with_name(entry.path(), relative)
+                .map_err(|e| {
+                    format!("error empaquetando symlink '{}': {}", relative.display(), e)
+                })?;
+        }
+        // Otros tipos (sockets, devices) se omiten silenciosamente: no tienen
+        // representación significativa en un backup de saves de juego.
+    }
+
+    // `into_inner` llama a `finish` internamente (escribe los dos bloques de
+    // terminación de 512 bytes cada uno) y devuelve el writer.
+    let mut channel_writer = builder
+        .into_inner()
+        .map_err(|e| format!("error finalizando TAR: {}", e))?;
+
+    // Flush explícito de defensa: garantiza que cualquier byte residual que
+    // `into_inner` no haya drenado llegue al canal. Es un no-op si el buffer
+    // ya está vacío, que es el caso habitual.
     channel_writer
         .flush_chunk()
         .map_err(|e| format!("error vaciando buffer final: {}", e))?;
