@@ -294,11 +294,16 @@ pub async fn sync_check_download_conflicts_batch(
 pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String> {
     let cfg = crate::config::load_config();
     let tolerance_secs = UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS;
-
-    let remote_files = api::sync_list_remote_saves().await?;
-
+    let tolerance = chrono::Duration::seconds(tolerance_secs);
     let game_ids: Vec<String> = cfg.games.iter().map(|g| g.id.clone()).collect();
-    let remote_backups_map = super::full_backup::list_full_backups_batch(game_ids).await?;
+
+    let (remote_files_res, remote_backups_res) = tokio::join!(
+        api::sync_list_remote_saves(),
+        super::full_backup::list_full_backups_batch(game_ids)
+    );
+
+    let remote_files = remote_files_res?;
+    let remote_backups_map = remote_backups_res?;
 
     let remote_file_map: HashMap<(String, String), DateTime<Utc>> = remote_files
         .into_iter()
@@ -313,7 +318,6 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         })
         .collect();
 
-    let tolerance = chrono::Duration::seconds(tolerance_secs);
     let mut unsynced = Vec::new();
 
     for game in &cfg.games {
@@ -332,7 +336,6 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         });
 
         let paths = game.paths.clone();
-
         let local_files =
             tokio::task::spawn_blocking(move || path_utils::list_all_files_with_mtime(&paths))
                 .await
@@ -351,9 +354,9 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
             };
             let local_dt = local_dt.with_timezone(&Utc);
 
-            let key = (game_id_low.clone(), rel.clone());
+            let key = (&game_id_low, rel.as_str());
 
-            match remote_file_map.get(&key) {
+            match remote_file_map.get(&(key.0.clone(), key.1.to_string())) {
                 Some(&cloud_dt) => {
                     if local_dt > cloud_dt + tolerance {
                         if let Some(backup_dt) = last_backup_dt {
