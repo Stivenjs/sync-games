@@ -9,7 +9,7 @@ import { useCloudBackupCounts } from "@hooks/useCloudBackupCounts";
 import { useGameStats } from "@hooks/useGameStats";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { getSteamAppId, needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
 import { GamesListMotionContainer, GamesListMotionItem } from "@features/games/GamesListMotion";
@@ -119,7 +119,8 @@ export function GamesList({
     hasSyncConfig && games.length > 0
   );
   const gameRunningStatus = useGameRunningStatus(games.map((g) => g.id));
-  const { syncOperation, progress } = useSyncProgress();
+  const syncOperation = useSyncStore((state) => state.syncOperation);
+  const progress = useSyncStore((state) => state.progress);
 
   if (games.length === 0) {
     const isEmptyState = !emptyFilterMessage;

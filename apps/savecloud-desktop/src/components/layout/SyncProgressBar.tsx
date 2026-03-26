@@ -1,18 +1,22 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Spinner, Tooltip } from "@heroui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { requestUploadCancel, requestUploadPause, syncUploadResume } from "@services/tauri";
 import { formatBytes } from "@utils/format";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatEta, formatSpeed } from "@utils/progress";
 import { Clock, HardDrive, Pause, Upload, X, Zap } from "lucide-react";
 
-export type { SyncProgressState } from "@contexts/SyncProgressContext";
+export type { SyncProgressState } from "@store/SyncStore";
 
 /** Barra flotante de progreso: solo se muestra en operaciones "subir/descargar todos" (batch). */
 export function SyncProgressBar() {
-  const { syncOperation, progress, pausedUploadInfo, clearPausedUploadInfo } = useSyncProgress();
+  const syncOperation = useSyncStore((state) => state.syncOperation);
+  const progress = useSyncStore((state) => state.progress);
+  const pausedUploadInfo = useSyncStore((state) => state.pausedUploadInfo);
+  const clearPausedUploadInfo = useSyncStore((state) => state.clearPausedUploadInfo);
+
   const [resuming, setResuming] = useState(false);
   const [speedBps, setSpeedBps] = useState<number | null>(null);
   const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
@@ -47,16 +51,18 @@ export function SyncProgressBar() {
     progress?.filename?.includes("Extrayendo") ||
     progress?.filename?.startsWith("backups/") ||
     progress?.filename?.endsWith(".tar");
+
   const showFloatingBar = progress && (syncOperation?.mode === "batch" || isPackagedOperation);
 
   const isIndeterminate =
     progress &&
     (progress.filename?.includes("Empaquetando") || progress.filename?.includes("Extrayendo") || progress.total <= 0);
+
   const value =
     progress && progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0;
+
   const canPause = progress?.type === "upload" && !(isPackagedOperation && progress.total <= 0);
 
-  // Calcular velocidad media (bytes/segundo) y ETA aproximada.
   useEffect(() => {
     if (!progress) {
       setSpeedBps(null);
@@ -66,9 +72,9 @@ export function SyncProgressBar() {
       return;
     }
 
-    // Si cambia de juego o archivo, reiniciar la "sesión" de cálculo.
     const now = performance.now();
     const last = lastProgressRef.current;
+
     if (
       !last ||
       last.gameId !== progress.gameId ||
@@ -86,6 +92,7 @@ export function SyncProgressBar() {
       setEtaSeconds(null);
       return;
     }
+
     if (!startRef.current) {
       startRef.current = now;
       lastProgressRef.current = {
@@ -107,8 +114,6 @@ export function SyncProgressBar() {
     const dtMs = now - startRef.current;
     if (dtMs <= 0) return;
 
-    // Usar ventana deslizante simple: desde el inicio de la sesión,
-    // pero ignorar los primeros 2s para ETA (warmup).
     const bytesDelta = progress.loaded - 0;
     const bps = bytesDelta / (dtMs / 1000);
     setSpeedBps(bps);
@@ -117,7 +122,6 @@ export function SyncProgressBar() {
     if (progress.total > 0 && bps > 0 && elapsedSec >= 2) {
       const remaining = progress.total - progress.loaded;
       let eta = remaining / bps;
-      // Cap de ETA visible para evitar valores absurdos.
       if (eta > 2 * 60 * 60) {
         eta = 2 * 60 * 60;
       }
@@ -133,6 +137,10 @@ export function SyncProgressBar() {
       filename: progress.filename,
     };
   }, [progress?.loaded, progress?.total, progress?.gameId, progress?.type]);
+
+  if (!showFloatingBar && !pausedUploadInfo) {
+    return <AnimatePresence />;
+  }
 
   return (
     <AnimatePresence>
@@ -196,9 +204,7 @@ export function SyncProgressBar() {
               <motion.div
                 className="h-full rounded-full bg-primary"
                 initial={false}
-                animate={{
-                  width: `${value}%`,
-                }}
+                animate={{ width: `${value}%` }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
               />
             </div>
@@ -237,7 +243,6 @@ export function SyncProgressBar() {
         </motion.div>
       )}
 
-      {/* Banner de subida pausada: Reanudar */}
       {pausedUploadInfo && (
         <motion.div
           key="paused-upload"

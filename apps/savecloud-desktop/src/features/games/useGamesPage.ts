@@ -31,7 +31,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfig } from "@hooks/useConfig";
 import { useDebouncedValue } from "@hooks/useDebouncedValue";
 import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { filterGames, type OriginFilter } from "@features/games/GamesFilters";
 import { CONFIG_QUERY_KEY } from "@hooks/useConfig";
 
@@ -213,7 +213,7 @@ export function useGamesPage() {
     refetch: refetchLastSync,
   } = useLastSyncInfo(hasSyncConfig);
 
-  const { setSyncOperation } = useSyncProgress();
+  const setSyncOperation = useSyncStore((state) => state.setSyncOperation);
 
   const { data: unsyncedGames } = useQuery({
     queryKey: ["unsynced-games"],

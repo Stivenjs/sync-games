@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { getConfig, syncDownloadAllGames, syncUploadAllGames, createAndUploadFullBackup } from "@services/tauri";
 import { toastDownloadResult, toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import {
@@ -13,7 +13,7 @@ import {
 import { formatGameDisplayName } from "@utils/gameImage";
 
 export function TrayActionsListener() {
-  const { setSyncOperation } = useSyncProgress();
+  const setSyncOperation = useSyncStore((state) => state.setSyncOperation);
   const queryClient = useQueryClient();
 
   useEffect(() => {

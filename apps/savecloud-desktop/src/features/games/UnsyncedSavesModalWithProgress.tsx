@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { useUnsyncedSaves } from "@hooks/useUnsyncedSaves";
 import { UnsyncedSavesModal } from "@features/games/UnsyncedSavesModal";
 import { syncUploadGame, createAndUploadFullBackup } from "@services/tauri";
@@ -8,7 +8,7 @@ import { notifyUploadError, notifyFullBackupError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 
 export function UnsyncedSavesModalWithProgress() {
-  const { setSyncOperation } = useSyncProgress();
+  const setSyncOperation = useSyncStore((state) => state.setSyncOperation);
   const { unsyncedGameIds, showUnsyncedModal, closeModal, uploadAll, isUploading, refetchUnsynced } =
     useUnsyncedSaves();
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null);

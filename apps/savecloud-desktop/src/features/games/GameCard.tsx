@@ -12,7 +12,7 @@ import { GameCardActions } from "@features/games/GameCardActions";
 import { useGameMedia } from "@hooks/useGameMedia";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
-import type { SyncProgressState } from "@contexts/SyncProgressContext";
+import type { SyncProgressState } from "@/store/SyncStore";
 import type { SteamAppdetailsMediaResult } from "@services/tauri";
 
 export interface GameCardProps {

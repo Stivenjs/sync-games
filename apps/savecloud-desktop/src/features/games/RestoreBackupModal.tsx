@@ -28,7 +28,7 @@ import { formatBytes } from "@utils/format";
 import { toastError, toastSuccess, toastSyncResult } from "@utils/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
+import { useSyncStore } from "@store/SyncStore";
 import { ask } from "@tauri-apps/plugin-dialog";
 import type { ConfiguredGame } from "@app-types/config";
 
@@ -42,7 +42,7 @@ interface RestoreBackupModalProps {
 export function RestoreBackupModal({ isOpen, onClose, game, onSuccess }: RestoreBackupModalProps) {
   const gameId = game?.id ?? "";
   const queryClient = useQueryClient();
-  const { setSyncOperation } = useSyncProgress();
+  const setSyncOperation = useSyncStore((state) => state.setSyncOperation);
 
   const { data: backups, isLoading } = useQuery({
     queryKey: ["backups", gameId],
