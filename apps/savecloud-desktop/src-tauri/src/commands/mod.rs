@@ -1,11 +1,8 @@
 //! Comandos Tauri expuestos al frontend.
 
 pub(crate) mod command_logs;
-pub mod sync;
-mod config_cmds;
 mod game_stats;
-mod scan;
+pub mod scan;
+pub mod sync;
 
-pub use config_cmds::*;
 pub use game_stats::*;
-pub use scan::*;
