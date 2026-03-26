@@ -631,7 +631,7 @@ pub(crate) async fn sync_download_game_impl(
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    if crate::process_check::is_game_running(&game_id, &game.paths) {
+    if crate::system::process_check::is_game_running(&game_id, &game.paths) {
         return Err(format!(
             "El juego está en ejecución. Cierra {} antes de descargar para evitar sobrescribir archivos en uso.",
             game.id
@@ -810,7 +810,7 @@ pub async fn sync_download_all_games(
     let mut results_by_id: HashMap<String, GameSyncResultDto> = cfg
         .games
         .iter()
-        .filter(|g| crate::process_check::is_game_running(&g.id, &g.paths))
+        .filter(|g| crate::system::process_check::is_game_running(&g.id, &g.paths))
         .map(|g| {
             let dto = GameSyncResultDto {
                 game_id: g.id.clone(),

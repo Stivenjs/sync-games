@@ -53,13 +53,13 @@ pub fn check_game_running(game_id: String) -> bool {
     else {
         return false;
     };
-    crate::process_check::is_game_running(&game_id, &game.paths)
+    crate::system::process_check::is_game_running(&game_id, &game.paths)
 }
 
 /// Versión para varios juegos: devuelve un mapa gameId → running.
 #[tauri::command]
 pub fn check_games_running(game_ids: Vec<String>) -> std::collections::HashMap<String, bool> {
-    crate::process_check::are_games_running(&game_ids)
+    crate::system::process_check::are_games_running(&game_ids)
 }
 
 /// Ruta del archivo de log de diagnóstico de sincronización (sync-debug.log).

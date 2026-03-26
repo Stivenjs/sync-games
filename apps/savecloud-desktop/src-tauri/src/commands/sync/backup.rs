@@ -135,7 +135,7 @@ pub fn restore_backup(game_id: String, backup_id: String) -> Result<SyncResultDt
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    if crate::process_check::is_game_running(&game_id, &game.paths) {
+    if crate::system::process_check::is_game_running(&game_id, &game.paths) {
         return Err(format!(
             "El juego está en ejecución. Cierra {} antes de restaurar.",
             game.id

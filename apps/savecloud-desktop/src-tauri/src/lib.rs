@@ -6,7 +6,7 @@ mod ipc;
 mod manifest;
 mod network;
 mod plugins;
-mod process_check;
+mod system;
 mod setup;
 mod steam;
 mod time;

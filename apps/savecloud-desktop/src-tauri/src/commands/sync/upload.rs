@@ -217,7 +217,7 @@ pub(crate) async fn sync_upload_game_impl(
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    if crate::process_check::is_game_running(&game_id, &game.paths) {
+    if crate::system::process_check::is_game_running(&game_id, &game.paths) {
         return Err(format!(
             "El juego está en ejecución. Cierra {} antes de sincronizar para evitar archivos bloqueados.",
             game.id
@@ -494,7 +494,7 @@ pub async fn sync_upload_all_games(
     let mut results_by_id: HashMap<String, GameSyncResultDto> = HashMap::new();
 
     for game in &cfg.games {
-        if crate::process_check::is_game_running(&game.id, &game.paths) {
+        if crate::system::process_check::is_game_running(&game.id, &game.paths) {
             let game_id = game.id.clone();
             results_by_id.insert(
                 game_id.clone(),
