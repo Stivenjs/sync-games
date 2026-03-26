@@ -5026,6 +5026,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "urlencoding",
+ "walkdir",
  "winreg 0.52.0",
 ]
 

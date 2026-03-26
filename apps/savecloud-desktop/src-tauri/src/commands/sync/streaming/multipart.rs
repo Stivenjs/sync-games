@@ -1,18 +1,42 @@
 //! Subida multipart de archivos grandes a S3 en modo streaming.
 //!
-//! Implementa la transferencia de archivos directamente desde la fuente
-//! de datos sin necesidad de almacenamiento temporal en disco.
+//! Implementa la transferencia directa desde el stream TAR hacia S3 sin
+//! almacenamiento temporal en disco.
 //!
-//! La configuración del pipeline (tamaño de parte, concurrencia, capacidad
-//! del canal) se delega completamente a `upload_strategy::UploadStrategy`,
-//! que elige los valores óptimos en función del tamaño estimado del archivo.
+//! El buffer de acumulación de partes usaba `Vec<u8>` con `extend_from_slice`
+//! seguido de `Bytes::from(mem::take(&mut part_buf))`. Aunque `Bytes::from(Vec)`
+//! no copia (transfiere la propiedad), el `Vec::with_capacity` posterior sí
+//! reserva nueva memoria en cada parte. Con `BytesMut`, `split_to(part_size).freeze()`
+//! separa el chunk del buffer en O(1) sin ninguna allocación, y el buffer principal
+//! continúa apuntando al espacio contiguo restante.
 //!
-//! La concurrencia se ajusta dinámicamente durante la subida a través de
-//! `upload_strategy::ConcurrencyController`, que mide el throughput real
-//! de las primeras partes completadas y actualiza el número de slots.
+//! ## Prefetch de URLs en background real
+//!
+//! La versión anterior hacía el prefetch de forma inline (await en el loop principal),
+//! bloqueando el pipeline mientras esperaba la respuesta del API. La nueva versión
+//! lanza el prefetch como una tarea Tokio independiente (`tokio::spawn`) y la almacena
+//! en `prefetch_task`. Cuando el loop necesita las URLs, espera la tarea solo si aún
+//! no terminó, sin bloquear si ya estaba lista.
+//!
+//! ## Semáforo de memoria global
+//!
+//! `strategy.max_inflight_bytes` define el techo de RAM que el pipeline puede consumir
+//! simultáneamente. Un `tokio::sync::Semaphore` con `max_inflight_bytes / part_size`
+//! permisos controla cuántas partes pueden estar en vuelo a la vez. Cada parte
+//! adquiere un permiso antes de enviarse y lo libera al completarse, limitando
+//! la presión de memoria sin depender solo de la concurrencia del `JoinSet`.
+//!
+//! ## Throttle de eventos de progreso
+//!
+//! Los eventos `sync-upload-progress` solo se emiten cuando se completa una parte
+//! completa o cuando cambia el porcentaje entero, evitando inundar el frontend con
+//! eventos mientras el encoder TAR llena el buffer interno.
 
 use std::collections::HashMap;
 use std::time::Instant;
+
+use bytes::{BufMut, BytesMut};
+use tokio::sync::Semaphore;
 
 use crate::network::DATA_CLIENT;
 use tauri::Emitter;
@@ -23,14 +47,15 @@ use super::tar_stream::TarStreamMsg;
 use super::upload_strategy::{ConcurrencyController, UploadStrategy};
 use crate::commands::logs::sync_logger;
 
-/// Número de URLs solicitadas en cada batch al API cuando no están en caché.
+/// Número de URLs solicitadas en cada batch al API.
+/// Debe coincidir con `PART_URL_BATCH` en `upload_strategy.rs`.
 const PART_URL_BATCH: u32 = 32;
 
 const MAX_RETRIES: u32 = 3;
 const RETRY_DELAY_SECS: u64 = 1;
 
-// Contexto compartido para las operaciones del API.
-// Evita repetir los mismos parámetros en cada función auxiliar.
+/// Contexto compartido para las operaciones del API.
+/// Evita repetir los mismos parámetros en cada función auxiliar.
 struct UploadCtx<'a> {
     api_base: &'a str,
     user_id: &'a str,
@@ -114,10 +139,7 @@ async fn multipart_init(
     game_id: &str,
     filename: &str,
 ) -> Result<(String, String), String> {
-    let body = serde_json::json!({
-        "gameId": game_id,
-        "filename": filename
-    });
+    let body = serde_json::json!({ "gameId": game_id, "filename": filename });
     let res = api::api_request(
         api_base,
         user_id,
@@ -225,16 +247,95 @@ async fn multipart_abort(ctx: &UploadCtx<'_>) -> Result<(), String> {
     Ok(())
 }
 
-/// Garantiza que la URL de `part_number` esté en caché, solicitando el siguiente
-/// batch si es necesario. Lanza un prefetch especulativo del batch siguiente
-/// cuando las URLs disponibles por delante caen bajo `prefetch_threshold`.
-async fn ensure_part_urls_cached(
+/// Estado del prefetch de URLs en background.
+///
+/// Encapsula la tarea Tokio que fetcha el siguiente batch de URLs mientras el
+/// loop principal está ocupado procesando chunks del TAR. Cuando el loop necesita
+/// las URLs, espera la tarea solo si aún no terminó, sin bloquear si ya estaba lista.
+struct PrefetchState {
+    /// Tarea en vuelo que resuelve el siguiente batch de URLs, o `None` si no hay
+    /// ningún prefetch en curso.
+    task: Option<tokio::task::JoinHandle<Result<Vec<(u32, String)>, String>>>,
+}
+
+impl PrefetchState {
+    fn new() -> Self {
+        Self { task: None }
+    }
+
+    /// Lanza un prefetch en background para los `part_numbers` dados.
+    ///
+    /// Si ya hay una tarea en vuelo, no lanza una nueva para no duplicar peticiones.
+    /// El llamador debe comprobar que la tarea anterior terminó antes de llamar de nuevo.
+    fn launch(
+        &mut self,
+        ctx_key: String,
+        ctx_upload_id: String,
+        ctx_api_base: String,
+        ctx_user_id: String,
+        ctx_api_key: String,
+        part_numbers: Vec<u32>,
+    ) {
+        if self.task.is_some() {
+            return;
+        }
+        self.task = Some(tokio::spawn(async move {
+            let ctx = UploadCtx {
+                api_base: &ctx_api_base,
+                user_id: &ctx_user_id,
+                api_key: &ctx_api_key,
+                key: &ctx_key,
+                upload_id: &ctx_upload_id,
+            };
+            multipart_part_urls(&ctx, &part_numbers).await
+        }));
+    }
+
+    /// Espera la tarea en vuelo y vuelca las URLs obtenidas en el caché.
+    ///
+    /// Si la tarea falló, el error se registra pero no se propaga: el llamador
+    /// volverá a pedir las URLs de forma bloqueante en la siguiente iteración.
+    async fn drain_into_cache(&mut self, cache: &mut HashMap<u32, String>) {
+        if let Some(task) = self.task.take() {
+            match task.await {
+                Ok(Ok(urls)) => {
+                    for (n, u) in urls {
+                        cache.insert(n, u);
+                    }
+                }
+                Ok(Err(e)) => {
+                    sync_logger::log_operation("prefetch_urls_error", &e);
+                }
+                Err(e) => {
+                    sync_logger::log_operation("prefetch_task_panic", &e.to_string());
+                }
+            }
+        }
+    }
+
+    /// Indica si hay una tarea de prefetch en vuelo actualmente.
+    fn is_running(&self) -> bool {
+        self.task.is_some()
+    }
+}
+
+/// Garantiza que la URL de `part_number` esté en caché, solicitando el batch
+/// necesario de forma bloqueante si no está disponible. Lanza el prefetch
+/// especulativo del siguiente batch como tarea en background cuando el caché
+/// cae por debajo de `prefetch_threshold`.
+async fn ensure_part_url_cached(
     cache: &mut HashMap<u32, String>,
+    prefetch: &mut PrefetchState,
     ctx: &UploadCtx<'_>,
     part_number: u32,
     prefetch_threshold: u32,
 ) -> Result<(), String> {
+    // Incorporar el resultado del prefetch en vuelo antes de comprobar el caché,
+    // para evitar pedir URLs que el prefetch ya está trayendo.
+    prefetch.drain_into_cache(cache).await;
+
     if !cache.contains_key(&part_number) {
+        // Fetch bloqueante: la URL es necesaria ahora y no está en caché.
         let batch_end = part_number.saturating_add(PART_URL_BATCH - 1);
         let part_numbers: Vec<u32> = (part_number..=batch_end).collect();
         let urls = with_retry(|| multipart_part_urls(ctx, &part_numbers)).await?;
@@ -243,62 +344,71 @@ async fn ensure_part_urls_cached(
         }
     }
 
-    // Prefetch especulativo: cuando quedan pocas URLs por delante se solicita
-    // el siguiente batch antes de que se agoten, eliminando la espera bloqueante.
+    // Lanzar prefetch especulativo en background cuando el caché está cerca de agotarse.
+    // Solo se lanza si no hay ya una tarea en vuelo y si hay partes por delante
+    // que no están en caché.
     let available_ahead = cache.keys().filter(|&&k| k >= part_number).count() as u32;
-    if available_ahead < prefetch_threshold {
+    if available_ahead < prefetch_threshold && !prefetch.is_running() {
         let next_start = part_number + available_ahead;
         let next_end = next_start.saturating_add(PART_URL_BATCH - 1);
         let missing: Vec<u32> = (next_start..=next_end)
             .filter(|n| !cache.contains_key(n))
             .collect();
-
         if !missing.is_empty() {
-            // El error se ignora: si el prefetch falla, la siguiente llamada
-            // obligatoria lo reintentará correctamente con backoff.
-            if let Ok(urls) = multipart_part_urls(ctx, &missing).await {
-                for (n, u) in urls {
-                    cache.insert(n, u);
-                }
-            }
+            prefetch.launch(
+                ctx.key.to_string(),
+                ctx.upload_id.to_string(),
+                ctx.api_base.to_string(),
+                ctx.user_id.to_string(),
+                ctx.api_key.to_string(),
+                missing,
+            );
         }
     }
 
     Ok(())
 }
 
-/// Resultado de una tarea de subida de parte.
+/// Resultado normalizado de una tarea de subida de parte.
 enum TaskResult {
     Part {
         part_number: u32,
         etag: String,
         bytes_sent: u64,
         elapsed_ms: u128,
+        /// Permiso del semáforo de memoria. Se dropea aquí para liberar el slot
+        /// de memoria en cuanto la parte confirma subida exitosa.
+        _permit: tokio::sync::OwnedSemaphorePermit,
     },
     Err(String),
 }
 
-/// Normaliza el resultado de `JoinSet::join_next` absorbiendo tanto errores
-/// de la tarea como panics del runtime de Tokio.
+/// Normaliza el resultado de `JoinSet::join_next` absorbiendo panics del runtime.
 fn normalize_join_result(
-    res: Result<Result<(u32, String, u64, u128), String>, tokio::task::JoinError>,
+    res: Result<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+        tokio::task::JoinError,
+    >,
 ) -> TaskResult {
     match res {
-        Ok(Ok((pn, etag, bytes_sent, elapsed_ms))) => TaskResult::Part {
+        Ok(Ok((pn, etag, bytes_sent, elapsed_ms, permit))) => TaskResult::Part {
             part_number: pn,
             etag,
             bytes_sent,
             elapsed_ms,
+            _permit: permit,
         },
         Ok(Err(e)) => TaskResult::Err(e),
-        Err(e) => TaskResult::Err(format!("Fallo critico en hilo de subida: {}", e)),
+        Err(e) => TaskResult::Err(format!("fallo critico en tarea de subida: {}", e)),
     }
 }
 
-/// Drena todas las tareas pendientes del JoinSet.
+/// Drena todas las tareas pendientes del JoinSet esperando su finalización.
 /// En caso de error cancela el resto y llama a `multipart_abort`.
 async fn drain_upload_tasks(
-    tasks: &mut tokio::task::JoinSet<Result<(u32, String, u64, u128), String>>,
+    tasks: &mut tokio::task::JoinSet<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+    >,
     ctx: &UploadCtx<'_>,
 ) -> Result<Vec<(u32, String, u64, u128)>, String> {
     let mut collected = Vec::new();
@@ -309,6 +419,7 @@ async fn drain_upload_tasks(
                 etag,
                 bytes_sent,
                 elapsed_ms,
+                ..
             } => {
                 collected.push((part_number, etag, bytes_sent, elapsed_ms));
             }
@@ -324,8 +435,11 @@ async fn drain_upload_tasks(
 
 /// Recoge sin bloquear las tareas que ya finalizaron.
 /// Actualiza `completed_parts`, `loaded` y alimenta el `ConcurrencyController`.
+/// Devuelve los bytes recién completados para que el llamador decida si emitir progreso.
 async fn collect_finished_tasks(
-    tasks: &mut tokio::task::JoinSet<Result<(u32, String, u64, u128), String>>,
+    tasks: &mut tokio::task::JoinSet<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+    >,
     ctx: &UploadCtx<'_>,
     completed_parts: &mut Vec<(u32, String)>,
     loaded: &mut u64,
@@ -339,6 +453,7 @@ async fn collect_finished_tasks(
                 etag,
                 bytes_sent,
                 elapsed_ms,
+                ..
             } => {
                 completed_parts.push((part_number, etag));
                 *loaded += bytes_sent;
@@ -355,9 +470,11 @@ async fn collect_finished_tasks(
     Ok(newly_loaded)
 }
 
-/// Espera a que un slot se libere cuando se alcanza el límite de concurrencia actual.
+/// Espera a que un slot de concurrencia se libere cuando el JoinSet está lleno.
 async fn wait_for_one_slot(
-    tasks: &mut tokio::task::JoinSet<Result<(u32, String, u64, u128), String>>,
+    tasks: &mut tokio::task::JoinSet<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+    >,
     ctx: &UploadCtx<'_>,
     completed_parts: &mut Vec<(u32, String)>,
     loaded: &mut u64,
@@ -373,6 +490,7 @@ async fn wait_for_one_slot(
                 etag,
                 bytes_sent,
                 elapsed_ms,
+                ..
             } => {
                 completed_parts.push((part_number, etag));
                 *loaded += bytes_sent;
@@ -389,11 +507,84 @@ async fn wait_for_one_slot(
     Ok(0)
 }
 
+/// Emite un evento de progreso al frontend si el porcentaje entero ha cambiado
+/// o si `force` es `true`. Devuelve el último porcentaje emitido.
+///
+/// El throttle por porcentaje entero evita inundar el IPC de Tauri con eventos
+/// mientras el encoder TAR llena el buffer interno sin que la red avance.
+fn maybe_emit_progress(
+    app: &tauri::AppHandle,
+    game_id: &str,
+    filename: &str,
+    loaded: u64,
+    total: u64,
+    last_pct: &mut u8,
+    force: bool,
+) {
+    let pct = if total > 0 {
+        ((loaded * 100) / total).min(100) as u8
+    } else {
+        0
+    };
+    if force || pct > *last_pct {
+        *last_pct = pct;
+        let _ = app.emit(
+            "sync-upload-progress",
+            SyncProgressPayload {
+                game_id: game_id.to_string(),
+                filename: filename.to_string(),
+                loaded,
+                total,
+            },
+        );
+    }
+}
+
+/// Lanza la subida de una parte adquiriendo un permiso del semáforo de memoria.
+///
+/// El permiso se pasa dentro de la tarea y se dropea solo cuando la parte
+/// confirma subida exitosa, liberando el slot de memoria en el momento correcto.
+/// Esto garantiza que el número de partes en vuelo × `part_size` nunca supera
+/// `strategy.max_inflight_bytes` independientemente de la concurrencia del JoinSet.
+async fn spawn_part_upload(
+    tasks: &mut tokio::task::JoinSet<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+    >,
+    semaphore: &std::sync::Arc<Semaphore>,
+    url: String,
+    part_number: u32,
+    bytes_to_send: bytes::Bytes,
+) -> Result<(), String> {
+    // Adquirir el permiso antes de encolar la tarea para que el backpressure
+    // se aplique aquí (en el loop principal) y no dentro de la tarea.
+    let permit = semaphore
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|_| "semaforo de memoria cerrado inesperadamente".to_string())?;
+
+    let pn = part_number;
+    tasks.spawn(async move {
+        let result = with_retry(|| {
+            let url = url.clone();
+            let b = bytes_to_send.clone();
+            async move { put_part(url, pn, b).await }
+        })
+        .await;
+        // Adjuntar el permiso al resultado para que se dropee al procesar la tarea.
+        result.map(|(pn, etag, bytes, ms)| (pn, etag, bytes, ms, permit))
+    });
+
+    Ok(())
+}
+
 /// Sube un archivo a S3 mediante multipart upload en modo streaming.
 ///
-/// La estrategia (tamaño de parte, concurrencia inicial, capacidad del canal)
-/// se calcula a partir de `estimated_total` usando `UploadStrategy::for_file`.
-/// La concurrencia se ajusta automáticamente tras las primeras partes completadas.
+/// Lee chunks del receptor TAR, los acumula en un `BytesMut` hasta completar
+/// una parte, y la sube concurrentemente con las demás. La concurrencia se
+/// ajusta automáticamente según el throughput medido por `ConcurrencyController`.
+/// Un semáforo de memoria impide que el número de partes en vuelo supere
+/// `strategy.max_inflight_bytes`.
 pub(crate) async fn upload_tar_stream_multipart(
     mut rx: tokio::sync::mpsc::Receiver<TarStreamMsg>,
     game_id: &str,
@@ -408,6 +599,11 @@ pub(crate) async fn upload_tar_stream_multipart(
     let strategy = UploadStrategy::for_file(estimated_total);
     let mut concurrency = ConcurrencyController::new(&strategy);
 
+    // Semáforo de memoria: `max_inflight_bytes / part_size` permisos disponibles.
+    // Limita la presión de memoria sin depender solo de la concurrencia del JoinSet.
+    let max_permits = (strategy.max_inflight_bytes / strategy.part_size).max(1);
+    let semaphore = std::sync::Arc::new(Semaphore::new(max_permits));
+
     let (upload_id, key) =
         with_retry(|| multipart_init(api_base, user_id, api_key, game_id, relative_filename))
             .await?;
@@ -419,6 +615,7 @@ pub(crate) async fn upload_tar_stream_multipart(
         key: &key,
         upload_id: &upload_id,
     };
+    let display_name = format!("{} (stream)", relative_filename);
     let log_ctx = format!(
         "gameId={} filename={} (streaming) strategy=[{}]",
         game_id,
@@ -428,23 +625,30 @@ pub(crate) async fn upload_tar_stream_multipart(
     sync_logger::log_operation("full_backup_streaming_start", &log_ctx);
 
     let mut part_urls_cache: HashMap<u32, String> = HashMap::new();
+    let mut prefetch = PrefetchState::new();
     let mut part_number: u32 = 1;
-    let mut part_buf: Vec<u8> = Vec::with_capacity(strategy.part_size);
+
+    // `BytesMut` como buffer de acumulación de partes. `split_to(part_size).freeze()`
+    // separa el chunk en O(1) sin mover bytes; el buffer continúa apuntando al
+    // espacio contiguo restante del mismo bloque de memoria.
+    let mut part_buf = BytesMut::with_capacity(strategy.part_size);
 
     let mut completed_parts: Vec<(u32, String)> = Vec::new();
     let mut loaded: u64 = 0;
+    let mut last_pct: u8 = 0;
 
-    let mut upload_tasks: tokio::task::JoinSet<Result<(u32, String, u64, u128), String>> =
-        tokio::task::JoinSet::new();
+    let mut upload_tasks: tokio::task::JoinSet<
+        Result<(u32, String, u64, u128, tokio::sync::OwnedSemaphorePermit), String>,
+    > = tokio::task::JoinSet::new();
 
-    let _ = app.emit(
-        "sync-upload-progress",
-        SyncProgressPayload {
-            game_id: game_id.to_string(),
-            filename: format!("{} (stream)", relative_filename),
-            loaded: 0,
-            total: estimated_total,
-        },
+    maybe_emit_progress(
+        &app,
+        game_id,
+        &display_name,
+        0,
+        estimated_total,
+        &mut last_pct,
+        true,
     );
 
     while let Some(msg) = rx.recv().await {
@@ -452,12 +656,12 @@ pub(crate) async fn upload_tar_stream_multipart(
             if t.upload_cancel_requested() {
                 upload_tasks.abort_all();
                 let _ = multipart_abort(&ctx).await;
-                return Err("Subida cancelada".to_string());
+                return Err("subida cancelada".to_string());
             }
             if t.upload_pause_requested() {
                 upload_tasks.abort_all();
                 let _ = multipart_abort(&ctx).await;
-                return Err("Pausa no soportada en backups streaming (usa Cancelar).".to_string());
+                return Err("pausa no soportada en backups streaming (usa cancelar)".to_string());
             }
         }
 
@@ -471,14 +675,14 @@ pub(crate) async fn upload_tar_stream_multipart(
         .await?;
 
         if newly_loaded > 0 {
-            let _ = app.emit(
-                "sync-upload-progress",
-                SyncProgressPayload {
-                    game_id: game_id.to_string(),
-                    filename: format!("{} (stream)", relative_filename),
-                    loaded,
-                    total: estimated_total,
-                },
+            maybe_emit_progress(
+                &app,
+                game_id,
+                &display_name,
+                loaded,
+                estimated_total,
+                &mut last_pct,
+                false,
             );
         }
 
@@ -486,14 +690,15 @@ pub(crate) async fn upload_tar_stream_multipart(
             TarStreamMsg::Chunk(bytes) => {
                 let mut offset = 0usize;
                 while offset < bytes.len() {
-                    let remaining = strategy.part_size - part_buf.len();
-                    let take = std::cmp::min(remaining, bytes.len() - offset);
-                    part_buf.extend_from_slice(&bytes[offset..offset + take]);
+                    let space = strategy.part_size - part_buf.len();
+                    let take = space.min(bytes.len() - offset);
+                    part_buf.put_slice(&bytes[offset..offset + take]);
                     offset += take;
 
                     if part_buf.len() == strategy.part_size {
-                        ensure_part_urls_cached(
+                        ensure_part_url_cached(
                             &mut part_urls_cache,
+                            &mut prefetch,
                             &ctx,
                             part_number,
                             strategy.prefetch_threshold,
@@ -502,12 +707,11 @@ pub(crate) async fn upload_tar_stream_multipart(
 
                         let url = part_urls_cache
                             .remove(&part_number)
-                            .ok_or_else(|| format!("Falta URL para parte {}", part_number))?;
+                            .ok_or_else(|| format!("falta URL para parte {}", part_number))?;
 
-                        // `Bytes::from(Vec)` transfiere la propiedad sin copiar.
-                        // `Bytes::clone` es O(1) (Arc interno), seguro dentro del closure de retry.
-                        let bytes_to_send = bytes::Bytes::from(std::mem::take(&mut part_buf));
-                        part_buf = Vec::with_capacity(strategy.part_size);
+                        // `split_to(part_size).freeze()` separa el chunk del buffer en O(1).
+                        // `Bytes::clone` es O(1) (Arc interno), seguro en el closure de retry.
+                        let bytes_to_send = part_buf.split_to(strategy.part_size).freeze();
 
                         let slot_bytes = wait_for_one_slot(
                             &mut upload_tasks,
@@ -519,26 +723,25 @@ pub(crate) async fn upload_tar_stream_multipart(
                         .await?;
 
                         if slot_bytes > 0 {
-                            let _ = app.emit(
-                                "sync-upload-progress",
-                                SyncProgressPayload {
-                                    game_id: game_id.to_string(),
-                                    filename: format!("{} (stream)", relative_filename),
-                                    loaded,
-                                    total: estimated_total,
-                                },
+                            maybe_emit_progress(
+                                &app,
+                                game_id,
+                                &display_name,
+                                loaded,
+                                estimated_total,
+                                &mut last_pct,
+                                false,
                             );
                         }
 
-                        let pn = part_number;
-                        upload_tasks.spawn(async move {
-                            with_retry(|| {
-                                let url = url.clone();
-                                let b = bytes_to_send.clone();
-                                async move { put_part(url, pn, b).await }
-                            })
-                            .await
-                        });
+                        spawn_part_upload(
+                            &mut upload_tasks,
+                            &semaphore,
+                            url,
+                            part_number,
+                            bytes_to_send,
+                        )
+                        .await?;
 
                         part_number += 1;
                     }
@@ -556,8 +759,9 @@ pub(crate) async fn upload_tar_stream_multipart(
 
     // Subir la última parte si quedaron bytes sin enviar (tamaño < part_size).
     if !part_buf.is_empty() {
-        ensure_part_urls_cached(
+        ensure_part_url_cached(
             &mut part_urls_cache,
+            &mut prefetch,
             &ctx,
             part_number,
             strategy.prefetch_threshold,
@@ -566,18 +770,17 @@ pub(crate) async fn upload_tar_stream_multipart(
 
         let url = part_urls_cache
             .remove(&part_number)
-            .ok_or_else(|| format!("Falta URL para parte {}", part_number))?;
+            .ok_or_else(|| format!("falta URL para parte {}", part_number))?;
 
-        let bytes_to_send = bytes::Bytes::from(std::mem::take(&mut part_buf));
-        let pn = part_number;
-        upload_tasks.spawn(async move {
-            with_retry(|| {
-                let url = url.clone();
-                let b = bytes_to_send.clone();
-                async move { put_part(url, pn, b).await }
-            })
-            .await
-        });
+        let bytes_to_send = part_buf.split_to(part_buf.len()).freeze();
+        spawn_part_upload(
+            &mut upload_tasks,
+            &semaphore,
+            url,
+            part_number,
+            bytes_to_send,
+        )
+        .await?;
     }
 
     // Drenar todas las tareas restantes propagando cualquier error.
@@ -588,14 +791,14 @@ pub(crate) async fn upload_tar_stream_multipart(
         concurrency.record_part(bytes_sent, elapsed_ms);
     }
 
-    let _ = app.emit(
-        "sync-upload-progress",
-        SyncProgressPayload {
-            game_id: game_id.to_string(),
-            filename: format!("{} (stream)", relative_filename),
-            loaded,
-            total: estimated_total,
-        },
+    maybe_emit_progress(
+        &app,
+        game_id,
+        &display_name,
+        loaded,
+        estimated_total,
+        &mut last_pct,
+        true,
     );
 
     completed_parts.sort_by_key(|p| p.0);
@@ -613,10 +816,11 @@ pub(crate) async fn upload_tar_stream_multipart(
     Ok(())
 }
 
-/// Dry-run: consume el stream de TAR y emite progreso sin subir nada a la nube.
+/// Dry-run: consume el stream TAR y emite progreso sin subir nada a S3.
 ///
-/// El emit de progreso está throttleado a una vez por `strategy.part_size` bytes
-/// para alinear la frecuencia de eventos con el path de subida real.
+/// El throttle de progreso usa el mismo mecanismo que el path real (porcentaje
+/// entero), alineando la frecuencia de eventos con la experiencia del usuario
+/// durante una subida real.
 pub(crate) async fn upload_tar_stream_multipart_dry_run(
     mut rx: tokio::sync::mpsc::Receiver<TarStreamMsg>,
     game_id: &str,
@@ -626,93 +830,84 @@ pub(crate) async fn upload_tar_stream_multipart_dry_run(
     cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
     let strategy = UploadStrategy::for_file(estimated_total);
-
-    let ctx = format!(
+    let display_name = format!("{} (stream dry-run)", relative_filename);
+    let log_ctx = format!(
         "gameId={} filename={} (streaming dry-run) strategy=[{}]",
         game_id,
         relative_filename,
         strategy.describe(),
     );
-    sync_logger::log_operation("full_backup_streaming_dry_run_start", &ctx);
+    sync_logger::log_operation("full_backup_streaming_dry_run_start", &log_ctx);
 
     let mut loaded: u64 = 0;
-    let mut last_emitted: u64 = 0;
+    let mut last_pct: u8 = 0;
 
-    let _ = app.emit(
-        "sync-upload-progress",
-        SyncProgressPayload {
-            game_id: game_id.to_string(),
-            filename: format!("{} (stream dry-run)", relative_filename),
-            loaded: 0,
-            total: estimated_total,
-        },
+    maybe_emit_progress(
+        &app,
+        game_id,
+        &display_name,
+        0,
+        estimated_total,
+        &mut last_pct,
+        true,
     );
 
     while let Some(msg) = rx.recv().await {
         if let Some(ref t) = cancel {
             if t.upload_cancel_requested() {
-                let cancel_ctx = format!("{} | cancelled_after_bytes={}", ctx, loaded);
-                sync_logger::log_operation("full_backup_streaming_dry_run_cancelled", &cancel_ctx);
-                return Err("Subida de prueba cancelada".to_string());
+                let ctx = format!("{} | cancelled_after_bytes={}", log_ctx, loaded);
+                sync_logger::log_operation("full_backup_streaming_dry_run_cancelled", &ctx);
+                return Err("subida de prueba cancelada".to_string());
             }
             if t.upload_pause_requested() {
-                let pause_ctx = format!("{} | pause_requested_bytes={}", ctx, loaded);
-                sync_logger::log_operation(
-                    "full_backup_streaming_dry_run_pause_ignored",
-                    &pause_ctx,
-                );
+                let ctx = format!("{} | pause_requested_bytes={}", log_ctx, loaded);
+                sync_logger::log_operation("full_backup_streaming_dry_run_pause_ignored", &ctx);
             }
         }
 
         match msg {
             TarStreamMsg::Chunk(bytes) => {
                 loaded += bytes.len() as u64;
-
-                // Throttle: emitir solo cuando se acumula al menos part_size bytes
-                // desde el último emit, alineando la frecuencia con el path real.
-                if loaded - last_emitted >= strategy.part_size as u64 {
-                    last_emitted = loaded;
-                    let _ = app.emit(
-                        "sync-upload-progress",
-                        SyncProgressPayload {
-                            game_id: game_id.to_string(),
-                            filename: format!("{} (stream dry-run)", relative_filename),
-                            loaded,
-                            total: estimated_total,
-                        },
-                    );
-                }
+                maybe_emit_progress(
+                    &app,
+                    game_id,
+                    &display_name,
+                    loaded,
+                    estimated_total,
+                    &mut last_pct,
+                    false,
+                );
             }
             TarStreamMsg::Err(e) => {
-                sync_logger::log_error("full_backup_streaming_dry_run_error", &ctx, &e);
+                sync_logger::log_error("full_backup_streaming_dry_run_error", &log_ctx, &e);
                 return Err(e);
             }
             TarStreamMsg::Done => break,
         }
     }
 
-    // Emit final para garantizar que el frontend refleja el 100%
-    // aunque el último chunk no haya alcanzado el umbral del throttle.
-    let _ = app.emit(
-        "sync-upload-progress",
-        SyncProgressPayload {
-            game_id: game_id.to_string(),
-            filename: format!("{} (stream dry-run)", relative_filename),
-            loaded,
-            total: estimated_total,
-        },
+    // Emit final forzado para garantizar que el frontend refleja el 100%.
+    maybe_emit_progress(
+        &app,
+        game_id,
+        &display_name,
+        loaded,
+        estimated_total,
+        &mut last_pct,
+        true,
     );
 
-    let final_ctx = format!("{} | bytes={}", ctx, loaded);
+    let final_ctx = format!("{} | bytes={}", log_ctx, loaded);
     sync_logger::log_operation("full_backup_streaming_dry_run_complete", &final_ctx);
     Ok(())
 }
 
-/// Sube una parte a S3 mediante PUT y devuelve el número de parte, ETag,
+/// Sube una parte a S3 mediante PUT y devuelve número de parte, ETag,
 /// bytes enviados y tiempo transcurrido en milisegundos.
 ///
-/// El tiempo se usa en `ConcurrencyController` para ajustar la concurrencia
-/// basándose en el throughput real medido, no en estimaciones estáticas.
+/// El tiempo se usa en `ConcurrencyController` para calcular el throughput real.
+/// `Content-Length` se incluye explícitamente porque S3 lo requiere en PUTs
+/// de partes multipart; `reqwest` lo deriva del tamaño del `Bytes` automáticamente.
 async fn put_part(
     url: String,
     part_number: u32,
