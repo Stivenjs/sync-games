@@ -671,7 +671,7 @@ fn build_official_path_index(candidates: &[PathCandidateDto]) -> HashSet<String>
     index
 }
 
-fn scan_path_candidates_sync(
+pub fn scan_path_candidates_sync(
     #[cfg(target_os = "windows")] manifest_index: Option<crate::manifest::ManifestIndex>,
 ) -> Vec<PathCandidateDto> {
     let cfg = config::load_config();

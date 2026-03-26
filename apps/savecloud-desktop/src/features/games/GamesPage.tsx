@@ -13,7 +13,7 @@ import { GamesFilters } from "@features/games/GamesFilters";
 import { GamesList } from "@features/games/GamesList";
 import { GamesPageHeader } from "@features/games/GamesPageHeader";
 import { GamesStatsCompact } from "@features/games/GamesStatsCompact";
-import { OperationErrorCard } from "@features/games/OperationErrorCard";
+/* import { OperationErrorCard } from "@features/games/OperationErrorCard"; */
 import { BulkActionConfirmModal } from "@features/games/BulkActionConfirmModal";
 import { RemoveGameModal } from "@features/games/RemoveGameModal";
 import { ScanModal } from "@features/games/ScanModal";
@@ -27,7 +27,8 @@ import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
 
 export function GamesPage() {
-  const { pushLayer, popLayer } = useNavigationStore();
+  const pushLayer = useNavigationStore((state) => state.pushLayer);
+  const popLayer = useNavigationStore((state) => state.popLayer);
   const {
     config,
     loading,
@@ -64,7 +65,7 @@ export function GamesPage() {
     syncing,
     downloading,
     fullBackupUploadingGameId,
-    operationResult,
+    /*  operationResult, */
     handleScanSelect,
     handleConfigureFromCloud,
     handleRemoveGame,
@@ -90,8 +91,8 @@ export function GamesPage() {
     filteredGames,
     emptyFilterMessage,
     unsyncedGameIds,
-    handleDismissOperationError,
-    handleRetryOperationError,
+    /*  handleDismissOperationError, */
+    /*  handleRetryOperationError, */
   } = useGamesPage();
 
   const { statsByGameId } = useGameStats(!!config?.games?.length);
@@ -100,15 +101,8 @@ export function GamesPage() {
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
   const handleShare = async (game: ConfiguredGame) => {
-    const base = config?.apiBaseUrl?.trim();
-    const uid = config?.userId?.trim();
-    const key = config?.apiKey?.trim();
-    if (!base || !uid || !key) {
-      toastError("Falta configuración", "Configura API URL, User ID y API Key en Configuración para compartir.");
-      return;
-    }
     try {
-      const { shareUrl } = await createShareLink(base, uid, key, game.id);
+      const { shareUrl } = await createShareLink(game.id);
       await navigator.clipboard.writeText(shareUrl);
       toastSuccess("Link copiado", "El link para compartir este juego está en el portapapeles. Válido 7 días.");
     } catch (e) {
@@ -188,7 +182,6 @@ export function GamesPage() {
           </div>
         </div>
       </div>
-
       <AddGameModal
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
@@ -288,7 +281,6 @@ export function GamesPage() {
           setGameToEdit(null);
         }}
       />
-
       {/* Filtros de la lista */}
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-default-500">Buscar y filtrar</h2>
@@ -299,7 +291,6 @@ export function GamesPage() {
           onOriginFilterChange={setOriginFilter}
         />
       </section>
-
       {/* Lista de juegos */}
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-default-500">Lista de juegos</h2>
@@ -328,13 +319,13 @@ export function GamesPage() {
         />
       </section>
 
-      {operationResult && operationResult.result.errors.length > 0 && (
+      {/* operationResult && operationResult.result.errors.length > 0 && (
         <OperationErrorCard
           operationResult={operationResult}
           onDismiss={handleDismissOperationError}
           onRetry={handleRetryOperationError}
         />
-      )}
+      )} */}
     </div>
   );
 }

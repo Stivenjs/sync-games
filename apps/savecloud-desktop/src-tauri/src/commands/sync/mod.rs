@@ -9,17 +9,15 @@
 //! - `upload`: Subida de guardados
 //! - `download`: Descarga y conflictos
 
-pub(crate) mod api;
-pub(crate) mod backup;
-pub(crate) mod download;
-pub(crate) mod full_backup;
+pub mod api;
+pub mod backup;
+pub mod download;
+pub mod full_backup;
 mod models;
-pub(crate) mod multipart_upload;
-mod path_utils;
-pub(crate) mod preview;
-pub(crate) mod streaming;
-pub(crate) mod sync_logger;
-pub(crate) mod upload;
+pub mod multipart_upload;
+pub mod preview;
+pub mod streaming;
+pub mod upload;
 
 use models::SaveFileDto;
 
@@ -35,7 +33,7 @@ pub async fn list_save_files(game_id: String) -> Result<Vec<SaveFileDto>, String
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    let files = path_utils::list_all_files_from_paths(&game.paths);
+    let files = crate::utils::path_utils::list_all_files_from_paths(&game.paths);
     Ok(files
         .into_iter()
         .map(|(absolute, relative)| SaveFileDto { absolute, relative })
@@ -53,18 +51,18 @@ pub fn check_game_running(game_id: String) -> bool {
     else {
         return false;
     };
-    crate::process_check::is_game_running(&game_id, &game.paths)
+    crate::system::process_check::is_game_running(&game_id, &game.paths)
 }
 
 /// Versión para varios juegos: devuelve un mapa gameId → running.
 #[tauri::command]
 pub fn check_games_running(game_ids: Vec<String>) -> std::collections::HashMap<String, bool> {
-    crate::process_check::are_games_running(&game_ids)
+    crate::system::process_check::are_games_running(&game_ids)
 }
 
 /// Ruta del archivo de log de diagnóstico de sincronización (sync-debug.log).
 /// Útil para abrirlo cuando hay errores 500 u otros fallos y ver qué ocurrió.
 #[tauri::command]
 pub fn get_sync_debug_log_path() -> Option<String> {
-    sync_logger::log_file_path()
+    crate::commands::logs::sync_logger::log_file_path()
 }

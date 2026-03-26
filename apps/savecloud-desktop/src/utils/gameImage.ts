@@ -92,33 +92,44 @@ export function needsSteamSearch(game: ConfiguredGame): boolean {
 
 /**
  * Convierte el id del juego a un término de búsqueda para Steam.
- * Quita prefijos de cracks (empress-, codex-, fitgirl-, etc.) y sustituye guiones por espacios.
+ * Limpia el ruido estructural (sufijos, versiones, tags) sin importar el grupo que lo subió,
+ * y sustituye guiones por espacios.
  */
 export function idToSearchQuery(id: string): string {
-  const knownPrefixes = ["empress-", "codex-", "fitgirl-", "dodi-", "scene-", "goldberg-", "steamless-"];
   let cleaned = id.trim();
-  for (const prefix of knownPrefixes) {
-    if (cleaned.toLowerCase().startsWith(prefix)) {
-      cleaned = cleaned.slice(prefix.length);
-      break;
-    }
-  }
 
-  cleaned = cleaned.replace(/-?(crack|repack|x64|x86|v[0-9.]+)$/i, "");
+  // 1. Eliminar Steam AppIDs al final (ej: "resident-evil-4-2050650" -> "resident-evil-4")
+  cleaned = cleaned.replace(/-\d{4,10}$/, "");
+
+  // 2. Eliminar sufijos técnicos/piratas genéricos (sin importar quién lo subió)
+  // Atrapa cosas como: -crack, -repack, -v1.0.3, -build-234, -multi12, -p2p, -rip
+  cleaned = cleaned.replace(/-(crack|repack|rip|p2p|x64|x86|v\d+[.\d]*|build-?\d+|multi\d+).*$/i, "");
+
+  // 3. Reemplazar los guiones restantes por espacios
   return cleaned.replace(/-/g, " ").trim() || id.replace(/-/g, " ");
 }
 
+const displayNameCache = new Map<string, string>();
+
 /**
  * Convierte el id del juego a un nombre legible para mostrar.
- * Quita prefijos de cracks, sufijos numéricos, y aplica formato título.
+ * Quita sufijos numéricos, aplica formato título y utiliza caché para máximo rendimiento.
  */
 export function formatGameDisplayName(id: string): string {
+  if (displayNameCache.has(id)) {
+    return displayNameCache.get(id)!;
+  }
+
   let cleaned = idToSearchQuery(id);
   cleaned = cleaned.replace(/\s+\d{4,10}$/, "");
-  return cleaned
+
+  const result = cleaned
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
+
+  displayNameCache.set(id, result);
+  return result;
 }
 
 /**

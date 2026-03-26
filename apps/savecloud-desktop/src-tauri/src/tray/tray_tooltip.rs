@@ -3,7 +3,7 @@
 //! Contiene la función para actualizar el tooltip de la bandeja,
 //! que se actualiza cuando se carga la aplicación.
 
-use crate::tray_state::TrayState;
+use super::tray_state::TrayState;
 use tauri::State;
 
 /// Actualiza el conteo de juegos con cambios pendientes y el tooltip del tray.

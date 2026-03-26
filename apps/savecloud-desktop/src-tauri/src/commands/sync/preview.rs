@@ -10,7 +10,7 @@
 use super::api;
 use super::download;
 use super::models::{PreviewDownloadDto, PreviewFileDto, PreviewUploadDto};
-use super::path_utils;
+use crate::utils::path_utils;
 use std::path::PathBuf;
 
 /// Previsualiza qué archivos se subirían.

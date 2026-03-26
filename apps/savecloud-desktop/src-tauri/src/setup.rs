@@ -5,13 +5,13 @@
 //! el motor de descargas P2P (Torrent), la vigilancia de procesos y los
 //! demonios de sincronización automática.
 
-use crate::commands::game_exit_sync;
-// use crate::commands::watch_sync;
+use crate::system::game_exit_sync;
+//use crate::system::watch_sync;
 use crate::controller::start_gamepad_loop;
 use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
-use crate::process_check::start_process_watcher;
+use crate::system::process_check::start_process_watcher;
 use crate::torrent::{engine::TorrentEngine, state::TorrentState};
-use crate::tray_state::TrayState;
+use crate::tray::tray_state::TrayState;
 
 use std::sync::Arc;
 use tauri::{App, Manager};

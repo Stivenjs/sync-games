@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigationStore } from "@features/input/store";
 
 export function useNavigable({
@@ -12,22 +12,32 @@ export function useNavigable({
 }) {
   const registerNode = useNavigationStore((state) => state.registerNode);
   const unregisterNode = useNavigationStore((state) => state.unregisterNode);
-  const focusedId = useNavigationStore((state) => state.focusedId);
-  const inputMode = useNavigationStore((state) => state.inputMode);
   const setFocus = useNavigationStore((state) => state.setFocus);
+
+  const isFocused = useNavigationStore((state) => state.focusedId === id);
+  const inputMode = useNavigationStore((state) => state.inputMode);
+
+  const onPressRef = useRef(onPress);
+  useEffect(() => {
+    onPressRef.current = onPress;
+  }, [onPress]);
 
   useEffect(() => {
     registerNode(layerId, {
       id,
       getElement: () => document.querySelector(`[data-nav-id="${id}"]`) as HTMLElement | null,
-      onPress,
+      onPress: () => {
+        if (onPressRef.current) {
+          onPressRef.current();
+        }
+      },
     });
 
     return () => unregisterNode(layerId, id);
-  }, [id, layerId, registerNode, unregisterNode, onPress]);
+  }, [id, layerId, registerNode, unregisterNode]);
 
   return {
-    isFocused: focusedId === id,
+    isFocused,
     inputMode,
     navProps: {
       "data-nav-id": id,

@@ -224,15 +224,10 @@ export function useFriendsPage() {
       toastError("Link inválido", "Pega la URL completa del link compartido o solo el código.");
       return;
     }
-    const base = ourConfig?.apiBaseUrl?.trim();
-    if (!base) {
-      toastError("Falta configuración", "Configura la URL de la API en Configuración.");
-      return;
-    }
     dispatch({ type: "SET_SHARE_LINK_LOADING", payload: true });
     dispatch({ type: "SET_SHARE_LINK_PREVIEW", payload: null });
     try {
-      const { userId, gameId } = await resolveShareToken(base, token);
+      const { userId, gameId } = await resolveShareToken(token);
       const [friendCfg, saves] = await Promise.all([
         getFriendConfig(userId).catch(() => null),
         syncListRemoteSavesForUser(userId),

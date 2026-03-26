@@ -9,7 +9,7 @@ use std::time::UNIX_EPOCH;
 static ENV_VAR_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%([^%]+)%").unwrap());
 
 /// Expande %VAR% y ~ en rutas.
-pub(crate) fn expand_path(raw: &str) -> Option<String> {
+pub fn expand_path(raw: &str) -> Option<String> {
     let mut result = raw.to_string();
 
     for cap in ENV_VAR_REGEX.captures_iter(raw) {
@@ -43,7 +43,7 @@ pub(crate) fn expand_path(raw: &str) -> Option<String> {
     }
 }
 
-pub(crate) fn collect_files_with_mtime(
+pub fn collect_files_with_mtime(
     dir: &Path,
     base: &Path,
     out: &mut Vec<(PathBuf, String, std::time::SystemTime, u64)>,
@@ -74,7 +74,7 @@ pub(crate) fn collect_files_with_mtime(
     }
 }
 
-pub(crate) fn list_all_files_with_mtime(
+pub fn list_all_files_with_mtime(
     paths: &[String],
 ) -> Vec<(String, String, std::time::SystemTime, u64)> {
     let mut seen = std::collections::HashSet::new();
@@ -117,7 +117,7 @@ pub(crate) fn list_all_files_with_mtime(
     results
 }
 
-pub(crate) fn list_all_files_from_paths(paths: &[String]) -> Vec<(String, String)> {
+pub fn list_all_files_from_paths(paths: &[String]) -> Vec<(String, String)> {
     list_all_files_with_mtime(paths)
         .into_iter()
         .map(|(a, r, _, _)| (a, r))

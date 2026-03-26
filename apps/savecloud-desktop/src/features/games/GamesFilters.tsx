@@ -1,7 +1,9 @@
 import { Input, Tabs, Tab } from "@heroui/react";
 import { Search } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import type { ConfiguredGame } from "@app-types/config";
 import { filterGamesBySearch, isSteamGame } from "@utils/gameImage";
+import { useDebouncedValue } from "@hooks/useDebouncedValue";
 
 export type OriginFilter = "all" | "steam" | "other";
 
@@ -29,18 +31,41 @@ export function filterGames(
 }
 
 export function GamesFilters({ searchTerm, onSearchChange, originFilter, onOriginFilterChange }: GamesFiltersProps) {
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+
+  const debouncedSearch = useDebouncedValue(localSearch, 300);
+
+  const onSearchChangeRef = useRef(onSearchChange);
+  useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
+
+  useEffect(() => {
+    onSearchChangeRef.current(debouncedSearch);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (searchTerm === "" && localSearch !== "") {
+      setLocalSearch("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <Input
         placeholder="Buscar juegos..."
-        value={searchTerm}
-        onValueChange={onSearchChange}
+        value={localSearch}
+        onValueChange={setLocalSearch}
         startContent={<Search size={18} className="text-default-400" />}
         className="max-w-xs"
         size="md"
         variant="bordered"
         isClearable
-        onClear={() => onSearchChange("")}
+        onClear={() => {
+          setLocalSearch("");
+          onSearchChangeRef.current("");
+        }}
       />
       <Tabs
         selectedKey={originFilter}

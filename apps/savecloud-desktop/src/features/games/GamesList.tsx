@@ -9,7 +9,6 @@ import { useCloudBackupCounts } from "@hooks/useCloudBackupCounts";
 import { useGameStats } from "@hooks/useGameStats";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { useResolvedSteamAppIds } from "@hooks/useResolvedSteamAppIds";
-import { useSyncProgress } from "@contexts/SyncProgressContext";
 import { getSteamAppId, needsSteamSearch } from "@utils/gameImage";
 import { GameCard } from "@features/games/GameCard";
 import { GamesListMotionContainer, GamesListMotionItem } from "@features/games/GamesListMotion";
@@ -19,7 +18,7 @@ type SyncStatus = "pending_upload" | "pending_download" | "in_sync" | null;
 /** Diferencia en ms por debajo de la cual consideramos local y nube "en sync" (precisión, reloj). */
 const SYNC_TOLERANCE_MS = 15_000; // 15 segundos
 /** Si la nube es más reciente que local pero por menos de esto, lo tratamos como "en sync":
- *  tras subir, S3 pone LastModified = ahora, así que cloud > local; no queremos mostrar "Pendiente descargar". */
+ * tras subir, S3 pone LastModified = ahora, así que cloud > local; no queremos mostrar "Pendiente descargar". */
 const CLOUD_NEWER_AS_SYNC_MS = 120_000; // 2 minutos
 
 function getSyncStatus(gameId: string, stats: GameStats | undefined, unsyncedGameIds: string[]): SyncStatus {
@@ -119,7 +118,11 @@ export function GamesList({
     hasSyncConfig && games.length > 0
   );
   const gameRunningStatus = useGameRunningStatus(games.map((g) => g.id));
-  const { syncOperation, progress } = useSyncProgress();
+
+  const stableListKey = useMemo(
+    () => [animationKey ?? "", games.map((g) => g.id).join(",")].join("|"),
+    [animationKey, games.map((g) => g.id).join(",")]
+  );
 
   if (games.length === 0) {
     const isEmptyState = !emptyFilterMessage;
@@ -166,10 +169,7 @@ export function GamesList({
       </Card>
     );
   }
-  const stableListKey = useMemo(
-    () => [animationKey ?? "", games.map((g) => g.id).join(",")].join("|"),
-    [animationKey, games.map((g) => g.id).join(",")]
-  );
+
   return (
     <GamesListMotionContainer
       className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5"
@@ -206,9 +206,6 @@ export function GamesList({
             isFullBackupUploading={fullBackupUploadingGameId === game.id}
             onEdit={onEdit}
             onShare={onShare}
-            syncProgress={
-              syncOperation?.mode === "single" && syncOperation.gameId === game.id ? (progress ?? null) : undefined
-            }
           />
         </GamesListMotionItem>
       ))}

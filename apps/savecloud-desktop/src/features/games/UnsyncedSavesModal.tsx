@@ -4,6 +4,7 @@ import { useQueries } from "@tanstack/react-query";
 import { previewUpload } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { isGameTooLargeForSync } from "@utils/packageRecommendation";
+import { useMemo } from "react";
 
 interface UnsyncedSavesModalProps {
   isOpen: boolean;
@@ -13,7 +14,6 @@ interface UnsyncedSavesModalProps {
   onUploadGame?: (gameId: string) => void | Promise<void>;
   onFullBackupGame?: (gameId: string) => void | Promise<void>;
   isLoadingAll?: boolean;
-  /** Juego en curso (subiendo o empaquetando) para deshabilitar sus botones. */
   loadingGameId?: string | null;
 }
 
@@ -34,12 +34,14 @@ export function UnsyncedSavesModal({
     })),
   });
 
-  const largeGameIds = new Set(
-    gameIds.filter((_, i) => {
-      const data = previewQueries[i]?.data;
-      return data && isGameTooLargeForSync(data.fileCount, data.totalSizeBytes);
-    })
-  );
+  const largeGameIds = useMemo(() => {
+    return new Set(
+      gameIds.filter((_, i) => {
+        const data = previewQueries[i]?.data;
+        return data && isGameTooLargeForSync(data.fileCount, data.totalSizeBytes);
+      })
+    );
+  }, [gameIds, previewQueries]);
 
   if (gameIds.length === 0) return null;
 
@@ -77,6 +79,8 @@ export function UnsyncedSavesModal({
               <ul className="flex flex-col gap-1.5">
                 {gameIds.map((gameId) => {
                   const busy = loadingGameId === gameId;
+                  const isLarge = largeGameIds.has(gameId);
+
                   return (
                     <li
                       key={gameId}
@@ -85,7 +89,7 @@ export function UnsyncedSavesModal({
                         {formatGameDisplayName(gameId)}
                       </span>
                       <span className="flex shrink-0 gap-2">
-                        {largeGameIds.has(gameId) ? (
+                        {isLarge ? (
                           <Tooltip content="Este juego es demasiado grande. Usa Empaquetar y subir." placement="top">
                             <span className="inline-flex">
                               <Button size="sm" variant="flat" isDisabled startContent={<CloudUpload size={14} />}>

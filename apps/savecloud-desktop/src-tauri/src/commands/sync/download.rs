@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::LazyLock;
 use std::time::{Duration, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
@@ -23,22 +22,11 @@ use super::models::{
     DownloadConflictDto, DownloadConflictsResultDto, GameConflictsResultDto, GameSyncResultDto,
     RemoteSaveInfoDto, SyncProgressPayload, SyncResultDto, UnsyncedGameDto,
 };
-use super::path_utils;
-use super::sync_logger;
-use crate::tray_state::TrayState;
+use crate::utils::path_utils;
+use crate::commands::logs::sync_logger;
+use crate::network::DATA_CLIENT;
+use crate::tray::tray_state::TrayState;
 use tauri::{AppHandle, Emitter, State};
-
-/// Cliente HTTP reutilizable para todas las descargas.
-///
-/// Se inicializa una sola vez de forma lazy con un `user-agent` identificativo
-/// y un timeout generoso para archivos de guardado grandes.
-static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .expect("Fallo al construir el cliente HTTP de descargas")
-});
 
 /// Número máximo de reintentos al intentar crear un archivo bloqueado.
 const FILE_CREATE_MAX_RETRIES: u32 = 3;
@@ -305,20 +293,19 @@ pub async fn sync_check_download_conflicts_batch(
 #[tauri::command]
 pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String> {
     let cfg = crate::config::load_config();
+    let tolerance_secs = UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS;
+    let tolerance = chrono::Duration::seconds(tolerance_secs);
+    let game_ids: Vec<String> = cfg.games.iter().map(|g| g.id.clone()).collect();
 
-    let _ = cfg
-        .api_base_url
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .ok_or("Configura apiBaseUrl en Configuración")?;
-    let _ = cfg
-        .user_id
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .ok_or("Configura userId en Configuración")?;
+    let (remote_files_res, remote_backups_res) = tokio::join!(
+        api::sync_list_remote_saves(),
+        super::full_backup::list_full_backups_batch(game_ids)
+    );
 
-    let remote = api::sync_list_remote_saves().await?;
-    let remote_map: HashMap<(String, String), DateTime<Utc>> = remote
+    let remote_files = remote_files_res?;
+    let remote_backups_map = remote_backups_res?;
+
+    let remote_file_map: HashMap<(String, String), DateTime<Utc>> = remote_files
         .into_iter()
         .filter_map(|s| {
             let dt = DateTime::parse_from_rfc3339(&s.last_modified)
@@ -331,17 +318,28 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
         })
         .collect();
 
-    let tolerance = chrono::Duration::seconds(UNSYNCED_LOCAL_NEWER_TOLERANCE_SECS);
     let mut unsynced = Vec::new();
 
     for game in &cfg.games {
-        // La enumeración de archivos hace I/O síncrono de disco; se delega a
-        // un thread de bloqueo para no interferir con el scheduler de Tokio.
+        let game_id_low = game.id.to_lowercase();
+
+        let last_backup_dt = remote_backups_map.get(&game.id).and_then(|backups| {
+            backups
+                .iter()
+                .filter_map(|b| {
+                    DateTime::parse_from_rfc3339(&b.last_modified)
+                        .or_else(|_| DateTime::parse_from_rfc2822(&b.last_modified))
+                        .ok()
+                })
+                .map(|dt| dt.with_timezone(&Utc))
+                .max()
+        });
+
         let paths = game.paths.clone();
         let local_files =
-            tokio::task::spawn_blocking(move || path_utils::list_all_files_with_mtime(&paths))
+            tokio::task::spawn_blocking(move || crate::utils::path_utils::list_all_files_with_mtime(&paths))
                 .await
-                .map_err(|e| format!("spawn_blocking list_files: {}", e))?;
+                .map_err(|e| format!("Error en scan local: {}", e))?;
 
         let mut has_unsynced = false;
 
@@ -355,18 +353,34 @@ pub async fn sync_check_unsynced_games() -> Result<Vec<UnsyncedGameDto>, String>
                 continue;
             };
             let local_dt = local_dt.with_timezone(&Utc);
-            let key = (game.id.to_lowercase(), rel.clone());
 
-            match remote_map.get(&key) {
+            let key = (&game_id_low, rel.as_str());
+
+            match remote_file_map.get(&(key.0.clone(), key.1.to_string())) {
+                Some(&cloud_dt) => {
+                    if local_dt > cloud_dt + tolerance {
+                        if let Some(backup_dt) = last_backup_dt {
+                            if local_dt > backup_dt + tolerance {
+                                has_unsynced = true;
+                                break 'files;
+                            }
+                        } else {
+                            has_unsynced = true;
+                            break 'files;
+                        }
+                    }
+                }
                 None => {
-                    has_unsynced = true;
-                    break 'files;
+                    if let Some(backup_dt) = last_backup_dt {
+                        if local_dt > backup_dt + tolerance {
+                            has_unsynced = true;
+                            break 'files;
+                        }
+                    } else {
+                        has_unsynced = true;
+                        break 'files;
+                    }
                 }
-                Some(&cloud_dt) if local_dt > cloud_dt + tolerance => {
-                    has_unsynced = true;
-                    break 'files;
-                }
-                _ => {}
             }
         }
 
@@ -448,7 +462,7 @@ async fn download_one_file(
         }
     }
 
-    let res = DOWNLOAD_CLIENT
+    let res = DATA_CLIENT
         .get(download_url)
         .send()
         .await
@@ -617,7 +631,7 @@ pub(crate) async fn sync_download_game_impl(
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    if crate::process_check::is_game_running(&game_id, &game.paths) {
+    if crate::system::process_check::is_game_running(&game_id, &game.paths) {
         return Err(format!(
             "El juego está en ejecución. Cierra {} antes de descargar para evitar sobrescribir archivos en uso.",
             game.id
@@ -796,7 +810,7 @@ pub async fn sync_download_all_games(
     let mut results_by_id: HashMap<String, GameSyncResultDto> = cfg
         .games
         .iter()
-        .filter(|g| crate::process_check::is_game_running(&g.id, &g.paths))
+        .filter(|g| crate::system::process_check::is_game_running(&g.id, &g.paths))
         .map(|g| {
             let dto = GameSyncResultDto {
                 game_id: g.id.clone(),

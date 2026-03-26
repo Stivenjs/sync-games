@@ -28,7 +28,7 @@
       "@services/*": ["src/services/*"],
       "@utils/*": ["src/utils/*"],
       "@app-types/*": ["src/types/*"],
-      "@contexts/*": ["src/contexts/*"]
+      "@store/*": ["src/store/*"]
     }
   },
   "include": ["src"],

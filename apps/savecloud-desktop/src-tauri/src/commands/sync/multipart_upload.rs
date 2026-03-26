@@ -21,11 +21,11 @@
 use std::collections::HashSet;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
 
 use super::api;
 use super::models::SyncProgressPayload;
-use super::sync_logger;
+use crate::commands::logs::sync_logger;
+use crate::network::DATA_CLIENT;
 use futures_util::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
@@ -34,17 +34,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 pub const PAUSED_ERR_MSG: &str = "PAUSED";
-
 const PAUSED_STATE_FILE: &str = "paused_upload.json";
-
-static MULTIPART_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
-        .build()
-        .expect("Fallo al construir cliente HTTP multipart")
-});
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,11 +93,6 @@ const PARTS_PER_URL_BATCH: u32 = 32;
 const MAX_RETRIES: u32 = 3;
 /// Segundos de espera entre reintentos (backoff: 1ª espera 1s, 2ª espera 2s).
 const RETRY_DELAY_SECS: u64 = 1;
-
-/// Timeout para conectar a la API.
-const CONNECT_TIMEOUT_SECS: u64 = 30;
-/// Timeout por solicitud (p. ej. PUT de una parte): subidas lentas pueden tardar minutos.
-const REQUEST_TIMEOUT_SECS: u64 = 600;
 
 /// Cuántas partes se suben en paralelo (acelera mucho archivos grandes).
 const MULTIPART_PUT_CONCURRENCY: usize = 8;
@@ -352,7 +337,7 @@ fn spawn_url_prefetcher(
     total_size: u64,
     parts_to_fetch: Vec<u32>,
     tx: mpsc::Sender<(u32, u64, u64, String)>,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) {
     tokio::spawn(async move {
         for chunk in parts_to_fetch.chunks(PARTS_PER_URL_BATCH as usize) {
@@ -398,7 +383,7 @@ pub(crate) async fn upload_one_file_multipart(
     user_id: &str,
     api_key: &str,
     app: tauri::AppHandle,
-    cancel: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    cancel: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<(), String> {
     let ctx =
         sync_logger::upload_context(game_id, relative_filename, &absolute_path.to_string_lossy());
@@ -470,7 +455,7 @@ pub(crate) async fn upload_one_file_multipart(
                     .await
                     .map_err(|e| format!("leer parte {}: {}", part_number, e))?;
 
-                let res = MULTIPART_CLIENT
+                let res = DATA_CLIENT
                     .put(&url)
                     .body(buf)
                     .header("Content-Type", "application/octet-stream")
@@ -662,7 +647,7 @@ pub(crate) async fn resume_paused_upload(app: tauri::AppHandle) -> Result<(), St
                     .await
                     .map_err(|e| format!("leer parte {}: {}", part_number, e))?;
 
-                let res = MULTIPART_CLIENT
+                let res = DATA_CLIENT
                     .put(&url)
                     .body(buf)
                     .header("Content-Type", "application/octet-stream")

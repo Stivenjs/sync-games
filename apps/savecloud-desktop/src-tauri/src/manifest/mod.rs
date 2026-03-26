@@ -11,6 +11,7 @@
 //! Fuente: https://github.com/mtkennerly/ludusavi-manifest
 //! Licencia del manifiesto: MIT (mtkennerly).
 
+use crate::network::API_CLIENT;
 use serde::{de::IgnoredAny, Deserialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -90,12 +91,7 @@ async fn ensure_manifest_cached(cache_path: &Path) -> Result<(), String> {
 
     let etag_path = cache_path.with_extension("etag");
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let mut request = client.get(MANIFEST_URL);
+    let mut request = API_CLIENT.get(MANIFEST_URL);
 
     if cache_path.exists() && etag_path.exists() {
         if let Ok(etag) = fs::read_to_string(&etag_path).await {

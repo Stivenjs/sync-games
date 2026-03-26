@@ -7,6 +7,7 @@
 pub mod io;
 pub mod models;
 pub mod paths;
+pub mod config_cmds;
 
 pub use io::*;
 pub use models::*;

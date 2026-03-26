@@ -178,12 +178,11 @@ export function useSettingsPage() {
       dispatch({
         type: "SET_CREATE_FORM_FROM_CONFIG",
         apiBaseUrl: config.apiBaseUrl ?? "",
-        apiKey: config.apiKey ?? "",
+        apiKey: state.createApiKey || config.apiKey || "",
         userId: config.userId ?? "",
       });
     }
   }, [state.createConfigModalOpen, config?.apiBaseUrl, config?.apiKey, config?.userId]);
-
   const handleExportConfig = async () => {
     dispatch({ type: "SET_EXPORTING", payload: true });
     try {
@@ -296,7 +295,9 @@ export function useSettingsPage() {
     dispatch({ type: "SET_CREATING_CONFIG", payload: true });
     dispatch({ type: "SET_CREATE_CONFIG_ERROR", payload: null });
     try {
-      const path = await createConfigFile(state.createApiBaseUrl, state.createApiKey, state.createUserId);
+      const apiKeyToSave =
+        state.createApiKey === "********" ? (config?.apiKey === "********" ? "" : config?.apiKey) : state.createApiKey;
+      const path = await createConfigFile(state.createApiBaseUrl, apiKeyToSave ?? "", state.createUserId);
       dispatch({ type: "SET_CREATE_MODAL", open: false });
 
       refetchConfig?.();

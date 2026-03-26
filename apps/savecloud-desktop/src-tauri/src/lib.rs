@@ -1,18 +1,19 @@
 mod commands;
 mod config;
 mod controller;
-mod handlers;
+mod ipc;
 #[cfg(target_os = "windows")]
 mod manifest;
-mod process_check;
+mod network;
+mod plugins;
+mod system;
 mod setup;
 mod steam;
 mod time;
 mod torrent;
 mod tray;
-mod tray_state;
+mod utils;
 use tauri::Manager;
-mod plugins;
 
 fn load_dotenv() {
     let _ = dotenvy::dotenv();
@@ -34,7 +35,7 @@ pub fn run() {
         }));
     }
 
-    builder = handlers::register_all_commands(builder);
+    builder = ipc::handlers::register_all_commands(builder);
 
     builder
         .plugin(tauri_plugin_process::init())

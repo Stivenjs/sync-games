@@ -5,6 +5,7 @@ import { toastSyncResult } from "@utils/toast";
 import { notifySyncComplete, notifySyncError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { useInputManager } from "@features/input/useInputManager";
+import { initSyncListeners } from "@store/SyncStore";
 
 /**
  * Hook encargado de inicializar comportamientos globales de la aplicación.
@@ -32,6 +33,7 @@ import { useInputManager } from "@features/input/useInputManager";
  */
 export function useAppInitialization() {
   useInputManager();
+  initSyncListeners();
   /**
    * Respaldos periódicos de configuración del usuario.
    *

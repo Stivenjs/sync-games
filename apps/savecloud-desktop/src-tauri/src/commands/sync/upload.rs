@@ -18,18 +18,17 @@
 //!   la cantidad de solicitudes al backend.
 //! - Se aplican reintentos con backoff en operaciones críticas.
 //! - Se configuran timeouts a nivel de conexión y de request en el cliente HTTP.
-use std::collections::HashMap;
-use std::fs;
-use std::io::{BufReader, Read};
-use std::sync::LazyLock;
-
 use super::api;
 use super::models::{GameSyncResultDto, SyncProgressPayload, SyncResultDto};
 use super::multipart_upload;
-use super::path_utils;
-use crate::tray_state::TrayState;
+use crate::utils::path_utils;
+use crate::network::DATA_CLIENT;
+use crate::tray::tray_state::TrayState;
 use bytes::Bytes;
 use futures_util::stream::{self, Stream, StreamExt};
+use std::collections::HashMap;
+use std::fs;
+use std::io::{BufReader, Read};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc;
 
@@ -44,14 +43,6 @@ const SIMPLE_PUT_CONCURRENCY: usize = 24;
 /// el usuario debe usar "Empaquetar y subir" obligatoriamente.
 const LARGE_GAME_BLOCK_FILE_COUNT: usize = 200;
 const LARGE_GAME_BLOCK_SIZE_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
-
-static UPLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .user_agent("SaveCloud-desktop/1.0")
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .expect("Fallo al construir cliente HTTP de subidas")
-});
 
 /// Stream que recibe chunks de un canal (llenado por un hilo que lee el archivo).
 #[allow(dead_code)]
@@ -217,7 +208,7 @@ pub async fn sync_upload_game(
 pub(crate) async fn sync_upload_game_impl(
     game_id: String,
     app: AppHandle,
-    tray_inner: Option<std::sync::Arc<crate::tray_state::TrayStateInner>>,
+    tray_inner: Option<std::sync::Arc<crate::tray::tray_state::TrayStateInner>>,
 ) -> Result<SyncResultDto, String> {
     let cfg = crate::config::load_config();
     let game = cfg
@@ -226,7 +217,7 @@ pub(crate) async fn sync_upload_game_impl(
         .find(|g| g.id.eq_ignore_ascii_case(&game_id))
         .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
 
-    if crate::process_check::is_game_running(&game_id, &game.paths) {
+    if crate::system::process_check::is_game_running(&game_id, &game.paths) {
         return Err(format!(
             "El juego está en ejecución. Cierra {} antes de sincronizar para evitar archivos bloqueados.",
             game.id
@@ -319,9 +310,11 @@ pub(crate) async fn sync_upload_game_impl(
                     );
                     break;
                 } else {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_multipart",
-                        &super::sync_logger::upload_context(&game_id, &relative, &absolute),
+                        &crate::commands::logs::sync_logger::upload_context(
+                            &game_id, &relative, &absolute,
+                        ),
                         &e,
                     );
                     errors.push(format!("{}: {}", relative, e));
@@ -351,7 +344,7 @@ pub(crate) async fn sync_upload_game_impl(
     const UPLOAD_URLS_BATCH_SIZE: usize = 500;
     if !simple_files.is_empty() {
         let total_simple = simple_files.len();
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_batch",
             &format!("gameId={} file_count={}", game_id, total_simple),
         );
@@ -363,7 +356,7 @@ pub(crate) async fn sync_upload_game_impl(
             let batch = api::get_upload_urls(api_base, user_id, api_key, &game_id, chunk)
                 .await
                 .map_err(|e| {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_urls",
                         &format!("gameId={}", game_id),
                         &e,
@@ -381,7 +374,7 @@ pub(crate) async fn sync_upload_game_impl(
             ));
         }
 
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_urls_ok",
             &format!("gameId={} total={}", game_id, total_simple),
         );
@@ -402,7 +395,7 @@ pub(crate) async fn sync_upload_game_impl(
                     }
                 };
 
-                let put_res = match UPLOAD_CLIENT
+                let put_res = match DATA_CLIENT
                     .put(&upload_url)
                     .body(body)
                     .header("Content-Type", "application/octet-stream")
@@ -436,7 +429,7 @@ pub(crate) async fn sync_upload_game_impl(
 
             put_count += 1;
             if put_count % 500 == 0 {
-                super::sync_logger::log_operation(
+                crate::commands::logs::sync_logger::log_operation(
                     "upload_simple_progress",
                     &format!("gameId={} done={}/{}", game_id, put_count, total_simple),
                 );
@@ -445,9 +438,13 @@ pub(crate) async fn sync_upload_game_impl(
             match result {
                 Ok(()) => ok_count += 1,
                 Err((relative, absolute, err_msg)) => {
-                    super::sync_logger::log_error(
+                    crate::commands::logs::sync_logger::log_error(
                         "upload_put",
-                        &super::sync_logger::upload_context(game_id.as_str(), &relative, &absolute),
+                        &crate::commands::logs::sync_logger::upload_context(
+                            game_id.as_str(),
+                            &relative,
+                            &absolute,
+                        ),
                         &err_msg,
                     );
                     errors.push(err_msg);
@@ -456,7 +453,7 @@ pub(crate) async fn sync_upload_game_impl(
             }
         }
 
-        super::sync_logger::log_operation(
+        crate::commands::logs::sync_logger::log_operation(
             "upload_simple_done",
             &format!("gameId={} files={}", game_id, total_simple),
         );
@@ -503,7 +500,7 @@ pub async fn sync_upload_all_games(
     let mut results_by_id: HashMap<String, GameSyncResultDto> = HashMap::new();
 
     for game in &cfg.games {
-        if crate::process_check::is_game_running(&game.id, &game.paths) {
+        if crate::system::process_check::is_game_running(&game.id, &game.paths) {
             let game_id = game.id.clone();
             results_by_id.insert(
                 game_id.clone(),
