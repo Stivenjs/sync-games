@@ -6,7 +6,7 @@
 //! demonios de sincronización automática.
 
 use crate::commands::game_exit_sync;
-use crate::commands::watch_sync;
+// use crate::commands::watch_sync;
 use crate::controller::start_gamepad_loop;
 use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
 use crate::process_check::start_process_watcher;
@@ -82,7 +82,8 @@ pub fn init_states_and_background_tasks(app: &mut App) {
 
     // Sincronización Activa (Nuestro nuevo módulo): Vigila cambios en el disco duro
     // y los encola con un debounce de 5 minutos para subidas silenciosas.
-    watch_sync::spawn_watcher(app.handle().clone(), tray_state.inner().0.clone());
+    // comentado temporalmente para evitar bugs:
+    // watch_sync::spawn_watcher(app.handle().clone(), tray_state.inner().0.clone());
 
     // Observador de Procesos: Audita la memoria del SO y emite eventos IPC al frontend.
     start_process_watcher(app.handle().clone());
