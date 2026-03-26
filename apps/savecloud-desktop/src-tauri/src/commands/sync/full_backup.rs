@@ -14,12 +14,12 @@
 //! múltiples archivos pequeños, siendo especialmente útil para juegos
 //! con grandes volúmenes de datos.
 
+use futures_util::StreamExt;
 use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-
-use futures_util::StreamExt;
 use tokio::io::AsyncWriteExt;
+use tokio_util::io::SyncIoBridge;
 
 use super::api;
 use super::models::SyncProgressPayload;
@@ -85,14 +85,6 @@ impl Drop for TempFileGuard {
     }
 }
 
-/// Extrae un .tar en `dest_dir`.
-fn extract_tar_archive(tar_path: &Path, dest_dir: &Path) -> Result<(), String> {
-    let file = fs::File::open(tar_path).map_err(|e| e.to_string())?;
-    let mut archive = tar::Archive::new(file);
-    archive.unpack(dest_dir).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BackupDto {
@@ -153,7 +145,28 @@ pub async fn list_cloud_backups(
 /// Cada cuántos bytes emitimos progreso de descarga del empaquetado.
 const FULL_BACKUP_DOWNLOAD_EMIT_BYTES: u64 = 256 * 1024;
 
-/// Implementación de descarga + extracción de un backup empaquetado.
+/// Implementa la descarga y extracción en streaming puro de un backup empaquetado.
+///
+/// Esta arquitectura elimina la necesidad de archivos temporales. Crea una tubería
+/// bidireccional (pipe) en memoria RAM. El flujo de red escribe en el transmisor (`tx`)
+/// mientras un hilo bloqueante dedicado consume el receptor (`rx`) y extrae los
+/// archivos directamente a su destino final utilizando `SyncIoBridge`.
+///
+/// Esto proporciona el máximo rendimiento de I/O posible y reduce a la mitad
+/// las escrituras físicas en el disco de almacenamiento.
+///
+/// # Parameters
+///
+/// * `game_id` - El identificador único del juego.
+/// * `backup_key` - La clave o ruta del objeto en el almacenamiento remoto.
+/// * `app` - El manejador de la aplicación Tauri, utilizado para emitir eventos de progreso.
+/// * `tray_state` - Referencia atómica al estado de la bandeja del sistema.
+/// * `emit_done` - Bandera que indica si se debe emitir el evento `sync-download-done` al finalizar.
+///
+/// # Errors
+///
+/// Retorna `Err(String)` ante fallos de red, errores de tubería en memoria,
+/// o fallos de descompresión en el hilo secundario.
 pub async fn download_and_restore_full_backup_impl(
     game_id: String,
     backup_key: String,
@@ -175,6 +188,7 @@ pub async fn download_and_restore_full_backup_impl(
             .ok_or("No se pudo expandir la ruta del juego")?;
     let dest_dir = PathBuf::from(dest_dir);
 
+    // Resolución de URL pre-firmada
     let body = serde_json::json!({ "gameId": game_id, "key": backup_key });
     let res = api::api_request(
         &ctx.base_url,
@@ -201,11 +215,7 @@ pub async fn download_and_restore_full_backup_impl(
         .and_then(|v| v.as_str())
         .ok_or("API no devolvió downloadUrl")?;
 
-    let temp_dir = std::env::temp_dir();
     let tar_name = backup_key.rsplit('/').next().unwrap_or("backup.tar");
-    let tar_path = temp_dir.join(tar_name);
-
-    let _temp_guard = TempFileGuard(tar_path.clone());
 
     let res = DATA_CLIENT
         .get(download_url)
@@ -219,18 +229,39 @@ pub async fn download_and_restore_full_backup_impl(
 
     let total = res.content_length().unwrap_or(0);
     let mut stream = res.bytes_stream();
-    let mut file = tokio::fs::File::create(&tar_path)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    // Arquitectura de Streaming: Tubería (Pipe) en memoria RAM con capacidad de 5MB.
+    // Proporciona retroalimentación de presión (backpressure): si el disco extrae
+    // más lento de lo que la red descarga, la red se pausará temporalmente.
+    let (mut tx, rx) = tokio::io::duplex(5 * 1024 * 1024);
+
+    let dest_dir_clone = dest_dir.clone();
+
+    // Hilo dedicado a la descompresión. Se ejecuta en paralelo a la descarga.
+    let extract_task = tokio::task::spawn_blocking(move || {
+        // SyncIoBridge convierte el canal asíncrono 'rx' en un lector implementando std::io::Read
+        // Esto permite usar la librería sincrónica 'tar' de forma nativa.
+        let sync_reader = SyncIoBridge::new(rx);
+        let mut archive = tar::Archive::new(sync_reader);
+
+        archive
+            .unpack(&dest_dir_clone)
+            .map_err(|e| format!("Fallo en extracción: {}", e))
+    });
 
     let mut loaded: u64 = 0;
     let mut last_emit: u64 = 0;
 
+    // Consumo del flujo de red
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|e| e.to_string())?;
         let n = chunk.len() as u64;
         loaded += n;
-        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+
+        // Escribir los bytes directamente en la memoria RAM hacia el descompresor
+        tx.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Error en tubería de memoria: {}", e))?;
 
         if loaded - last_emit >= FULL_BACKUP_DOWNLOAD_EMIT_BYTES || (total > 0 && loaded >= total) {
             last_emit = loaded;
@@ -257,24 +288,15 @@ pub async fn download_and_restore_full_backup_impl(
             },
         );
     }
-    file.flush().await.map_err(|e| e.to_string())?;
-    drop(file);
 
-    let _ = app.emit(
-        "sync-download-progress",
-        SyncProgressPayload {
-            game_id: game_id.clone(),
-            filename: "Extrayendo…".to_string(),
-            loaded: 0,
-            total: 1,
-        },
-    );
+    // Clausura del transmisor. Esto inyecta una señal EOF (End Of File) en el receptor,
+    // indicando a 'tar::Archive' que el archivo ha finalizado de forma limpia.
+    drop(tx);
 
-    let tar_path_clone = tar_path.clone();
-    let dest_dir_clone = dest_dir.clone();
-    tokio::task::spawn_blocking(move || extract_tar_archive(&tar_path_clone, &dest_dir_clone))
+    // Sincronización del hilo principal con la finalización del hilo extractor
+    extract_task
         .await
-        .map_err(|e| e.to_string())??;
+        .map_err(|e| format!("Pánico en hilo de descompresión: {}", e))??;
 
     tray_state.set_just_restored(&game_id);
     if emit_done {
@@ -283,7 +305,6 @@ pub async fn download_and_restore_full_backup_impl(
 
     Ok(())
 }
-
 #[tauri::command]
 pub async fn create_and_upload_full_backup(
     game_id: String,

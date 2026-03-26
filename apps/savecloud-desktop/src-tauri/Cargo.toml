@@ -41,7 +41,6 @@ tauri-plugin-process = "2"
 sysinfo = "0.31"
 base64 = "0.22"
 bytes = "1"
-tokio = { version = "1", features = ["sync", "time", "fs", "io-util"] }
 rayon = "1"
 tar = "0.4"
 librqbit = "8.1.1"
@@ -49,6 +48,8 @@ tauri-plugin-single-instance = "2.4.0"
 filetime = "0.2.27"
 mlua = { version = "0.11", features = ["luajit", "vendored", "serialize", "send"] }
 tokio-stream = { version = "0.1.18", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "time", "fs", "io-util"] }
+tokio-util = { version = "0.7.18", features = ["io", "io-util"] }
 walkdir = "2.5.0"
 
 
