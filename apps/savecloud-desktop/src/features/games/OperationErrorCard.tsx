@@ -1,6 +1,6 @@
 import { Button, Card, CardBody } from "@heroui/react";
 import { RefreshCw, X } from "lucide-react";
-import type { OperationResult } from "@features/games/useGamesPage";
+import type { OperationResult } from "@/hooks/useGamesPage";
 
 interface OperationErrorCardProps {
   operationResult: OperationResult;

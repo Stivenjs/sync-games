@@ -2,9 +2,8 @@ import { useState } from "react";
 import { Button, Spinner } from "@heroui/react";
 import { RefreshCw } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
-import { AddGameModal } from "@features/games/AddGameModal";
 import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
-import { EditGameModal } from "@features/games/EditGameModal";
+import { GameDrawer } from "@features/games/GameDrawer";
 import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
 import { FullBackupConfirmModal } from "@features/games/FullBackupConfirmModal";
 import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
@@ -17,7 +16,7 @@ import { GamesStatsCompact } from "@features/games/GamesStatsCompact";
 import { BulkActionConfirmModal } from "@features/games/BulkActionConfirmModal";
 import { RemoveGameModal } from "@features/games/RemoveGameModal";
 import { ScanModal } from "@features/games/ScanModal";
-import { useGamesPage } from "@features/games/useGamesPage";
+import { useGamesPage } from "@/hooks/useGamesPage";
 import { useGameStats } from "@hooks/useGameStats";
 import { scheduleConfigBackupToCloud } from "@services/tauri";
 import { countGamesOverSizeThreshold } from "@utils/packageRecommendation";
@@ -182,13 +181,14 @@ export function GamesPage() {
           </div>
         </div>
       </div>
-      <AddGameModal
+      <GameDrawer
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSuccess={() => {
           scheduleConfigBackupToCloud();
           handleRefresh?.();
         }}
+        mode="add"
         initialPath={addModalInitial.path}
         suggestedId={addModalInitial.suggestedId}
       />
@@ -271,15 +271,16 @@ export function GamesPage() {
         game={gameToRestoreBackup}
         onSuccess={handleRefresh}
       />
-      <EditGameModal
+      <GameDrawer
         isOpen={!!gameToEdit}
-        game={gameToEdit}
         onClose={() => setGameToEdit(null)}
         onSuccess={() => {
           scheduleConfigBackupToCloud();
           handleRefresh();
           setGameToEdit(null);
         }}
+        mode="edit"
+        game={gameToEdit}
       />
       {/* Filtros de la lista */}
       <section className="space-y-2">

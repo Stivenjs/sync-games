@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
-import { getPausedUploadInfo } from "@services/tauri";
+import { getPausedUploadInfo } from "@services/tauri/config.service";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { notifyDownloadDone, notifyFullBackupDone, notifyUploadDone } from "@utils/notification";
 

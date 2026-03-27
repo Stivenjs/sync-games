@@ -65,11 +65,13 @@ pub fn init_states_and_background_tasks(app: &mut App) {
     });
 
     // 3. Inicialización del motor P2P (BitTorrent)
+    let torrent_engine = tauri::async_runtime::block_on(TorrentEngine::new(
+        std::env::temp_dir().join("SaveCloud-torrents"),
+    ))
+    .expect("fallo crítico al inicializar TorrentEngine");
+
     app.manage(TorrentState {
-        engine: std::sync::Arc::new(tokio::sync::Mutex::new(tauri::async_runtime::block_on(
-            TorrentEngine::new(std::env::temp_dir().join("SaveCloud-torrents")),
-        ))),
-        app_handle: app.handle().clone(),
+        engine: std::sync::Arc::new(tokio::sync::Mutex::new(torrent_engine)),
     });
 
     // 4. Extracción de estados compartidos

@@ -6,6 +6,7 @@ import { notifySyncComplete, notifySyncError } from "@utils/notification";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { useInputManager } from "@features/input/useInputManager";
 import { initSyncListeners } from "@store/SyncStore";
+import { initTorrentListeners } from "@store/TorrentStore";
 
 /**
  * Hook encargado de inicializar comportamientos globales de la aplicación.
@@ -34,6 +35,7 @@ import { initSyncListeners } from "@store/SyncStore";
 export function useAppInitialization() {
   useInputManager();
   initSyncListeners();
+  initTorrentListeners();
   /**
    * Respaldos periódicos de configuración del usuario.
    *

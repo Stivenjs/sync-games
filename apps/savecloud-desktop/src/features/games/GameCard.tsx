@@ -114,7 +114,7 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
         <Card className="group relative overflow-hidden border-none shadow-none" radius="lg">
           <GameCardActions {...props} isUploadTooLarge={isUploadTooLarge} />
 
-          {syncProgress && syncProgress.total > 0 && <GameCardSyncProgress progress={syncProgress} />}
+          {syncProgress && <GameCardSyncProgress progress={syncProgress} />}
 
           <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large bg-default-100">
             {(isEffectivelyLoading || (displayImageUrl && !imgLoaded && !imgError)) && (
