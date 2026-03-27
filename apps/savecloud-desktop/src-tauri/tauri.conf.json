@@ -15,14 +15,9 @@
       {
         "label": "main",
         "title": "SaveCloud",
-        "center": true,
-        "width": 1280,
-        "height": 720,
-        "minWidth": 900,
-        "minHeight": 720,
+        "maximized": true,
         "resizable": true,
-        "decorations": true,
-        "transparent": false
+        "decorations": true
       }
     ],
     "security": {

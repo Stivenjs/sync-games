@@ -365,8 +365,16 @@ export class S3SaveRepository implements SaveRepository {
     }
   }
 
+  private static assertValidDeletableKey(userId: string, gameId: string, key: string): void {
+    const base = `${userId}/${gameId}/`;
+    const allowed = ["backups/", "__torrent__/"];
+    if (!allowed.some((p) => key.startsWith(`${base}${p}`)) || key.includes("..")) {
+      throw new Error("Invalid key: must be a backup or torrent of this user and game");
+    }
+  }
+
   async deleteBackup(userId: string, gameId: string, key: string): Promise<void> {
-    S3SaveRepository.assertValidBackupKey(userId, gameId, key);
+    S3SaveRepository.assertValidDeletableKey(userId, gameId, key);
     await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }));
   }
 

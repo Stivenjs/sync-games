@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Tooltip } from "@heroui/react";
 import { useCallback, useRef, useState } from "react";
 import type { TorrentProgressState } from "@store/TorrentStore";
+import { useTorrentStore } from "@store/TorrentStore";
 import { cancelTorrent, pauseTorrent, resumeTorrent } from "@services/tauri";
 import { formatBytes } from "@utils/format";
 import { formatEta, formatSpeed } from "@utils/progress";
@@ -20,7 +21,9 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
   const [toggling, setToggling] = useState(false);
 
   const onCancel = useCallback(() => {
-    cancelTorrent(progress.infoHash).catch(() => {});
+    cancelTorrent(progress.infoHash)
+      .then(() => useTorrentStore.getState().setProgress(null))
+      .catch(() => {});
   }, [progress.infoHash]);
 
   const onTogglePause = useCallback(async () => {
