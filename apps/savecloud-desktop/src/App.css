@@ -11,21 +11,37 @@ body {
   view-transition-name: none;
 }
 
-::view-transition-old(page-content),
-::view-transition-new(page-content) {
-  animation-duration: 300ms;
+/* Page slide transition (enter/exit via <ViewTransition> classes) */
+::view-transition-old(.page-slide),
+::view-transition-new(.page-slide) {
+  animation-duration: 250ms;
   animation-fill-mode: both;
   will-change: transform, opacity;
 }
 
-::view-transition-old(page-content) {
+::view-transition-old(.page-slide) {
   animation-name: fade-out, slide-out-left;
   animation-timing-function: ease-in, cubic-bezier(0.4, 0, 1, 1);
 }
 
-::view-transition-new(page-content) {
+::view-transition-new(.page-slide) {
   animation-name: fade-in, slide-in-right;
   animation-timing-function: ease-out, cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Shared element: card image ↔ hero banner */
+::view-transition-group(.hero-morph) {
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(.hero-morph),
+::view-transition-new(.hero-morph) {
+  animation: none;
+  mix-blend-mode: normal;
+  height: 100%;
+  overflow: clip;
+  object-fit: cover;
 }
 
 @keyframes fade-in {
