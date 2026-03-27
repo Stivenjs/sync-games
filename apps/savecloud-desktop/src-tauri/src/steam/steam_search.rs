@@ -201,6 +201,7 @@ pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
     results
 }
 
+/// URLs de medios de una aplicación de Steam (portada, capturas, vídeo).
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SteamAppdetailsMedia {
@@ -208,24 +209,33 @@ pub struct SteamAppdetailsMedia {
     pub video_url: Option<String>,
 }
 
-async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetailsMedia, String> {
+// Helpers compartidos entre media y details
+
+/// Realiza una petición a `appdetails` y retorna el campo `data` tomando
+/// ownership del sub-árbol JSON para evitar clones innecesarios.
+///
+/// Retorna `Ok(None)` cuando `success` es `false` (app no encontrada).
+async fn fetch_appdetails_data(
+    app_id: &str,
+    lang: &str,
+    filters: &str,
+) -> Result<Option<serde_json::Value>, String> {
     let url = format!(
-        "https://store.steampowered.com/api/appdetails?appids={}&l=english&filters=basic,screenshots,movies",
-        app_id
+        "https://store.steampowered.com/api/appdetails?appids={app_id}&l={lang}&filters={filters}"
     );
 
     let res = STEAM_CLIENT
         .get(&url)
         .send()
         .await
-        .map_err(|e| format!("Request Error: {}", e))?;
+        .map_err(|e| format!("Request Error: {e}"))?;
 
     let status = res.status();
     if !status.is_success() {
         if status.as_u16() == 429 {
-            eprintln!("Límite de Steam (429) alcanzado en app_id: {}", app_id);
+            eprintln!("Límite de Steam (429) alcanzado en app_id: {app_id}");
         }
-        return Err(format!("HTTP Error: {}", status));
+        return Err(format!("HTTP Error: {status}"));
     }
 
     let body_text = res.text().await.unwrap_or_default();
@@ -233,96 +243,134 @@ async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetai
         return Err("Empty response".into());
     }
 
-    let data: serde_json::Value =
-        serde_json::from_str(&body_text).map_err(|e| format!("JSON Parse Error: {}", e))?;
+    let mut root: serde_json::Value =
+        serde_json::from_str(&body_text).map_err(|e| format!("JSON Parse Error: {e}"))?;
 
-    let mut media_urls = Vec::new();
-    let mut video_url: Option<String> = None;
-
-    let success = data
+    let success = root
         .get(app_id)
         .and_then(|e| e.get("success"))
         .and_then(|e| e.as_bool())
         .unwrap_or(false);
 
     if !success {
-        return Ok(SteamAppdetailsMedia {
-            media_urls,
-            video_url,
-        });
+        return Ok(None);
     }
 
-    let data_obj = match data.get(app_id).and_then(|e| e.get("data")) {
-        Some(d) => d,
-        None => {
-            return Ok(SteamAppdetailsMedia {
-                media_urls,
-                video_url,
-            })
-        }
+    let data = root
+        .as_object_mut()
+        .and_then(|obj| obj.remove(app_id))
+        .and_then(|mut entry| entry.as_object_mut().and_then(|obj| obj.remove("data")));
+
+    Ok(data)
+}
+
+/// Mejor URL de vídeo de un item de `movies`.
+///
+/// Prioridad: HLS H264 → DASH H264 → WebM (max/480) → MP4 (max/480).
+fn extract_best_video_url(movie: &serde_json::Value) -> Option<String> {
+    let direct = |key: &str| {
+        movie
+            .get(key)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
     };
 
-    if let Some(s) = data_obj.get("header_image").and_then(|v| v.as_str()) {
-        if !s.is_empty() {
-            media_urls.push(s.to_string());
+    let nested = |container: &str| {
+        movie.get(container).and_then(|obj| {
+            obj.get("max")
+                .or_else(|| obj.get("480"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+        })
+    };
+
+    direct("hls_h264")
+        .or_else(|| direct("dash_h264"))
+        .or_else(|| nested("webm"))
+        .or_else(|| nested("mp4"))
+}
+
+/// Parsea portada, capturas, thumbnails y URL de vídeo del campo `data`
+/// de la API de Steam.
+fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
+    let mut media_urls: Vec<String> = Vec::new();
+    let mut video_url: Option<String> = None;
+
+    if let Some(header) = data.get("header_image").and_then(|v| v.as_str()) {
+        if !header.is_empty() {
+            media_urls.push(header.to_owned());
         }
     }
 
-    if let Some(arr) = data_obj.get("screenshots").and_then(|v| v.as_array()) {
-        for item in arr {
+    if let Some(screenshots) = data.get("screenshots").and_then(|v| v.as_array()) {
+        for item in screenshots {
             if let Some(path) = item.get("path_full").and_then(|v| v.as_str()) {
-                if !path.is_empty() && !media_urls.contains(&path.to_string()) {
-                    media_urls.push(path.to_string());
+                if !path.is_empty() && !media_urls.iter().any(|u| u == path) {
+                    media_urls.push(path.to_owned());
                 }
             }
         }
     }
 
-    if let Some(arr) = data_obj.get("movies").and_then(|v| v.as_array()) {
-        for item in arr {
+    if let Some(movies) = data.get("movies").and_then(|v| v.as_array()) {
+        for item in movies {
             if let Some(thumb) = item.get("thumbnail").and_then(|v| v.as_str()) {
-                if !thumb.is_empty() && !media_urls.contains(&thumb.to_string()) {
-                    media_urls.push(thumb.to_string());
+                if !thumb.is_empty() && !media_urls.iter().any(|u| u == thumb) {
+                    media_urls.push(thumb.to_owned());
                 }
             }
             if video_url.is_none() {
-                let u = item
-                    .get("hls_h264")
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-                    .or_else(|| {
-                        item.get("dash_h264")
-                            .and_then(|v| v.as_str())
-                            .map(String::from)
-                    })
-                    .or_else(|| {
-                        item.get("webm").and_then(|webm| {
-                            webm.get("max")
-                                .or_else(|| webm.get("480"))
-                                .and_then(|v| v.as_str())
-                                .map(String::from)
-                        })
-                    })
-                    .or_else(|| {
-                        item.get("mp4").and_then(|mp4| {
-                            mp4.get("max")
-                                .or_else(|| mp4.get("480"))
-                                .and_then(|v| v.as_str())
-                                .map(String::from)
-                        })
-                    });
-
-                if let Some(url) = u.filter(|url| !url.is_empty()) {
-                    video_url = Some(url);
-                }
+                video_url = extract_best_video_url(item);
             }
         }
     }
 
-    Ok(SteamAppdetailsMedia {
+    SteamAppdetailsMedia {
         media_urls,
         video_url,
-    })
+    }
+}
+
+/// Extrae un array plano de strings (`["Valve", "Hidden Path"]`).
+fn extract_plain_string_array(value: &serde_json::Value, field: &str) -> Vec<String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Extrae un array de strings de objetos con sub-campo
+/// (ej. `genres: [{"description":"Action"}, ...]`).
+fn extract_keyed_string_array(value: &serde_json::Value, field: &str, sub: &str) -> Vec<String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|item| item.get(sub).and_then(|v| v.as_str()).map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// Media fetch (usa helpers compartidos)
+
+async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetailsMedia, String> {
+    let data = fetch_appdetails_data(app_id, "english", "basic,screenshots,movies").await?;
+    Ok(data
+        .as_ref()
+        .map(parse_media_from_data)
+        .unwrap_or_else(|| SteamAppdetailsMedia {
+            media_urls: Vec::new(),
+            video_url: None,
+        }))
 }
 
 #[tauri::command]
@@ -414,4 +462,124 @@ pub async fn get_steam_appdetails_media_batch(
     }
 
     Ok(final_results)
+}
+
+/// Ficha completa de una aplicación de Steam.
+///
+/// Incluye textos descriptivos (en español), metadatos (desarrollador,
+/// editor, géneros, fecha de lanzamiento) y los mismos medios que
+/// [`SteamAppdetailsMedia`]. Si los medios ya existían en [`MEDIA_CACHE`],
+/// se reutilizan sin una petición adicional de screenshots/movies.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SteamAppDetails {
+    pub name: String,
+    pub short_description: String,
+    pub detailed_description: String,
+    pub header_image: String,
+    pub developers: Vec<String>,
+    pub publishers: Vec<String>,
+    pub genres: Vec<String>,
+    pub categories: Vec<String>,
+    pub release_date: Option<String>,
+    pub pc_requirements_minimum: Option<String>,
+    pub pc_requirements_recommended: Option<String>,
+    pub media: SteamAppdetailsMedia,
+}
+
+static DETAILS_CACHE: LazyLock<RwLock<HashMap<String, SteamAppDetails>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Obtiene la ficha completa de un juego de Steam.
+///
+/// Reutiliza [`MEDIA_CACHE`] para evitar pedir screenshots/movies si ya
+/// se obtuvieron previamente: cuando hay cache usa `filters=basic`
+/// (payload ~5× menor). Los textos se solicitan en español (`l=spanish`).
+async fn fetch_steam_app_details_impl(app_id: &str) -> Result<SteamAppDetails, String> {
+    let cached_media = { MEDIA_CACHE.read().unwrap().get(app_id).cloned() };
+
+    let filters = if cached_media.is_some() {
+        "basic"
+    } else {
+        "basic,screenshots,movies"
+    };
+
+    let data = fetch_appdetails_data(app_id, "spanish", filters)
+        .await?
+        .ok_or_else(|| "Juego no encontrado en Steam".to_string())?;
+
+    let str_field = |key: &str| -> String {
+        data.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned()
+    };
+
+    let release_date = data
+        .get("release_date")
+        .and_then(|rd| rd.get("date").and_then(|v| v.as_str()).map(String::from));
+
+    let pc_req = data.get("pc_requirements");
+    let pc_requirements_minimum = pc_req
+        .and_then(|r| r.get("minimum"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let pc_requirements_recommended = pc_req
+        .and_then(|r| r.get("recommended"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let media = if let Some(cached) = cached_media {
+        cached
+    } else {
+        let parsed = parse_media_from_data(&data);
+        let mut cache = MEDIA_CACHE.write().unwrap();
+        cache.insert(app_id.to_owned(), parsed.clone());
+        parsed
+    };
+
+    Ok(SteamAppDetails {
+        name: str_field("name"),
+        short_description: str_field("short_description"),
+        detailed_description: str_field("detailed_description"),
+        header_image: str_field("header_image"),
+        developers: extract_plain_string_array(&data, "developers"),
+        publishers: extract_plain_string_array(&data, "publishers"),
+        genres: extract_keyed_string_array(&data, "genres", "description"),
+        categories: extract_keyed_string_array(&data, "categories", "description"),
+        release_date,
+        pc_requirements_minimum,
+        pc_requirements_recommended,
+        media,
+    })
+}
+
+/// Obtiene la ficha completa de un juego de Steam por su App ID.
+///
+/// # Errors
+///
+/// Retorna `Err` si el `app_id` no es numérico, si hay error de red,
+/// o si Steam no tiene datos para esa app.
+#[tauri::command]
+pub async fn get_steam_app_details(app_id: String) -> Result<SteamAppDetails, String> {
+    let app_id = app_id.trim().to_string();
+    if app_id.is_empty() || !app_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err("App ID inválido".to_string());
+    }
+
+    {
+        let cache = DETAILS_CACHE.read().unwrap();
+        if let Some(cached) = cache.get(&app_id) {
+            return Ok(cached.clone());
+        }
+    }
+
+    let result = fetch_steam_app_details_impl(&app_id).await?;
+
+    {
+        let mut cache = DETAILS_CACHE.write().unwrap();
+        cache.insert(app_id, result.clone());
+    }
+
+    Ok(result)
 }

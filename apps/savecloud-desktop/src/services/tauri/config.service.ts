@@ -69,6 +69,27 @@ export async function getSteamAppdetailsMediaBatch(
   return invoke<Record<string, SteamAppdetailsMediaResult>>("get_steam_appdetails_media_batch", { appIds: ids });
 }
 
+/** Ficha completa de un juego de Steam: descripción, requisitos, géneros, medios, etc. */
+export interface SteamAppDetailsResult {
+  name: string;
+  shortDescription: string;
+  detailedDescription: string;
+  headerImage: string;
+  developers: string[];
+  publishers: string[];
+  genres: string[];
+  categories: string[];
+  releaseDate: string | null;
+  pcRequirementsMinimum: string | null;
+  pcRequirementsRecommended: string | null;
+  media: SteamAppdetailsMediaResult;
+}
+
+/** Obtiene la ficha completa de un juego de Steam (descripción, requisitos, géneros, medios). */
+export async function getSteamAppDetails(appId: string): Promise<SteamAppDetailsResult> {
+  return invoke<SteamAppDetailsResult>("get_steam_app_details", { appId });
+}
+
 /** Comprueba si un único juego está en ejecución (para mostrar advertencia) */
 export function checkGameRunning(gameId: string): Promise<boolean> {
   return invoke<boolean>("check_game_running", { gameId });
