@@ -1,9 +1,18 @@
 import { Button, Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader, Tab, Tabs } from "@heroui/react";
-import { Gamepad2, Image, Download } from "lucide-react";
+import { Download, Gamepad2, Image, Play } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
-import { addGame, renameGame, renameGameInCloud, updateGame } from "@services/tauri";
+import {
+  addGame,
+  renameGame,
+  renameGameInCloud,
+  scheduleConfigBackupToCloud,
+  setGameExecutableNames,
+  setGameLaunchExecutable,
+  updateGame,
+} from "@services/tauri";
 import { useGameForm } from "@/hooks/useGameForm";
 import { GameDrawerGeneralTab } from "@/features/games/GameDrawerGeneralTab";
+import { GameDrawerLaunchTab } from "@/features/games/GameDrawerLaunchTab";
 import { GameDrawerMediaTab } from "@/features/games/GameDrawerMediaTab";
 import { GameDrawerTorrentTab } from "@/features/games/GameDrawerTorrentTab";
 
@@ -82,6 +91,10 @@ export function GameDrawer({
         );
       }
 
+      await setGameLaunchExecutable(id, form.launchExecutablePath.trim() || null);
+      await setGameExecutableNames(id, form.executableNames);
+      scheduleConfigBackupToCloud();
+
       onSuccess();
       handleClose();
     } catch (e) {
@@ -130,6 +143,17 @@ export function GameDrawer({
                 </div>
               }>
               <GameDrawerMediaTab form={form} setField={setField} setError={setError} isOpen={isOpen} />
+            </Tab>
+
+            <Tab
+              key="launch"
+              title={
+                <div className="flex items-center gap-1.5">
+                  <Play size={14} />
+                  <span>Ejecución</span>
+                </div>
+              }>
+              <GameDrawerLaunchTab form={form} setField={setField} setError={setError} isOpen={isOpen} />
             </Tab>
 
             <Tab

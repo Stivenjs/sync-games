@@ -9,6 +9,7 @@ import {
   History,
   Link2,
   Pencil,
+  Play,
   Trash2,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -21,6 +22,8 @@ export interface GameDetailActionsProps {
   onSync?: (game: ConfiguredGame) => void;
   onDownload?: (game: ConfiguredGame) => void;
   onOpenFolder?: (game: ConfiguredGame) => void;
+  /** Lanza el .exe configurado en el drawer (Ejecución). Deshabilitado si no hay ruta. */
+  onPlay?: (game: ConfiguredGame) => void;
   onRestoreBackup?: (game: ConfiguredGame) => void;
   onFullBackupUpload?: (game: ConfiguredGame) => void;
   onEdit?: (game: ConfiguredGame) => void;
@@ -35,6 +38,7 @@ export function GameDetailActions({
   onSync,
   onDownload,
   onOpenFolder,
+  onPlay,
   onRestoreBackup,
   onFullBackupUpload,
   onEdit,
@@ -75,10 +79,24 @@ export function GameDetailActions({
   };
 
   const disabledKeys = isGameRunning ? ["sync", "download", "fullBackup", "restore"] : [];
+  const canPlay = Boolean(game.launchExecutablePath?.trim());
 
   return (
-    <div className="flex items-center gap-3">
-      <Button color="primary" startContent={<FolderOpen size={18} />} onPress={() => onOpenFolder?.(game)}>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        color="primary"
+        startContent={<Play size={18} />}
+        isDisabled={!canPlay}
+        title={canPlay ? undefined : "Configura el ejecutable en la lista de juegos: Editar juego → pestaña Ejecución"}
+        onPress={() => onPlay?.(game)}>
+        Jugar
+      </Button>
+
+      <Button
+        color="primary"
+        variant="bordered"
+        startContent={<FolderOpen size={18} />}
+        onPress={() => onOpenFolder?.(game)}>
         Abrir carpeta
       </Button>
 

@@ -68,6 +68,9 @@ pub struct ConfiguredGame {
     pub source_url: Option<String>,
     #[serde(default)]
     pub magnet_link: Option<String>,
+    /// Ruta absoluta al .exe para abrir el juego desde la app (opcional).
+    #[serde(default)]
+    pub launch_executable_path: Option<String>,
     #[serde(default)]
     pub playtime_seconds: u64,
 }
@@ -130,6 +133,10 @@ pub struct GameDto {
     pub edition_label: Option<String>,
     pub source_url: Option<String>,
     pub magnet_link: Option<String>,
+    #[serde(default)]
+    pub executable_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub launch_executable_path: Option<String>,
     pub playtime_seconds: u64,
 }
 

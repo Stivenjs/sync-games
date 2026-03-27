@@ -10,6 +10,10 @@ export interface GameFormState {
   selectedSteamAppId: string | null;
   imageUrl: string;
   magnetLink: string;
+  /** Ruta absoluta al .exe para lanzar el juego desde la ficha (se guarda al pulsar Guardar). */
+  launchExecutablePath: string;
+  /** Nombres de proceso para detección manual (se guardan al pulsar Guardar). */
+  executableNames: string[];
 }
 
 export interface UseGameFormReturn {
@@ -31,6 +35,8 @@ const EMPTY_FORM: GameFormState = {
   selectedSteamAppId: null,
   imageUrl: "",
   magnetLink: "",
+  launchExecutablePath: "",
+  executableNames: [],
 };
 
 interface UseGameFormOptions {
@@ -51,6 +57,8 @@ function buildFormFromGame(game: ConfiguredGame): GameFormState {
     selectedSteamAppId: game.steamAppId ?? null,
     imageUrl: game.imageUrl ?? "",
     magnetLink: game.magnetLink ?? "",
+    launchExecutablePath: game.launchExecutablePath ?? "",
+    executableNames: game.executableNames?.length ? [...game.executableNames] : [],
   };
 }
 

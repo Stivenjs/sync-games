@@ -94,6 +94,8 @@ pub fn get_config() -> ConfigDto {
                     edition_label: g.edition_label,
                     source_url: g.source_url,
                     magnet_link: g.magnet_link,
+                    executable_names: g.executable_names.clone(),
+                    launch_executable_path: g.launch_executable_path.clone(),
                     playtime_seconds: g.playtime_seconds,
                 }
             })
@@ -244,6 +246,7 @@ pub fn add_game(
             edition_label: trim_opt(edition_label),
             source_url: trim_opt(source_url),
             magnet_link: None,
+            launch_executable_path: None,
             playtime_seconds: 0,
         });
     }
@@ -348,6 +351,79 @@ pub fn remove_game(game_id: String, path: Option<String>) -> Result<(), String> 
         library.games.remove(idx);
     }
 
+    config::save_library(&library)
+}
+
+/// Lista ejecutables de procesos en ejecución (nombres únicos, ordenados) para el selector manual.
+#[tauri::command]
+pub fn list_running_process_exe_names() -> Vec<String> {
+    crate::system::process_check::list_running_process_exe_names()
+}
+
+/// Inicia el ejecutable configurado para este juego (ruta absoluta guardada en config).
+#[tauri::command]
+pub fn launch_game(game_id: String) -> Result<(), String> {
+    let library = config::load_library();
+    let game_id = game_id.trim();
+    let game = library
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| "Juego no encontrado".to_string())?;
+    let path = game
+        .launch_executable_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Configura primero el ejecutable del juego".to_string())?;
+    if !Path::new(path).is_file() {
+        return Err(format!("El archivo no existe: {}", path));
+    }
+    std::process::Command::new(path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Guarda la ruta al .exe para abrir el juego desde la app (`None` o cadena vacía borra la ruta).
+#[tauri::command]
+pub fn set_game_launch_executable(game_id: String, path: Option<String>) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+    g.launch_executable_path = path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    config::save_library(&library)
+}
+
+/// Fija los nombres de proceso usados para detectar si el juego está en ejecución.
+/// Lista vacía restaura la detección automática por nombre del juego.
+#[tauri::command]
+pub fn set_game_executable_names(game_id: String, names: Vec<String>) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+    let filtered: Vec<String> = names
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    g.executable_names = if filtered.is_empty() {
+        None
+    } else {
+        Some(filtered)
+    };
     config::save_library(&library)
 }
 
@@ -721,6 +797,8 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
                 edition_label: g.edition_label,
                 source_url: g.source_url,
                 magnet_link: g.magnet_link,
+                executable_names: g.executable_names.clone(),
+                launch_executable_path: g.launch_executable_path.clone(),
                 playtime_seconds: g.playtime_seconds,
             })
             .collect(),
@@ -748,10 +826,11 @@ pub fn add_games_from_friend(friend_games: Vec<GameDto>) -> Result<usize, String
             },
             steam_app_id: g.steam_app_id,
             image_url: g.image_url,
-            executable_names: None,
+            executable_names: g.executable_names.clone(),
             edition_label: g.edition_label,
             source_url: g.source_url,
             magnet_link: None,
+            launch_executable_path: g.launch_executable_path.clone(),
             playtime_seconds: 0,
         });
         existing_ids.insert(g.id.to_lowercase());

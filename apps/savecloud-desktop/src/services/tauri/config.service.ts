@@ -90,6 +90,29 @@ export async function getSteamAppDetails(appId: string): Promise<SteamAppDetails
   return invoke<SteamAppDetailsResult>("get_steam_app_details", { appId });
 }
 
+/** Lista nombres de ejecutable únicos de procesos en ejecución (para asignar detección manual). */
+export function listRunningProcessExeNames(): Promise<string[]> {
+  return invoke<string[]>("list_running_process_exe_names");
+}
+
+/** Inicia el ejecutable configurado para el juego. */
+export function launchGame(gameId: string): Promise<void> {
+  return invoke("launch_game", { gameId });
+}
+
+/** Guarda la ruta al .exe para abrir el juego desde la app (`null` borra). */
+export function setGameLaunchExecutable(gameId: string, path: string | null): Promise<void> {
+  return invoke("set_game_launch_executable", { gameId, path });
+}
+
+/**
+ * Fija los nombres de proceso para detectar si el juego está en ejecución.
+ * Array vacío restaura la detección automática.
+ */
+export function setGameExecutableNames(gameId: string, names: string[]): Promise<void> {
+  return invoke("set_game_executable_names", { gameId, names });
+}
+
 /** Comprueba si un único juego está en ejecución (para mostrar advertencia) */
 export function checkGameRunning(gameId: string): Promise<boolean> {
   return invoke<boolean>("check_game_running", { gameId });

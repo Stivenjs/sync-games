@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Button, Spinner } from "@heroui/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { formatGameDisplayName } from "@utils/gameImage";
-import { openSaveFolder, removeGame, syncUploadGame, syncDownloadGame } from "@services/tauri";
+import { launchGame, openSaveFolder, removeGame, syncDownloadGame, syncUploadGame } from "@services/tauri";
 import { createShareLink } from "@services/share.service";
 import { toastError, toastSuccess } from "@utils/toast";
-import { useGameDetail } from "./useGameDetail";
-import { GameDetailHero } from "./GameDetailHero";
-import { GameDetailStats } from "./GameDetailStats";
-import { GameDetailActions } from "./GameDetailActions";
-import { GameDetailInfo } from "./GameDetailInfo";
+import { useGameDetail } from "@features/game-detail/useGameDetail";
+import { GameDetailHero } from "@features/game-detail/GameDetailHero";
+import { GameDetailStats } from "@features/game-detail/GameDetailStats";
+import { GameDetailActions } from "@features/game-detail/GameDetailActions";
+import { GameDetailInfo } from "@features/game-detail/GameDetailInfo";
 import type { ConfiguredGame } from "@app-types/config";
 
 export function GameDetailPage() {
@@ -26,6 +26,14 @@ export function GameDetailPage() {
       await openSaveFolder(g.id);
     } catch (e) {
       toastError("Error al abrir carpeta", e instanceof Error ? e.message : "Error inesperado");
+    }
+  }, []);
+
+  const handlePlay = useCallback(async (g: ConfiguredGame) => {
+    try {
+      await launchGame(g.id);
+    } catch (e) {
+      toastError("No se pudo abrir el juego", e instanceof Error ? e.message : "Error inesperado");
     }
   }, []);
 
@@ -110,6 +118,7 @@ export function GameDetailPage() {
           game={game}
           isGameRunning={isGameRunning}
           hasSyncConfig={hasSyncConfig}
+          onPlay={handlePlay}
           onOpenFolder={handleOpenFolder}
           onSync={hasSyncConfig ? handleSync : undefined}
           onDownload={hasSyncConfig ? handleDownload : undefined}
