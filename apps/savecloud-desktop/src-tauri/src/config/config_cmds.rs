@@ -10,6 +10,7 @@ use crate::commands::sync::api::{
 use crate::config::{self, Config, ConfigDto, ConfiguredGame, GameDto, OperationLogEntryDto};
 use crate::steam;
 use crate::time;
+use crate::utils::launch_exe;
 use base64::Engine;
 use chrono::Utc;
 use regex::Regex;
@@ -379,10 +380,7 @@ pub fn launch_game(game_id: String) -> Result<(), String> {
     if !Path::new(path).is_file() {
         return Err(format!("El archivo no existe: {}", path));
     }
-    std::process::Command::new(path)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    launch_exe::launch_game_executable(path)
 }
 
 /// Guarda la ruta al .exe para abrir el juego desde la app (`None` o cadena vacía borra la ruta).
