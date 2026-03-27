@@ -162,7 +162,7 @@ export function SyncProgressBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 48, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-lg border border-default-200 bg-default-100/95 px-4 py-3 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
+            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-lg border border-default-200 bg-default-50/95 px-4 py-3 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
             aria-label={progress.type === "upload" ? "Progreso de subida" : "Progreso de descarga"}
             role="status"
             aria-valuenow={value}
