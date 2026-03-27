@@ -6,7 +6,7 @@ import { requestUploadCancel, requestUploadPause, syncUploadResume } from "@serv
 import { formatBytes } from "@utils/format";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { formatEta, formatSpeed } from "@utils/progress";
-import { Clock, HardDrive, Pause, Upload, X, Zap } from "lucide-react";
+import { Clock, HardDrive, Pause, PauseCircle, Upload, X, Zap } from "lucide-react";
 
 export type { SyncProgressState } from "@store/SyncStore";
 
@@ -162,94 +162,122 @@ export function SyncProgressBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 48, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-lg border border-default-200 bg-default-50/95 px-4 py-3 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
+            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-xl border border-default-200 bg-default-50/95 px-4 py-3.5 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2"
             aria-label={progress.type === "upload" ? "Progreso de subida" : "Progreso de descarga"}
             role="status"
             aria-valuenow={value}
             aria-valuemin={0}
             aria-valuemax={100}>
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {progress.type === "upload" ? "Subiendo" : "Descargando"}: {formatGameDisplayName(progress.gameId)}
-              </span>
-              <span className="text-xs text-default-500 tabular-nums">
+            {/* Header: badge de tipo + nombre del juego + porcentaje */}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Badge coloreado según tipo de operación */}
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    progress.type === "upload" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"
+                  }`}>
+                  {progress.type === "upload" ? <Upload size={10} aria-hidden /> : <HardDrive size={10} aria-hidden />}
+                  {progress.type === "upload" ? "Subiendo" : "Descargando"}
+                </span>
+                <span className="truncate text-sm font-medium text-foreground">
+                  {formatGameDisplayName(progress.gameId)}
+                </span>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-default-500 tabular-nums">
                 {isIndeterminate ? "—" : progress.total > 0 ? `${value}%` : "—"}
               </span>
             </div>
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <p className="min-w-0 flex-1 truncate text-xs text-default-500">{progress.filename}</p>
+
+            {/* Filename + controles separados por divisor */}
+            <div className="mt-1 flex items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-xs text-default-400">{progress.filename}</p>
               {progress.type === "upload" && (
-                <span className="flex shrink-0 gap-1 pointer-events-auto">
-                  {canPause ? (
-                    <Tooltip content="Pausar subida" placement="top">
+                <>
+                  {/* Separador visual */}
+                  <span className="shrink-0 text-default-200 select-none" aria-hidden>
+                    |
+                  </span>
+                  <span className="flex shrink-0 gap-1 pointer-events-auto">
+                    {canPause ? (
+                      <Tooltip content="Pausar subida" placement="top">
+                        <button
+                          type="button"
+                          onClick={onPauseUpload}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200 transition-colors"
+                          aria-label="Pausar subida"
+                          onPointerDownCapture={(e) => e.stopPropagation()}>
+                          <Pause size={14} />
+                        </button>
+                      </Tooltip>
+                    ) : null}
+                    <Tooltip content="Cancelar subida" placement="top">
                       <button
                         type="button"
-                        onClick={onPauseUpload}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-default-200"
-                        aria-label="Pausar subida"
-                        onPointerDownCapture={(e) => e.stopPropagation()} // Evita que al hacer clic se inicie un drag
-                      >
-                        <Pause size={14} />
+                        onClick={onCancelUpload}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors"
+                        aria-label="Cancelar subida"
+                        onPointerDownCapture={(e) => e.stopPropagation()}>
+                        <X size={14} />
                       </button>
                     </Tooltip>
-                  ) : null}
-                  <Tooltip content="Cancelar subida" placement="top">
-                    <button
-                      type="button"
-                      onClick={onCancelUpload}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-danger hover:bg-danger/10"
-                      aria-label="Cancelar subida"
-                      onPointerDownCapture={(e) => e.stopPropagation()} // Evita que al hacer clic se inicie un drag
-                    >
-                      <X size={14} />
-                    </button>
-                  </Tooltip>
-                </span>
+                  </span>
+                </>
               )}
             </div>
+
+            {/* Barra de progreso o spinner */}
             {isIndeterminate ? (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2.5 flex items-center gap-2">
                 <Spinner size="sm" color="primary" aria-label="Preparando datos" />
                 <p className="text-xs text-default-500">
                   Preparando datos… esto puede tardar unos minutos en juegos grandes.
                 </p>
               </div>
             ) : (
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
+              <div className="relative mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
                 <motion.div
                   className="h-full rounded-full bg-primary"
                   initial={false}
                   animate={{ width: `${value}%` }}
                   transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
                 />
+                {/* Pulso animado sobre la barra activa */}
+                {value > 0 && value < 100 && (
+                  <motion.div
+                    className="absolute inset-y-0 left-0 rounded-full bg-primary/40"
+                    animate={{ width: [`${value}%`, `${Math.min(value + 4, 100)}%`, `${value}%`] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
               </div>
             )}
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-default-500">
+
+            {/* Métricas: bytes, velocidad, ETA */}
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-default-400">
               <span className="inline-flex items-center gap-1.5">
                 {progress.type === "upload" ? (
-                  <Upload size={12} className="shrink-0 text-primary" aria-hidden />
+                  <Upload size={11} className="shrink-0 text-primary" aria-hidden />
                 ) : (
-                  <HardDrive size={12} className="shrink-0 text-primary" aria-hidden />
+                  <HardDrive size={11} className="shrink-0 text-primary" aria-hidden />
                 )}
                 <span>
                   {progress.type === "upload" ? "Enviados" : "En disco"}:{" "}
-                  <span className="tabular-nums">
+                  <span className="tabular-nums font-medium text-default-500">
                     {formatBytes(progress.loaded)}
                     {progress.total > 0 ? ` / ${formatBytes(progress.total)}` : ""}
                   </span>
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Zap size={12} className="shrink-0 text-default-400" aria-hidden />
+                <Zap size={11} className="shrink-0 text-default-400" aria-hidden />
                 <span>
-                  Velocidad{isIndeterminate ? " (aprox.)" : ""}:{" "}
-                  <span className="tabular-nums">{formatSpeed(speedBps)}</span>
+                  Velocidad: <span className="tabular-nums font-medium text-default-500">{formatSpeed(speedBps)}</span>
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Clock size={12} className="shrink-0 text-default-400" aria-hidden />
+                <Clock size={11} className="shrink-0 text-default-400" aria-hidden />
                 {!isIndeterminate && progress.total > 0 ? (
-                  <span className="tabular-nums">{formatEta(etaSeconds)}</span>
+                  <span className="tabular-nums font-medium text-default-500">{formatEta(etaSeconds)}</span>
                 ) : (
                   <span>—</span>
                 )}
@@ -258,6 +286,7 @@ export function SyncProgressBar() {
           </motion.div>
         )}
 
+        {/* Estado pausado: más llamativo con ícono, borde y fondo diferenciado */}
         {!showFloatingBar && pausedUploadInfo && (
           <motion.div
             key="paused-upload"
@@ -269,18 +298,22 @@ export function SyncProgressBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 48, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-lg border border-default-200 bg-default-100/95 px-4 py-3 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm text-foreground">
-                Subida pausada: {formatGameDisplayName(pausedUploadInfo.gameId)} —{" "}
-                <span className="truncate">{pausedUploadInfo.filename}</span>
-              </span>
+            className="fixed bottom-4 left-6 right-6 z-50 cursor-grab rounded-xl border border-warning/40 bg-warning/5 px-4 py-3.5 shadow-lg backdrop-blur active:cursor-grabbing sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2">
+            <div className="flex items-center gap-3">
+              {/* Ícono de pausa con color warning */}
+              <PauseCircle size={20} className="shrink-0 text-warning" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-warning">Subida pausada</p>
+                <p className="truncate text-xs text-default-500">
+                  {formatGameDisplayName(pausedUploadInfo.gameId)} — {pausedUploadInfo.filename}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={onResumeUpload}
                 disabled={resuming}
-                onPointerDownCapture={(e) => e.stopPropagation()} // Previene conflictos de arrastre al hacer clic
-                className="shrink-0 text-sm font-medium text-primary hover:underline disabled:opacity-50">
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                className="shrink-0 rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/25 disabled:opacity-50 transition-colors">
                 {resuming ? "Reanudando…" : "Reanudar"}
               </button>
             </div>
