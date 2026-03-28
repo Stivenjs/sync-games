@@ -129,7 +129,11 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
             className={`relative z-0 h-full origin-left rounded-full ${isCompleted ? "bg-success" : isPaused ? "bg-warning" : "bg-secondary"}`}
             initial={{ width: "0%" }}
             animate={{ width: `${value}%` }}
-            transition={{ type: "tween", duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              type: "tween",
+              duration: value === 0 ? 0 : 0.38,
+              ease: [0.22, 1, 0.36, 1],
+            }}
           />
           {value === 0 && !isCompleted && !isPaused && (
             <motion.div

@@ -30,9 +30,12 @@ impl TorrentEngine {
         // trackers/DHT va sin puerto útil y UPnP no hace nada. Afecta a magnets (metadatos vía
         // enjambre) y a .torrent (conexión con peers / arranque de la descarga).
         let options = SessionOptions {
-            listen_port_range: Some(6881..6890),
+            // Más puertos candidatos si 6881–6889 están ocupados (firewall / otro cliente).
+            listen_port_range: Some(6881..6900),
             enable_upnp_port_forwarding: true,
             fastresume: true,
+            // Varios torrents inicializándose en paralelo (por defecto librqbit usa 3).
+            concurrent_init_limit: Some(8),
             ..Default::default()
         };
         let session = Session::new_with_opts(output_folder, options)
