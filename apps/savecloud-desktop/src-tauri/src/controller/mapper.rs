@@ -7,7 +7,10 @@ pub fn map_button(button: Button) -> Option<SemanticAction> {
     match button {
         Button::South => Some(SemanticAction::Confirm), // A en Xbox, Cruz en PS
         Button::East => Some(SemanticAction::Back),     // B en Xbox, Círculo en PS
-        Button::Start => Some(SemanticAction::Menu),
+        // Start/Options (≡) y botón sistema (Guide/PS): menú lateral de la app.
+        Button::Start | Button::Mode => Some(SemanticAction::Menu),
+        // View (Xbox) / Share (PS): perfil.
+        Button::Select => Some(SemanticAction::Profile),
         Button::DPadUp => Some(SemanticAction::NavigateUp),
         Button::DPadDown => Some(SemanticAction::NavigateDown),
         Button::DPadLeft => Some(SemanticAction::NavigateLeft),

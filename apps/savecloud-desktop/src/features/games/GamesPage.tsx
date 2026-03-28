@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
 import { RefreshCw } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
@@ -25,6 +25,7 @@ import { UserBadge } from "@features/games/UserBadge";
 import { ProfileDrawer } from "@features/profile";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
+import { useShellUiStore } from "@store/ShellUiStore";
 
 export function GamesPage() {
   const pushLayer = useNavigationStore((state) => state.pushLayer);
@@ -98,6 +99,18 @@ export function GamesPage() {
   const { statsByGameId } = useGameStats(!!config?.games?.length);
 
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    let last = useShellUiStore.getState().profileOpenRequest;
+    return useShellUiStore.subscribe((state) => {
+      const n = state.profileOpenRequest;
+      if (n > last) {
+        last = n;
+        setProfileDrawerOpen(true);
+      }
+    });
+  }, []);
+
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
