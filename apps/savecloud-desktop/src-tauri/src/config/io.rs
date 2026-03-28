@@ -242,6 +242,9 @@ pub fn get_combined_config() -> Config {
         keep_backups_per_game: settings.keep_backups_per_game,
         full_backup_streaming: settings.full_backup_streaming,
         full_backup_streaming_dry_run: settings.full_backup_streaming_dry_run,
+        profile_background: settings.profile_background.clone(),
+        profile_avatar: settings.profile_avatar.clone(),
+        profile_frame: settings.profile_frame.clone(),
         games: library.games,
         operation_history: history.entries,
         gamification: load_gamification(),
@@ -293,6 +296,13 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
     current_settings.keep_backups_per_game = cfg.keep_backups_per_game;
     current_settings.full_backup_streaming = cfg.full_backup_streaming;
     current_settings.full_backup_streaming_dry_run = cfg.full_backup_streaming_dry_run;
+
+    current_settings.profile_background = cfg
+        .profile_background
+        .clone()
+        .or(current_settings.profile_background);
+    current_settings.profile_avatar = cfg.profile_avatar.clone().or(current_settings.profile_avatar);
+    current_settings.profile_frame = cfg.profile_frame.clone().or(current_settings.profile_frame);
 
     save_settings(&current_settings)?;
     save_library(&GameLibrary {

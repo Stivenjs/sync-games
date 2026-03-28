@@ -588,6 +588,15 @@ pub fn import_config_from_file(path: String, mode: String) -> Result<(), String>
             &current.gamification,
             &imported.gamification,
         );
+        if imported.profile_background.is_some() {
+            current.profile_background = imported.profile_background.clone();
+        }
+        if imported.profile_avatar.is_some() {
+            current.profile_avatar = imported.profile_avatar.clone();
+        }
+        if imported.profile_frame.is_some() {
+            current.profile_frame = imported.profile_frame.clone();
+        }
         return config::apply_combined_config(&current);
     }
 

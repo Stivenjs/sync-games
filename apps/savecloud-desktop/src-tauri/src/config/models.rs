@@ -134,6 +134,13 @@ pub struct Config {
     pub keep_backups_per_game: Option<u32>,
     pub full_backup_streaming: Option<bool>,
     pub full_backup_streaming_dry_run: Option<bool>,
+    /// Perfil (mismos campos que `AppSettings`; incluidos en export/import y backup en nube).
+    #[serde(default)]
+    pub profile_background: Option<String>,
+    #[serde(default)]
+    pub profile_avatar: Option<String>,
+    #[serde(default)]
+    pub profile_frame: Option<String>,
     pub games: Vec<ConfiguredGame>,
     #[serde(default)]
     pub operation_history: Vec<OperationLogEntry>,
