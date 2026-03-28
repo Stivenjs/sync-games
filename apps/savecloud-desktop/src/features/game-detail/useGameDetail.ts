@@ -5,10 +5,10 @@ import {
   getConfig,
   getSteamAppDetails,
   getGameStats,
-  checkGameRunning,
   type SteamAppDetailsResult,
   type GameStats,
 } from "@services/tauri";
+import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { getSteamAppId } from "@utils/gameImage";
 import type { ConfiguredGame } from "@app-types/config";
 
@@ -53,13 +53,8 @@ export function useGameDetail() {
 
   const stats = useMemo(() => allStats?.find((s) => s.gameId === gameId) ?? null, [allStats, gameId]);
 
-  const { data: isGameRunning = false } = useQuery({
-    queryKey: ["game-running", gameId],
-    queryFn: () => checkGameRunning(gameId!),
-    enabled: !!gameId,
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: false,
-  });
+  const runningByGame = useGameRunningStatus(gameId ? [gameId] : []);
+  const isGameRunning = gameId ? (runningByGame[gameId] ?? false) : false;
 
   // La primera URL es el header/capsule (muy pequeña), se omite del carrusel
   const mediaUrls = useMemo(() => {
