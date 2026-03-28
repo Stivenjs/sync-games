@@ -26,6 +26,7 @@ import { ProfileDrawer } from "@features/profile";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
 import { useShellUiStore } from "@store/ShellUiStore";
+import { useGamification } from "@hooks/useGamification";
 
 export function GamesPage() {
   const pushLayer = useNavigationStore((state) => state.pushLayer);
@@ -95,6 +96,8 @@ export function GamesPage() {
     /*  handleDismissOperationError, */
     /*  handleRetryOperationError, */
   } = useGamesPage();
+
+  const { data: gamification } = useGamification();
 
   const { statsByGameId } = useGameStats(!!config?.games?.length);
 
@@ -346,6 +349,7 @@ export function GamesPage() {
         isOpen={profileDrawerOpen}
         onClose={() => setProfileDrawerOpen(false)}
         config={config}
+        gamification={gamification}
         hasSyncConfig={hasSyncConfig}
         connectionStatus={connectionStatus}
       />

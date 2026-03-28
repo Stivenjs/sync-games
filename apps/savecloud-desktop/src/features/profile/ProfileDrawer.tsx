@@ -10,12 +10,14 @@ import {
   Input,
 } from "@heroui/react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, ImageIcon, Layers, Link2, MonitorPlay, Save, User } from "lucide-react";
+import { FolderOpen, ImageIcon, Layers, Link2, MonitorPlay, Save, Trophy, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Config } from "@app-types/config";
+import type { GamificationState } from "@app-types/gamification";
 import type { ConnectionStatus } from "@hooks/useLastSyncInfo";
 import { CONFIG_QUERY_KEY } from "@hooks/useConfig";
 import { readImageAsDataUrl, scheduleConfigBackupToCloud, setProfileAppearance } from "@services/tauri";
+import { achievementLabel, formatHoursToNextLevel } from "@utils/gamificationLabels";
 import { formatPlaytime } from "@utils/format";
 import { isProfileVideoSource, resolveProfileAsset } from "@utils/profileMedia";
 import { toastError, toastSuccess } from "@utils/toast";
@@ -24,6 +26,7 @@ interface ProfileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   config: Config | null;
+  gamification?: GamificationState | null;
   hasSyncConfig?: boolean;
   connectionStatus?: ConnectionStatus;
 }
@@ -55,7 +58,14 @@ function ProfileHeroBackground({ rawUrl }: { rawUrl: string }) {
   return <img src={resolved} alt="" className="absolute inset-0 size-full object-cover" />;
 }
 
-export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connectionStatus }: ProfileDrawerProps) {
+export function ProfileDrawer({
+  isOpen,
+  onClose,
+  config,
+  gamification,
+  hasSyncConfig,
+  connectionStatus,
+}: ProfileDrawerProps) {
   const queryClient = useQueryClient();
   const [bg, setBg] = useState("");
   const [avatar, setAvatar] = useState("");
@@ -75,10 +85,16 @@ export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connecti
   const displayName = userId || "Usuario";
   const conn = connectionLabel(hasSyncConfig ? connectionStatus : undefined);
 
-  const level = useMemo(
+  const fallbackLevel = useMemo(
     () => Math.min(99, Math.max(1, Math.floor(Math.sqrt(Math.max(1, totalSeconds / 3600))) + 1)),
     [totalSeconds]
   );
+  const lp = gamification?.levelProgress;
+  const level = lp?.level ?? fallbackLevel;
+  const nextLevel = lp?.nextLevel;
+  const progressToNext = lp?.progressToNextLevel ?? 0;
+  const secondsToNext = lp?.secondsToNextLevel ?? 0;
+  const atMaxLevel = (lp?.level ?? 0) >= 99;
 
   const avatarResolved = useMemo(() => resolveProfileAsset(avatar || undefined), [avatar]);
   const frameResolved = useMemo(() => resolveProfileAsset(frame || undefined), [frame]);
@@ -207,6 +223,49 @@ export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connecti
           <p className="text-[11px] leading-snug text-default-500">
             Enlaces https o archivos locales. Las rutas locales dependen del archivo en disco.
           </p>
+
+          <div className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:bg-default-100/5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Trophy size={16} className="text-warning" />
+                Progreso de nivel
+              </span>
+              {!atMaxLevel && nextLevel != null ? (
+                <span className="text-xs text-default-500">
+                  Nivel {level} → {nextLevel}
+                </span>
+              ) : (
+                <span className="text-xs text-default-500">Nivel máximo</span>
+              )}
+            </div>
+            {!atMaxLevel ? (
+              <>
+                <div className="h-2 overflow-hidden rounded-full bg-default-200 dark:bg-default-100/20">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width]"
+                    style={{ width: `${Math.min(100, Math.max(0, progressToNext * 100))}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-default-500">
+                  Faltan {formatHoursToNextLevel(secondsToNext)} para el nivel {nextLevel ?? "—"}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-default-500">Has alcanzado el nivel 99.</p>
+            )}
+            {gamification?.achievementsUnlocked?.length ? (
+              <div className="mt-3 border-t border-default-200 pt-3">
+                <p className="mb-2 text-xs font-medium text-default-600">Logros</p>
+                <ul className="flex flex-col gap-1.5">
+                  {gamification.achievementsUnlocked.map((id) => (
+                    <li key={id} className="text-xs text-default-600">
+                      · {achievementLabel(id)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
 
           <Accordion
             isCompact

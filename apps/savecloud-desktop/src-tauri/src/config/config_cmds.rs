@@ -7,6 +7,7 @@
 use crate::commands::sync::api::{
     api_request, sync_list_remote_saves, sync_list_remote_saves_for_user,
 };
+use crate::config::gamification::GamificationStateDto;
 use crate::config::{self, Config, ConfigDto, ConfiguredGame, GameDto, OperationLogEntryDto};
 use crate::steam;
 use crate::time;
@@ -583,6 +584,10 @@ pub fn import_config_from_file(path: String, mode: String) -> Result<(), String>
                 current.custom_scan_paths.push(p);
             }
         }
+        current.gamification = crate::config::gamification::merge_gamification(
+            &current.gamification,
+            &imported.gamification,
+        );
         return config::apply_combined_config(&current);
     }
 
@@ -910,4 +915,39 @@ pub async fn import_friend_config(friend_user_id: String) -> Result<(), String> 
     imported.user_id = Some(friend_id.to_string());
 
     config::apply_combined_config(&imported)
+}
+
+#[tauri::command]
+pub fn get_gamification_state() -> GamificationStateDto {
+    let g = config::load_gamification();
+    let total = time::get_total_playtime();
+    config::gamification::build_state_dto(&g, total)
+}
+
+#[tauri::command]
+pub fn consume_achievement_toasts() -> Result<Vec<String>, String> {
+    let mut g = config::load_gamification();
+    let out = std::mem::take(&mut g.pending_achievement_toasts);
+    config::save_gamification(&g)?;
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn mark_shortcuts_hint_seen() -> Result<(), String> {
+    let mut g = config::load_gamification();
+    g.seen_shortcuts_hint = true;
+    config::save_gamification(&g)
+}
+
+#[tauri::command]
+pub fn mark_weekly_digest_notified(week_id: String) -> Result<(), String> {
+    let mut g = config::load_gamification();
+    g.last_weekly_digest_notification_week_id = week_id;
+    config::save_gamification(&g)
+}
+
+#[tauri::command]
+pub fn should_show_weekly_digest_notification(current_week_id: String) -> bool {
+    let g = config::load_gamification();
+    g.last_weekly_digest_notification_week_id != current_week_id && g.weekly_playtime_seconds >= 60
 }

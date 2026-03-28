@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { formatPlaytime } from "@utils/format";
 
 /** Título de las notificaciones (cambiar aquí para todas). */
 export const NOTIFICATION_TITLE = "SaveCloud";
@@ -178,6 +179,16 @@ export async function notifySyncComplete(gameName: string, okCount: number, errC
       body: `${gameName}: No se pudo subir`,
     };
   });
+}
+
+/**
+ * Resumen semanal de tiempo de juego (solo si la app está en segundo plano).
+ */
+export async function notifyWeeklyDigest(weeklyPlaytimeSeconds: number): Promise<void> {
+  await maybeNotify(() => ({
+    title: NOTIFICATION_TITLE,
+    body: `Esta semana: ${formatPlaytime(weeklyPlaytimeSeconds)} jugados.`,
+  }));
 }
 
 /**

@@ -4,10 +4,11 @@
 //! utilizados para la configuración de entorno, biblioteca local y registros
 //! de sincronización.
 
+pub mod config_cmds;
+pub mod gamification;
 pub mod io;
 pub mod models;
 pub mod paths;
-pub mod config_cmds;
 
 pub use io::*;
 pub use models::*;

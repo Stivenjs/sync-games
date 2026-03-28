@@ -34,6 +34,7 @@ import { useLastSyncInfo } from "@hooks/useLastSyncInfo";
 import { useSyncStore } from "@store/SyncStore";
 import { filterGames, type OriginFilter } from "@features/games/GamesFilters";
 import { CONFIG_QUERY_KEY } from "@hooks/useConfig";
+import { GAMIFICATION_QUERY_KEY } from "@hooks/useGamification";
 
 export interface OperationResult {
   type: "sync" | "download";
@@ -233,6 +234,7 @@ export function useGamesPage() {
         queryClient.invalidateQueries({ queryKey: ["game-stats"], type: "active" }),
         queryClient.invalidateQueries({ queryKey: ["unsynced-games"], type: "active" }),
         queryClient.invalidateQueries({ queryKey: ["last-sync-info"], type: "active" }),
+        queryClient.invalidateQueries({ queryKey: GAMIFICATION_QUERY_KEY, type: "active" }),
       ]);
     } finally {
       dispatch({ type: "SET_REFRESHING", payload: false });

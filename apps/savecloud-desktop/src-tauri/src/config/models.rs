@@ -95,6 +95,30 @@ pub struct OperationLogEntry {
     pub err_count: u32,
 }
 
+/// Gamificación y estadísticas locales; viaja en el JSON monolítico (export, import, nube).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GamificationConfig {
+    #[serde(default)]
+    pub upload_success_count: u64,
+    #[serde(default)]
+    pub utc_days_with_sync: Vec<String>,
+    #[serde(default)]
+    pub utc_days_with_play: Vec<String>,
+    #[serde(default)]
+    pub weekly_playtime_seconds: u64,
+    #[serde(default)]
+    pub week_id: String,
+    #[serde(default)]
+    pub achievements_unlocked: Vec<String>,
+    #[serde(default)]
+    pub pending_achievement_toasts: Vec<String>,
+    #[serde(default)]
+    pub seen_shortcuts_hint: bool,
+    #[serde(default)]
+    pub last_weekly_digest_notification_week_id: String,
+}
+
 /// Vista unificada de la configuración completa.
 ///
 /// Combina [`AppSettings`], [`GameLibrary`] y [`OperationHistory`].
@@ -113,6 +137,8 @@ pub struct Config {
     pub games: Vec<ConfiguredGame>,
     #[serde(default)]
     pub operation_history: Vec<OperationLogEntry>,
+    #[serde(default)]
+    pub gamification: GamificationConfig,
 }
 
 /// Objeto de transferencia de datos (DTO) de la configuración principal,
