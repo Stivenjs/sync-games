@@ -21,9 +21,19 @@ interface TorrentTabProps {
   gameId: string;
   savePath: string;
   mode: "add" | "edit";
+  /** Si false, no se consultan ni muestran torrents en la nube (p. ej. sin sync). */
+  cloudEnabled?: boolean;
 }
 
-export function GameDrawerTorrentTab({ form, setField, setError, gameId, savePath, mode }: TorrentTabProps) {
+export function GameDrawerTorrentTab({
+  form,
+  setField,
+  setError,
+  gameId,
+  savePath,
+  mode,
+  cloudEnabled = true,
+}: TorrentTabProps) {
   const queryClient = useQueryClient();
   const [localTorrentPath, setLocalTorrentPath] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -44,7 +54,7 @@ export function GameDrawerTorrentTab({ form, setField, setError, gameId, savePat
   } = useQuery({
     queryKey: ["cloud-torrents", effectiveGameId],
     queryFn: () => listCloudTorrents(effectiveGameId),
-    enabled: mode === "edit" && !!effectiveGameId,
+    enabled: mode === "edit" && !!effectiveGameId && cloudEnabled,
   });
 
   const handleSelectTorrentFile = async () => {
@@ -264,7 +274,7 @@ export function GameDrawerTorrentTab({ form, setField, setError, gameId, savePat
       </div>
 
       {/* Torrents en la nube */}
-      {mode === "edit" && effectiveGameId && (
+      {mode === "edit" && effectiveGameId && cloudEnabled && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-default-500 flex items-center gap-1.5">

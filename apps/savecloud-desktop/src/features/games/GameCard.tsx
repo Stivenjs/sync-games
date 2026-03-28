@@ -47,6 +47,8 @@ export interface GameCardProps {
   isFullBackupUploading?: boolean;
   /** Callback para editar el juego. Si no se pasa, no se muestra el botón. */
   onEdit?: (game: ConfiguredGame) => void;
+  /** Callback para abrir el panel de torrent. */
+  onTorrent?: (game: ConfiguredGame) => void;
   /** Callback para compartir por link (genera URL y copia al portapapeles). */
   onShare?: (game: ConfiguredGame) => void;
   /** Estado de sincronización con la nube (para mostrar badge). */

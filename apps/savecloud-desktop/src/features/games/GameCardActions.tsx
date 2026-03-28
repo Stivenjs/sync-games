@@ -6,6 +6,7 @@ import {
   FolderOpen,
   History,
   Link2,
+  Magnet,
   MoreVertical,
   Pencil,
   Trash2,
@@ -28,6 +29,8 @@ export interface GameCardActionsProps {
   onRestoreBackup?: (game: ConfiguredGame) => void;
   onFullBackupUpload?: (game: ConfiguredGame) => void;
   onEdit?: (game: ConfiguredGame) => void;
+  /** Abre el panel de torrent (magnet, .torrent local, nube). */
+  onTorrent?: (game: ConfiguredGame) => void;
   onShare?: (game: ConfiguredGame) => void;
 }
 
@@ -45,6 +48,7 @@ export function GameCardActions({
   onRestoreBackup,
   onFullBackupUpload,
   onEdit,
+  onTorrent,
   onShare,
 }: GameCardActionsProps) {
   const handleAction = async (key: React.Key) => {
@@ -53,6 +57,9 @@ export function GameCardActions({
     switch (action) {
       case "edit":
         onEdit?.(game);
+        break;
+      case "torrent":
+        onTorrent?.(game);
         break;
       case "folder":
         onOpenFolder?.(game);
@@ -104,6 +111,10 @@ export function GameCardActions({
         <DropdownMenu aria-label={`Acciones para ${game.id}`} onAction={handleAction} disabledKeys={disabledKeys}>
           <DropdownItem key="edit" className={!onEdit ? "hidden" : ""} startContent={<Pencil size={16} />}>
             Editar juego
+          </DropdownItem>
+
+          <DropdownItem key="torrent" className={!onTorrent ? "hidden" : ""} startContent={<Magnet size={16} />}>
+            Torrent
           </DropdownItem>
 
           <DropdownItem

@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
 import { GameDrawer } from "@features/games/GameDrawer";
+import { GameTorrentDrawer } from "@features/games/GameTorrentDrawer";
 import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
 import { FullBackupConfirmModal } from "@features/games/FullBackupConfirmModal";
 import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
@@ -115,6 +116,7 @@ export function GamesPage() {
   }, []);
 
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
+  const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
   const handleShare = async (game: ConfiguredGame) => {
@@ -307,6 +309,12 @@ export function GamesPage() {
         mode="edit"
         game={gameToEdit}
       />
+      <GameTorrentDrawer
+        isOpen={!!gameForTorrent}
+        onClose={() => setGameForTorrent(null)}
+        game={gameForTorrent}
+        cloudEnabled={hasSyncConfig}
+      />
       {/* Filtros de la lista */}
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-default-500">Buscar y filtrar</h2>
@@ -340,6 +348,7 @@ export function GamesPage() {
           onFullBackupUpload={hasSyncConfig ? setGameToFullBackupConfirm : undefined}
           fullBackupUploadingGameId={fullBackupUploadingGameId}
           onEdit={setGameToEdit}
+          onTorrent={setGameForTorrent}
           onShare={hasSyncConfig ? handleShare : undefined}
           hasSyncConfig={hasSyncConfig}
         />

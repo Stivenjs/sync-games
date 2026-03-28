@@ -68,6 +68,8 @@ interface GamesListProps {
   fullBackupUploadingGameId?: string | null;
   /** Callback para editar el juego. */
   onEdit?: (game: ConfiguredGame) => void;
+  /** Callback para abrir el panel de torrent. */
+  onTorrent?: (game: ConfiguredGame) => void;
   /** Callback para compartir por link. */
   onShare?: (game: ConfiguredGame) => void;
   /** Si hay configuración de nube (para cargar conteo de backups empaquetados). */
@@ -91,6 +93,7 @@ export function GamesList({
   onFullBackupUpload,
   fullBackupUploadingGameId,
   onEdit,
+  onTorrent,
   onShare,
   hasSyncConfig = false,
 }: GamesListProps) {
@@ -205,6 +208,7 @@ export function GamesList({
             onFullBackupUpload={onFullBackupUpload}
             isFullBackupUploading={fullBackupUploadingGameId === game.id}
             onEdit={onEdit}
+            onTorrent={onTorrent}
             onShare={onShare}
           />
         </GamesListMotionItem>
