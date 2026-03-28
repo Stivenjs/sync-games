@@ -1,5 +1,5 @@
 import { Button, Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader, Tab, Tabs } from "@heroui/react";
-import { Download, Gamepad2, Image, Play } from "lucide-react";
+import { Gamepad2, Image, Play } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
 import {
   addGame,
@@ -14,7 +14,6 @@ import { useGameForm } from "@/hooks/useGameForm";
 import { GameDrawerGeneralTab } from "@/features/games/GameDrawerGeneralTab";
 import { GameDrawerLaunchTab } from "@/features/games/GameDrawerLaunchTab";
 import { GameDrawerMediaTab } from "@/features/games/GameDrawerMediaTab";
-import { GameDrawerTorrentTab } from "@/features/games/GameDrawerTorrentTab";
 
 interface GameDrawerProps {
   isOpen: boolean;
@@ -154,24 +153,6 @@ export function GameDrawer({
                 </div>
               }>
               <GameDrawerLaunchTab form={form} setField={setField} setError={setError} isOpen={isOpen} />
-            </Tab>
-
-            <Tab
-              key="torrent"
-              title={
-                <div className="flex items-center gap-1.5">
-                  <Download size={14} />
-                  <span>Torrent</span>
-                </div>
-              }>
-              <GameDrawerTorrentTab
-                form={form}
-                setField={setField}
-                setError={setError}
-                gameId={form.gameId}
-                savePath={form.path}
-                mode={mode}
-              />
             </Tab>
           </Tabs>
 

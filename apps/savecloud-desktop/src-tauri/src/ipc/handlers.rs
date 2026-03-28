@@ -87,6 +87,8 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::tray::tray_tooltip::refresh_tray_tooltip,
         crate::steam::steam_search::get_steam_app_names_batch,
         crate::steam::steam_search::get_steam_app_details,
+        crate::compat::evaluate_run_compatibility,
+        crate::compat::get_host_specs,
         crate::plugins::plugin_sdk::export_plugin_sdk,
         crate::commands::logs::command_logs::get_plugin_logs,
         crate::commands::share::share::resolve_remote_share_token,

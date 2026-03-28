@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::network::{API_CLIENT, DATA_CLIENT};
 use crate::torrent::engine;
@@ -72,6 +72,7 @@ pub async fn start_torrent_file_download(
 pub async fn cancel_torrent(
     info_hash: String,
     state: State<'_, TorrentState>,
+    app: AppHandle,
 ) -> Result<(), TorrentError> {
     let session = {
         let mut engine = state.engine.lock().await;
@@ -79,7 +80,9 @@ pub async fn cancel_torrent(
         engine.session()
     };
 
-    engine::cancel_via_session(&session, &info_hash).await
+    engine::cancel_via_session(&session, &info_hash).await?;
+    let _ = app.emit(engine::TORRENT_CANCELLED_EVENT, &info_hash);
+    Ok(())
 }
 
 /// Pausa un torrent activo. No necesita el mutex del engine.

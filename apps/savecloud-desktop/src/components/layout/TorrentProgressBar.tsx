@@ -78,7 +78,10 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
 
         <div className="mt-1 flex items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-xs text-default-400">
-            {progress.state === "starting" && "Resolviendo metadatos…"}
+            {progress.state === "starting" &&
+              (progress.totalBytes > 0 && progress.progressPercent > 0
+                ? "Verificando datos ya en disco (reanudación)…"
+                : "Iniciando…")}
             {progress.state === "downloading" &&
               (progress.downloadedBytes > 0
                 ? "Descargando…"
@@ -122,28 +125,22 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
         </div>
 
         <div className="relative mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
-          {value === 0 && !isCompleted && !isPaused ? (
+          <motion.div
+            className={`relative z-0 h-full origin-left rounded-full ${isCompleted ? "bg-success" : isPaused ? "bg-warning" : "bg-secondary"}`}
+            initial={{ width: "0%" }}
+            animate={{ width: `${value}%` }}
+            transition={{
+              type: "tween",
+              duration: value === 0 ? 0 : 0.38,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          />
+          {value === 0 && !isCompleted && !isPaused && (
             <motion.div
-              className="absolute inset-y-0 w-1/4 rounded-full bg-secondary/60"
-              animate={{ left: ["-25%", "100%"] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              className="pointer-events-none absolute inset-y-0 z-10 w-1/4 rounded-full bg-secondary/55"
+              animate={{ left: ["-30%", "100%"] }}
+              transition={{ duration: 1.35, repeat: Infinity, ease: "easeInOut" }}
             />
-          ) : (
-            <>
-              <motion.div
-                className={`h-full rounded-full ${isCompleted ? "bg-success" : isPaused ? "bg-warning" : "bg-secondary"}`}
-                initial={false}
-                animate={{ width: `${value}%` }}
-                transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-              />
-              {value > 0 && value < 100 && !isCompleted && !isPaused && (
-                <motion.div
-                  className="absolute inset-y-0 left-0 rounded-full bg-secondary/40"
-                  animate={{ width: [`${value}%`, `${Math.min(value + 4, 100)}%`, `${value}%`] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                />
-              )}
-            </>
           )}
         </div>
 
@@ -155,6 +152,13 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
                 {formatBytes(progress.downloadedBytes)}
                 {progress.totalBytes > 0 ? ` / ${formatBytes(progress.totalBytes)}` : ""}
               </span>
+              {progress.state === "starting" && progress.totalBytes > 0 && progress.progressPercent > 0 ? (
+                <span
+                  className="ml-1 text-[10px] opacity-80"
+                  title="Incluye archivos que ya estaban en la carpeta de destino">
+                  (en disco)
+                </span>
+              ) : null}
             </span>
           </span>
           <span className="inline-flex items-center gap-1.5">

@@ -47,6 +47,8 @@ export interface GameCardProps {
   isFullBackupUploading?: boolean;
   /** Callback para editar el juego. Si no se pasa, no se muestra el botón. */
   onEdit?: (game: ConfiguredGame) => void;
+  /** Callback para abrir el panel de torrent. */
+  onTorrent?: (game: ConfiguredGame) => void;
   /** Callback para compartir por link (genera URL y copia al portapapeles). */
   onShare?: (game: ConfiguredGame) => void;
   /** Estado de sincronización con la nube (para mostrar badge). */
@@ -58,6 +60,10 @@ export interface GameCardProps {
   mediaBySteamAppId?: Record<string, SteamAppdetailsMediaResult> | null;
   /** Si true, los medios vienen solo del batch (no hacer useQuery individual aunque el batch siga cargando). */
   mediaFromBatch?: boolean;
+  /** Control del menú de acciones: un solo desplegable abierto en listas con muchas tarjetas. */
+  actionsMenuOpen?: boolean;
+  /** Callback estable desde la lista; incluye gameId para no crear closures por tarjeta en cada render. */
+  onActionsMenuOpenChange?: (isOpen: boolean, gameId: string) => void;
 }
 
 export const GameCard = memo(function GameCard(props: GameCardProps) {
@@ -71,6 +77,8 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     cloudBackupCount = 0,
     mediaBySteamAppId,
     mediaFromBatch = false,
+    onActionsMenuOpenChange: onActionsMenuFromParent,
+    ...cardRest
   } = props;
 
   const syncProgress = useSyncStore((state) => {
@@ -111,6 +119,13 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
 
   const isUploadTooLarge = (stats?.localSizeBytes ?? 0) >= LARGE_GAME_BLOCK_SIZE_BYTES;
 
+  const handleActionsMenuOpenChange = useCallback(
+    (open: boolean) => {
+      onActionsMenuFromParent?.(open, game.id);
+    },
+    [game.id, onActionsMenuFromParent]
+  );
+
   if (externalLoading) {
     return (
       <Card isFooterBlurred className="overflow-hidden border-none shadow-md" radius="lg">
@@ -134,7 +149,13 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && handleCardClick()}>
           <Card className="group relative overflow-hidden border-none shadow-none" radius="lg">
-            <GameCardActions {...props} isUploadTooLarge={isUploadTooLarge} />
+            <GameCardActions
+              {...cardRest}
+              game={game}
+              isGameRunning={isGameRunning}
+              isUploadTooLarge={isUploadTooLarge}
+              onActionsMenuOpenChange={onActionsMenuFromParent ? handleActionsMenuOpenChange : undefined}
+            />
 
             {syncProgress && <GameCardSyncProgress progress={syncProgress} />}
 
@@ -177,7 +198,7 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
                 cloudBackupCount={cloudBackupCount}
               />
 
-              {isUploadTooLarge && props.onFullBackupUpload && (
+              {isUploadTooLarge && cardRest.onFullBackupUpload && (
                 <Tooltip content="Demasiado grande: usa Empaquetar." placement="top">
                   <span className="mt-0.5 inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning text-center">
                     Requiere empaquetar

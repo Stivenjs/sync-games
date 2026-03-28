@@ -54,6 +54,13 @@ export function initTorrentListeners() {
     setProgress(ev.payload);
   });
 
+  listen<string>("torrent-download-cancelled", (ev) => {
+    const cur = useTorrentStore.getState().progress;
+    if (cur && cur.infoHash === ev.payload) {
+      setProgress(null);
+    }
+  });
+
   listen<TorrentProgressState>("torrent-download-done", () => {
     const state = useTorrentStore.getState();
     if (state.progress) {

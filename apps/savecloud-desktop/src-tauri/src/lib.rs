@@ -1,4 +1,5 @@
 mod commands;
+mod compat;
 mod config;
 mod controller;
 mod ipc;
