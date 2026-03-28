@@ -13,6 +13,8 @@ use super::models::{TorrentDownloadState, TorrentProgressPayload};
 const TORRENT_PROGRESS_EVENT: &str = "torrent-download-progress";
 /// Nombre del evento emitido cuando un torrent termina de descargarse.
 const TORRENT_DONE_EVENT: &str = "torrent-download-done";
+/// Tras cancelar: el frontend oculta la barra (evita carrera con un progreso ya emitido).
+pub const TORRENT_CANCELLED_EVENT: &str = "torrent-download-cancelled";
 /// Intervalo entre emisiones de progreso al frontend.
 const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
 
@@ -24,7 +26,11 @@ pub struct TorrentEngine {
 
 impl TorrentEngine {
     pub async fn new(output_folder: PathBuf) -> Result<Self, TorrentError> {
+        // Sin `listen_port_range`, librqbit no abre socket TCP para peers entrantes: el anuncio a
+        // trackers/DHT va sin puerto útil y UPnP no hace nada. Afecta a magnets (metadatos vía
+        // enjambre) y a .torrent (conexión con peers / arranque de la descarga).
         let options = SessionOptions {
+            listen_port_range: Some(6881..6890),
             enable_upnp_port_forwarding: true,
             fastresume: true,
             ..Default::default()
@@ -161,7 +167,9 @@ pub async fn add_file_to_session(
 
     let handle = response.into_handle().ok_or(TorrentError::ListOnly)?;
     let info_hash = handle.info_hash().as_string();
-    handle.wait_until_initialized().await.ok();
+    // No usar `wait_until_initialized()`: bloquearía el comando Tauri hasta que el torrent salga de
+    // Initializing (peers, disco…), p. ej. varios minutos; el frontend ya recibe estado vía
+    // `spawn_progress_monitor`.
 
     let name = handle
         .name()
@@ -234,6 +242,12 @@ pub fn spawn_progress_monitor(
                     _ => TorrentDownloadState::Downloading,
                 }
             };
+
+            // Otro hilo puede haber cancelado el torrent entre el `get` inicial y aquí: no emitir
+            // progreso obsoleto (evita que la barra reaparezca tras cancelar).
+            if session.get(TorrentIdOrHash::Id(torrent_id)).is_none() {
+                break;
+            }
 
             let payload = TorrentProgressPayload {
                 info_hash: info_hash.clone(),
