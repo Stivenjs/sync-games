@@ -125,8 +125,6 @@ export function TorrentProgressBar({ progress }: TorrentProgressBarProps) {
         </div>
 
         <div className="relative mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-default-200">
-          {/* Misma capa de relleno siempre: si alternábamos otra rama (solo shimmer vs relleno),
-              al pasar de 0 % a >0 % se montaba un motion nuevo y el ancho saltaba sin transición. */}
           <motion.div
             className={`relative z-0 h-full origin-left rounded-full ${isCompleted ? "bg-success" : isPaused ? "bg-warning" : "bg-secondary"}`}
             initial={{ width: "0%" }}
