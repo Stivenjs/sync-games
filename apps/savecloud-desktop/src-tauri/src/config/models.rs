@@ -31,6 +31,15 @@ pub struct AppSettings {
     pub full_backup_streaming: Option<bool>,
     #[serde(default)]
     pub full_backup_streaming_dry_run: Option<bool>,
+    /// URL o ruta local: fondo del perfil (imagen, GIF o vídeo).
+    #[serde(default)]
+    pub profile_background: Option<String>,
+    /// URL, data URL o ruta local: avatar del perfil.
+    #[serde(default)]
+    pub profile_avatar: Option<String>,
+    /// URL o ruta local: marco superpuesto al avatar (PNG recomendado).
+    #[serde(default)]
+    pub profile_frame: Option<String>,
 }
 
 /// Biblioteca local de juegos configurados.
@@ -120,6 +129,12 @@ pub struct ConfigDto {
     pub full_backup_streaming: Option<bool>,
     pub full_backup_streaming_dry_run: Option<bool>,
     pub total_playtime: u64,
+    #[serde(default)]
+    pub profile_background: Option<String>,
+    #[serde(default)]
+    pub profile_avatar: Option<String>,
+    #[serde(default)]
+    pub profile_frame: Option<String>,
 }
 
 /// DTO representativo de un juego para el frontend.

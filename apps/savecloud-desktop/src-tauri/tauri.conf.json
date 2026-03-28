@@ -21,8 +21,13 @@
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      },
       "csp": {
-        "img-src": "'self' data: blob: https: http:"
+        "img-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost",
+        "media-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost"
       }
     }
   },

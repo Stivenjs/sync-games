@@ -23,6 +23,19 @@ export async function getConfig(): Promise<Config> {
   return invoke<Config>("get_config");
 }
 
+/** Guarda fondo, avatar y marco del perfil (vacío o null borra cada campo). */
+export async function setProfileAppearance(updates: {
+  profileBackground?: string | null;
+  profileAvatar?: string | null;
+  profileFrame?: string | null;
+}): Promise<void> {
+  await invoke("set_profile_appearance", {
+    profileBackground: updates.profileBackground ?? null,
+    profileAvatar: updates.profileAvatar ?? null,
+    profileFrame: updates.profileFrame ?? null,
+  });
+}
+
 /** Ruta del archivo de configuración (para mostrar al usuario) */
 export async function getConfigPath(): Promise<string> {
   return invoke<string>("get_config_path");

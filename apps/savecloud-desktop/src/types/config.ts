@@ -28,10 +28,18 @@ export interface Config {
   readonly userId?: string;
   readonly games: readonly ConfiguredGame[];
   readonly customScanPaths?: readonly string[];
+  /** Tiempo de juego total acumulado (segundos). */
+  readonly totalPlaytime?: number;
   /** Cuántos backups locales mantener por juego (valor por defecto del selector y auto-limpieza tras descargas). */
   readonly keepBackupsPerGame?: number;
   /** Experimental: backup completo (tar) en streaming, sin .tar temporal. */
   readonly fullBackupStreaming?: boolean;
   /** Modo prueba: streaming sin subir a la nube. */
   readonly fullBackupStreamingDryRun?: boolean;
+  /** URL o ruta local del fondo del perfil (imagen, GIF o vídeo). */
+  readonly profileBackground?: string;
+  /** URL, data URL o ruta local del avatar. */
+  readonly profileAvatar?: string;
+  /** URL o ruta local del marco sobre el avatar. */
+  readonly profileFrame?: string;
 }

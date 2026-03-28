@@ -61,6 +61,7 @@ fn expand_path(raw: &str) -> Option<PathBuf> {
 #[tauri::command]
 pub fn get_config() -> ConfigDto {
     let combined = config::get_combined_config();
+    let settings = config::load_settings();
 
     #[cfg(target_os = "windows")]
     let steam_map = steam::get_steam_path_to_appid_map();
@@ -76,6 +77,9 @@ pub fn get_config() -> ConfigDto {
         full_backup_streaming: combined.full_backup_streaming,
         full_backup_streaming_dry_run: combined.full_backup_streaming_dry_run,
         total_playtime: time::get_total_playtime(),
+        profile_background: settings.profile_background.clone(),
+        profile_avatar: settings.profile_avatar.clone(),
+        profile_frame: settings.profile_frame.clone(),
         games: combined
             .games
             .into_iter()
@@ -186,6 +190,24 @@ pub fn set_full_backup_streaming(enabled: bool) -> Result<(), String> {
 pub fn set_full_backup_streaming_dry_run(enabled: bool) -> Result<(), String> {
     let mut settings = config::load_settings();
     settings.full_backup_streaming_dry_run = Some(enabled);
+    config::save_settings(&settings)
+}
+
+/// Persiste la apariencia del perfil (fondo, avatar, marco). Cadenas vacías o `None` borran el valor.
+#[tauri::command]
+pub fn set_profile_appearance(
+    profile_background: Option<String>,
+    profile_avatar: Option<String>,
+    profile_frame: Option<String>,
+) -> Result<(), String> {
+    fn norm(s: Option<String>) -> Option<String> {
+        s.map(|x| x.trim().to_string()).filter(|x| !x.is_empty())
+    }
+
+    let mut settings = config::load_settings();
+    settings.profile_background = norm(profile_background);
+    settings.profile_avatar = norm(profile_avatar);
+    settings.profile_frame = norm(profile_frame);
     config::save_settings(&settings)
 }
 
@@ -784,6 +806,9 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
         full_backup_streaming: None,
         full_backup_streaming_dry_run: None,
         total_playtime: 0,
+        profile_background: None,
+        profile_avatar: None,
+        profile_frame: None,
         games: imported
             .games
             .into_iter()

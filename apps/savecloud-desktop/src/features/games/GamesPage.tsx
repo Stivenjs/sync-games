@@ -22,6 +22,7 @@ import { scheduleConfigBackupToCloud } from "@services/tauri";
 import { countGamesOverSizeThreshold } from "@utils/packageRecommendation";
 import { createShareLink } from "@services/share.service";
 import { UserBadge } from "@features/games/UserBadge";
+import { ProfileDrawer } from "@features/profile";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
 
@@ -96,6 +97,7 @@ export function GamesPage() {
 
   const { statsByGameId } = useGameStats(!!config?.games?.length);
 
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
 
@@ -144,7 +146,12 @@ export function GamesPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <UserBadge userId={config?.userId} hasSyncConfig={hasSyncConfig} connectionStatus={connectionStatus} />{" "}
+            <UserBadge
+              userId={config?.userId}
+              hasSyncConfig={hasSyncConfig}
+              connectionStatus={connectionStatus}
+              onOpenProfile={() => setProfileDrawerOpen(true)}
+            />{" "}
           </div>
         </div>
 
@@ -319,6 +326,14 @@ export function GamesPage() {
           hasSyncConfig={hasSyncConfig}
         />
       </section>
+
+      <ProfileDrawer
+        isOpen={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        config={config}
+        hasSyncConfig={hasSyncConfig}
+        connectionStatus={connectionStatus}
+      />
 
       {/* operationResult && operationResult.result.errors.length > 0 && (
         <OperationErrorCard

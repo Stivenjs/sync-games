@@ -18,6 +18,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::config::config_cmds::set_keep_backups_per_game,
         crate::config::config_cmds::set_full_backup_streaming,
         crate::config::config_cmds::set_full_backup_streaming_dry_run,
+        crate::config::config_cmds::set_profile_appearance,
         crate::steam::steam_search::get_steam_app_name,
         crate::steam::steam_search::get_steam_appdetails_media,
         crate::steam::steam_search::get_steam_appdetails_media_batch,
