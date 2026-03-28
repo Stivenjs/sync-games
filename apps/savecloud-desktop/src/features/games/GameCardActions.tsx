@@ -32,6 +32,9 @@ export interface GameCardActionsProps {
   /** Abre el panel de torrent (magnet, .torrent local, nube). */
   onTorrent?: (game: ConfiguredGame) => void;
   onShare?: (game: ConfiguredGame) => void;
+  /** Estado controlado del menú (evita varios popovers abiertos en la lista). */
+  actionsMenuOpen?: boolean;
+  onActionsMenuOpenChange?: (isOpen: boolean) => void;
 }
 
 export function GameCardActions({
@@ -50,6 +53,8 @@ export function GameCardActions({
   onEdit,
   onTorrent,
   onShare,
+  actionsMenuOpen,
+  onActionsMenuOpenChange,
 }: GameCardActionsProps) {
   const handleAction = async (key: React.Key) => {
     const action = String(key);
@@ -95,9 +100,12 @@ export function GameCardActions({
         ? ["download", "sync", "fullBackup", "restore"]
         : [];
 
+  const controlledMenu =
+    onActionsMenuOpenChange != null ? { isOpen: actionsMenuOpen ?? false, onOpenChange: onActionsMenuOpenChange } : {};
+
   return (
     <div className="absolute right-2 top-2 z-20" onClick={(e) => e.stopPropagation()}>
-      <Dropdown placement="bottom-end">
+      <Dropdown placement="bottom-end" {...controlledMenu}>
         <DropdownTrigger>
           <Button
             isIconOnly

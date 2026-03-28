@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, CardBody } from "@heroui/react";
 import { Download, Settings2, UserPlus } from "lucide-react";
@@ -38,6 +38,11 @@ export function FriendGamesSection({
     staleTime: 5 * 60 * 1000,
   });
 
+  const [openActionsGameId, setOpenActionsGameId] = useState<string | null>(null);
+  const handleActionsMenuOpenChange = useCallback((open: boolean, gameId: string) => {
+    setOpenActionsGameId(open ? gameId : null);
+  }, []);
+
   if (summaries.length === 0) {
     return (
       <Card>
@@ -70,6 +75,8 @@ export function FriendGamesSection({
                 isLoading={false}
                 mediaBySteamAppId={mediaBySteamAppId ?? null}
                 mediaFromBatch
+                actionsMenuOpen={openActionsGameId === game.id}
+                onActionsMenuOpenChange={handleActionsMenuOpenChange}
               />
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, CardBody, Code } from "@heroui/react";
 import { FolderSearch, Gamepad2, PlusCircle } from "lucide-react";
@@ -127,6 +127,11 @@ export function GamesList({
     [animationKey, games.map((g) => g.id).join(",")]
   );
 
+  const [openActionsGameId, setOpenActionsGameId] = useState<string | null>(null);
+  const handleActionsMenuOpenChange = useCallback((open: boolean, gameId: string) => {
+    setOpenActionsGameId(open ? gameId : null);
+  }, []);
+
   if (games.length === 0) {
     const isEmptyState = !emptyFilterMessage;
     return (
@@ -210,6 +215,8 @@ export function GamesList({
             onEdit={onEdit}
             onTorrent={onTorrent}
             onShare={onShare}
+            actionsMenuOpen={openActionsGameId === game.id}
+            onActionsMenuOpenChange={handleActionsMenuOpenChange}
           />
         </GamesListMotionItem>
       ))}
