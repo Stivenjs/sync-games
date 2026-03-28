@@ -80,14 +80,20 @@ export function GameDetailActions({
 
   const disabledKeys = isGameRunning ? ["sync", "download", "fullBackup", "restore"] : [];
   const canPlay = Boolean(game.launchExecutablePath?.trim());
+  const playDisabled = !canPlay || Boolean(isGameRunning);
+  const playTitle = !canPlay
+    ? "Configura el ejecutable en la lista de juegos: Editar juego → pestaña Ejecución"
+    : isGameRunning
+      ? "El juego parece estar en ejecución"
+      : undefined;
 
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button
         color="primary"
         startContent={<Play size={18} />}
-        isDisabled={!canPlay}
-        title={canPlay ? undefined : "Configura el ejecutable en la lista de juegos: Editar juego → pestaña Ejecución"}
+        isDisabled={playDisabled}
+        title={playTitle}
         onPress={() => onPlay?.(game)}>
         Jugar
       </Button>
