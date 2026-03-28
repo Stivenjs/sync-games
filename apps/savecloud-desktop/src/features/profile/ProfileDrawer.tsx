@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Input } from "@heroui/react";
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  Input,
+} from "@heroui/react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Gamepad2, ImageIcon, Layers, Link2, MonitorPlay, Save, User } from "lucide-react";
+import { FolderOpen, ImageIcon, Layers, Link2, MonitorPlay, Save, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Config } from "@app-types/config";
 import type { ConnectionStatus } from "@hooks/useLastSyncInfo";
@@ -131,17 +140,26 @@ export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connecti
       }}
       placement="right"
       size="lg"
-      backdrop="blur"
-      classNames={{ base: "sm:max-w-lg" }}>
-      <DrawerContent className="bg-content1">
-        <DrawerHeader className="flex flex-col gap-0 border-b border-default-200 p-0">
-          <div className="relative h-44 w-full overflow-hidden">
+      backdrop="opaque"
+      classNames={{
+        base: "sm:max-w-lg",
+        wrapper: "overflow-hidden",
+      }}>
+      <DrawerContent className="flex max-h-dvh flex-col bg-content1">
+        <DrawerHeader className="flex shrink-0 flex-col gap-0 border-b border-default-200 p-0">
+          {/* Zona de fondo: más alta cuando hay media (hasta ~55vh / 28rem) */}
+          <div
+            className={`relative w-full overflow-hidden ${
+              bg.trim()
+                ? "min-h-[min(55vh,28rem)] max-h-[min(65vh,32rem)]"
+                : "min-h-[min(42vh,18rem)] max-h-[min(50vh,22rem)]"
+            }`}>
             {bg.trim() ? (
               <ProfileHeroBackground rawUrl={bg.trim()} />
             ) : (
               <div className="absolute inset-0 bg-[linear-gradient(125deg,#1b2838_0%,#0e1621_45%,#1b2838_100%)]" />
             )}
-            <div className="absolute inset-0 bg-linear-to-t from-content1 via-content1/70 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-content1 via-content1/45 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 px-4 pb-3">
               <div className="relative size-[72px] shrink-0">
                 <div className="relative size-full overflow-hidden rounded-md border border-white/10 bg-black/30 shadow-lg">
@@ -185,74 +203,112 @@ export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connecti
           </div>
         </DrawerHeader>
 
-        <DrawerBody className="gap-4 px-4 py-4">
-          <p className="text-xs text-default-500">
-            Pega enlaces remotos (https) o elige archivos locales. El fondo admite imagen, GIF o vídeo; avatar y marco,
-            imagen.
+        <DrawerBody className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+          <p className="text-[11px] leading-snug text-default-500">
+            Enlaces https o archivos locales. Las rutas locales dependen del archivo en disco.
           </p>
 
-          <section className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-default-700">
-              <MonitorPlay size={16} />
-              Fondo del perfil
-            </div>
-            <Input
-              size="sm"
-              label="URL"
-              placeholder="https://… o deja vacío para quitar"
-              value={bg}
-              onValueChange={setBg}
-              variant="bordered"
-              startContent={<Link2 size={14} className="text-default-400" />}
-            />
-            <Button size="sm" variant="flat" className="w-full" onPress={() => void pickFile("background")}>
-              Elegir archivo del sistema…
-            </Button>
-          </section>
+          <Accordion
+            isCompact
+            selectionMode="multiple"
+            defaultExpandedKeys={["bg"]}
+            className="px-0"
+            itemClasses={{
+              base: "px-0",
+              title: "text-sm font-medium",
+              trigger: "py-2",
+              content: "pb-3 pt-0",
+            }}>
+            <AccordionItem
+              key="bg"
+              aria-label="Fondo"
+              title={
+                <span className="flex items-center gap-2">
+                  <MonitorPlay size={15} className="text-default-500" />
+                  Fondo
+                </span>
+              }>
+              <div className="flex flex-col gap-2">
+                <Input
+                  size="sm"
+                  label="URL"
+                  placeholder="https://… · vacío quita el fondo"
+                  value={bg}
+                  onValueChange={setBg}
+                  variant="bordered"
+                  startContent={<Link2 size={14} className="text-default-400" />}
+                />
+                <Button
+                  size="sm"
+                  variant="bordered"
+                  className="w-full justify-start"
+                  startContent={<FolderOpen size={16} />}
+                  onPress={() => void pickFile("background")}>
+                  Archivo en disco…
+                </Button>
+              </div>
+            </AccordionItem>
+            <AccordionItem
+              key="avatar"
+              aria-label="Avatar"
+              title={
+                <span className="flex items-center gap-2">
+                  <ImageIcon size={15} className="text-default-500" />
+                  Foto de perfil
+                </span>
+              }>
+              <div className="flex flex-col gap-2">
+                <Input
+                  size="sm"
+                  label="URL"
+                  placeholder="https://…"
+                  value={avatar}
+                  onValueChange={setAvatar}
+                  variant="bordered"
+                  startContent={<Link2 size={14} className="text-default-400" />}
+                />
+                <Button
+                  size="sm"
+                  variant="bordered"
+                  className="w-full justify-start"
+                  startContent={<FolderOpen size={16} />}
+                  onPress={() => void pickFile("avatar")}>
+                  Imagen local…
+                </Button>
+              </div>
+            </AccordionItem>
+            <AccordionItem
+              key="frame"
+              aria-label="Marco"
+              title={
+                <span className="flex items-center gap-2">
+                  <Layers size={15} className="text-default-500" />
+                  Marco
+                </span>
+              }>
+              <div className="flex flex-col gap-2">
+                <Input
+                  size="sm"
+                  label="URL"
+                  placeholder="PNG con transparencia"
+                  value={frame}
+                  onValueChange={setFrame}
+                  variant="bordered"
+                  startContent={<Link2 size={14} className="text-default-400" />}
+                />
+                <Button
+                  size="sm"
+                  variant="bordered"
+                  className="w-full justify-start"
+                  startContent={<FolderOpen size={16} />}
+                  onPress={() => void pickFile("frame")}>
+                  Imagen local…
+                </Button>
+              </div>
+            </AccordionItem>
+          </Accordion>
 
-          <Divider />
-
-          <section className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-default-700">
-              <ImageIcon size={16} />
-              Foto de perfil
-            </div>
-            <Input
-              size="sm"
-              label="URL"
-              placeholder="https://… o data URL"
-              value={avatar}
-              onValueChange={setAvatar}
-              variant="bordered"
-              startContent={<Link2 size={14} className="text-default-400" />}
-            />
-            <Button size="sm" variant="flat" className="w-full" onPress={() => void pickFile("avatar")}>
-              Elegir imagen local…
-            </Button>
-          </section>
-
-          <Divider />
-
-          <section className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-default-700">
-              <Layers size={16} />
-              Marco (opcional)
-            </div>
-            <Input
-              size="sm"
-              label="URL"
-              placeholder="PNG con transparencia recomendado"
-              value={frame}
-              onValueChange={setFrame}
-              variant="bordered"
-              startContent={<Link2 size={14} className="text-default-400" />}
-            />
-            <Button size="sm" variant="flat" className="w-full" onPress={() => void pickFile("frame")}>
-              Elegir imagen local…
-            </Button>
-          </section>
-
-          <div className="flex gap-2 pt-2">
+          <div className="mt-auto flex shrink-0 gap-2 border-t border-default-200 pt-3">
             <Button variant="flat" className="flex-1" onPress={onClose}>
               Cancelar
             </Button>
@@ -264,11 +320,6 @@ export function ProfileDrawer({ isOpen, onClose, config, hasSyncConfig, connecti
               onPress={() => void handleSave()}>
               Guardar
             </Button>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-default-200 py-3 text-default-400">
-            <Gamepad2 size={18} />
-            <span className="text-xs">Vista previa arriba · estilo compacto</span>
           </div>
         </DrawerBody>
       </DrawerContent>

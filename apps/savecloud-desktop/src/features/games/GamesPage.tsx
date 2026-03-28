@@ -148,6 +148,8 @@ export function GamesPage() {
           <div className="flex items-center gap-3">
             <UserBadge
               userId={config?.userId}
+              profileAvatar={config?.profileAvatar}
+              profileFrame={config?.profileFrame}
               hasSyncConfig={hasSyncConfig}
               connectionStatus={connectionStatus}
               onOpenProfile={() => setProfileDrawerOpen(true)}
