@@ -2,9 +2,17 @@ import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useNavigationStore } from "@features/input/store";
 import { SemanticAction } from "@features/input/types";
+import { useShellUiStore } from "@store/ShellUiStore";
 
 const NAVIGATION_THROTTLE_MS = 120;
 
+/**
+ * Atajos de teclado (además del mando):
+ * - Menú lateral: F10, Alt+M, o Ctrl+Shift+M (este último suele funcionar aunque el WebView se coma F10).
+ * - Perfil (Juegos): Alt+P o Ctrl+Shift+P.
+ *
+ * El listener usa fase capture para recibir la pulsación antes que el SO/WebView la consuma.
+ */
 export function useInputManager() {
   const { setInputMode, navigate, confirm, popLayer } = useNavigationStore();
   const mouseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -20,6 +28,44 @@ export function useInputManager() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.repeat) {
+        const isMenuShortcut =
+          e.code === "F10" ||
+          e.key === "F10" ||
+          (e.ctrlKey &&
+            e.shiftKey &&
+            !e.altKey &&
+            !e.metaKey &&
+            (e.code === "KeyM" || e.key === "m" || e.key === "M")) ||
+          (e.altKey &&
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.shiftKey &&
+            (e.code === "KeyM" || e.key === "m" || e.key === "M"));
+
+        if (isMenuShortcut) {
+          e.preventDefault();
+          e.stopPropagation();
+          useShellUiStore.getState().requestStaggeredMenuToggle();
+          return;
+        }
+
+        const isProfileShortcut =
+          (e.altKey &&
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.shiftKey &&
+            (e.code === "KeyP" || e.key === "p" || e.key === "P")) ||
+          (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (e.code === "KeyP" || e.key === "p" || e.key === "P"));
+
+        if (isProfileShortcut) {
+          e.preventDefault();
+          e.stopPropagation();
+          useShellUiStore.getState().requestProfileOpen();
+          return;
+        }
+      }
+
       const isNavKey = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key);
 
       if (isNavKey) {
@@ -56,7 +102,7 @@ export function useInputManager() {
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
 
     const unlisten = listen<{ action: SemanticAction; player: number }>("controller_action", (event) => {
       const now = Date.now();
@@ -86,12 +132,18 @@ export function useInputManager() {
         case "back":
           popLayer();
           break;
+        case "menu":
+          useShellUiStore.getState().requestStaggeredMenuToggle();
+          break;
+        case "profile":
+          useShellUiStore.getState().requestProfileOpen();
+          break;
       }
     });
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
       unlisten.then((f) => f());
     };
   }, [navigate, confirm, popLayer, setInputMode]);

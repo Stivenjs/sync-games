@@ -10,6 +10,8 @@ pub enum SemanticAction {
     Confirm,
     Back,
     Menu,
+    /// Perfil / cuenta (p. ej. View en Xbox, Share en PlayStation).
+    Profile,
 }
 
 #[derive(Debug, Clone, Serialize)]

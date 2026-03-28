@@ -1,10 +1,8 @@
-import type { ReactNode } from "react";
+import { type ReactNode, startTransition } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@heroui/react";
 import { Moon, Sun } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { flushSync } from "react-dom";
-import { useRef } from "react";
 import type { NavItem } from "@components/layout/Sidebar";
 import { StaggeredMenu } from "@components/external/StaggeredMenu";
 
@@ -28,37 +26,16 @@ export function AppLayout({ navItems, children }: AppLayoutProps) {
   const location = useLocation();
   const isDark = resolvedTheme === "dark";
 
-  const isNavigatingRef = useRef(false);
-
   const handleNavigation = (link: string) => {
     if (location.pathname === link) return;
-
-    if (isNavigatingRef.current) return;
-
-    isNavigatingRef.current = true;
-
-    if (!document.startViewTransition) {
+    startTransition(() => {
       navigate(link);
-      isNavigatingRef.current = false;
-      return;
-    }
-
-    document.startViewTransition(() => {
-      flushSync(() => {
-        navigate(link);
-      });
     });
-
-    setTimeout(() => {
-      isNavigatingRef.current = false;
-    }, 350);
   };
 
   return (
     <div className="relative min-h-screen">
-      <main className="min-h-screen overflow-auto pt-16 px-6 pb-6" style={{ viewTransitionName: "page-content" }}>
-        {children}
-      </main>
+      <main className="min-h-screen overflow-auto pt-16 px-6 pb-6">{children}</main>
 
       <StaggeredMenu
         isFixed

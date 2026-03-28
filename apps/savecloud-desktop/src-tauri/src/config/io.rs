@@ -216,7 +216,13 @@ pub fn append_operation_log(
     }
 
     let path = paths::history_path().ok_or("Ruta no disponible")?;
-    save_json(&path, &history)
+    save_json(&path, &history)?;
+
+    let mut g = load_gamification();
+    super::gamification::on_operation_logged_inner(&mut g, kind, file_count, err_count);
+    save_gamification(&g)?;
+
+    Ok(())
 }
 
 /// Genera una instancia monolítica combinando todos los estados persistidos.
@@ -238,7 +244,26 @@ pub fn get_combined_config() -> Config {
         full_backup_streaming_dry_run: settings.full_backup_streaming_dry_run,
         games: library.games,
         operation_history: history.entries,
+        gamification: load_gamification(),
     }
+}
+
+/// Carga el bloque de gamificación desde disco (o valores por defecto).
+pub fn load_gamification() -> GamificationConfig {
+    let Some(path) = paths::gamification_path() else {
+        return GamificationConfig::default();
+    };
+    fs::read_to_string(&path)
+        .ok()
+        .and_then(|c| serde_json::from_str::<GamificationConfig>(&c).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_gamification(g: &GamificationConfig) -> Result<(), String> {
+    let Some(path) = paths::gamification_path() else {
+        return Err("Ruta de datos no disponible".to_string());
+    };
+    save_json(&path, g)
 }
 
 /// Descompone una instancia monolítica y distribuye sus componentes a disco.
@@ -276,6 +301,7 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
     save_history(&OperationHistory {
         entries: cfg.operation_history.clone(),
     })?;
+    save_gamification(&cfg.gamification)?;
 
     Ok(())
 }

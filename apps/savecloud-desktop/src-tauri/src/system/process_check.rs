@@ -31,6 +31,23 @@ pub(crate) fn get_sys() -> std::sync::MutexGuard<'static, System> {
 /// # Arguments
 /// * `game_id` - Identificador único del juego.
 /// * `_paths` - Rutas de guardado (actualmente no utilizadas para la detección de proceso).
+/// Lista nombres de ejecutable únicos de procesos en ejecución (ordenados), para el selector manual en la UI.
+pub fn list_running_process_exe_names() -> Vec<String> {
+    let mut sys = get_sys();
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        ProcessRefreshKind::new().with_exe(UpdateKind::OnlyIfNotSet),
+    );
+    let mut names: Vec<String> = sys
+        .processes()
+        .values()
+        .map(|p| p.name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
 pub fn is_game_running(game_id: &str, _paths: &[String]) -> bool {
     let names = get_executable_names_to_check(game_id);
     if names.is_empty() {

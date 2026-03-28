@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
 import { RefreshCw } from "lucide-react";
 import type { ConfiguredGame } from "@app-types/config";
-import { AddGameModal } from "@features/games/AddGameModal";
 import { DownloadAllConflictModal } from "@features/games/DownloadAllConflictModal";
-import { EditGameModal } from "@features/games/EditGameModal";
+import { GameDrawer } from "@features/games/GameDrawer";
 import { DownloadConflictModal } from "@features/games/DownloadConflictModal";
 import { FullBackupConfirmModal } from "@features/games/FullBackupConfirmModal";
 import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
@@ -17,14 +16,17 @@ import { GamesStatsCompact } from "@features/games/GamesStatsCompact";
 import { BulkActionConfirmModal } from "@features/games/BulkActionConfirmModal";
 import { RemoveGameModal } from "@features/games/RemoveGameModal";
 import { ScanModal } from "@features/games/ScanModal";
-import { useGamesPage } from "@features/games/useGamesPage";
+import { useGamesPage } from "@/hooks/useGamesPage";
 import { useGameStats } from "@hooks/useGameStats";
 import { scheduleConfigBackupToCloud } from "@services/tauri";
 import { countGamesOverSizeThreshold } from "@utils/packageRecommendation";
 import { createShareLink } from "@services/share.service";
 import { UserBadge } from "@features/games/UserBadge";
+import { ProfileDrawer } from "@features/profile";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
+import { useShellUiStore } from "@store/ShellUiStore";
+import { useGamification } from "@hooks/useGamification";
 
 export function GamesPage() {
   const pushLayer = useNavigationStore((state) => state.pushLayer);
@@ -95,7 +97,22 @@ export function GamesPage() {
     /*  handleRetryOperationError, */
   } = useGamesPage();
 
+  const { data: gamification } = useGamification();
+
   const { statsByGameId } = useGameStats(!!config?.games?.length);
+
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    let last = useShellUiStore.getState().profileOpenRequest;
+    return useShellUiStore.subscribe((state) => {
+      const n = state.profileOpenRequest;
+      if (n > last) {
+        last = n;
+        setProfileDrawerOpen(true);
+      }
+    });
+  }, []);
 
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
@@ -145,7 +162,14 @@ export function GamesPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <UserBadge userId={config?.userId} hasSyncConfig={hasSyncConfig} connectionStatus={connectionStatus} />{" "}
+            <UserBadge
+              userId={config?.userId}
+              profileAvatar={config?.profileAvatar}
+              profileFrame={config?.profileFrame}
+              hasSyncConfig={hasSyncConfig}
+              connectionStatus={connectionStatus}
+              onOpenProfile={() => setProfileDrawerOpen(true)}
+            />{" "}
           </div>
         </div>
 
@@ -182,13 +206,14 @@ export function GamesPage() {
           </div>
         </div>
       </div>
-      <AddGameModal
+      <GameDrawer
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSuccess={() => {
           scheduleConfigBackupToCloud();
           handleRefresh?.();
         }}
+        mode="add"
         initialPath={addModalInitial.path}
         suggestedId={addModalInitial.suggestedId}
       />
@@ -271,15 +296,16 @@ export function GamesPage() {
         game={gameToRestoreBackup}
         onSuccess={handleRefresh}
       />
-      <EditGameModal
+      <GameDrawer
         isOpen={!!gameToEdit}
-        game={gameToEdit}
         onClose={() => setGameToEdit(null)}
         onSuccess={() => {
           scheduleConfigBackupToCloud();
           handleRefresh();
           setGameToEdit(null);
         }}
+        mode="edit"
+        game={gameToEdit}
       />
       {/* Filtros de la lista */}
       <section className="space-y-2">
@@ -318,6 +344,15 @@ export function GamesPage() {
           hasSyncConfig={hasSyncConfig}
         />
       </section>
+
+      <ProfileDrawer
+        isOpen={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        config={config}
+        gamification={gamification}
+        hasSyncConfig={hasSyncConfig}
+        connectionStatus={connectionStatus}
+      />
 
       {/* operationResult && operationResult.result.errors.length > 0 && (
         <OperationErrorCard

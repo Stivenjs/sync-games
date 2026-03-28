@@ -21,6 +21,8 @@ pub fn add_playtime(game_id: &str, seconds: u64) -> Result<(), String> {
         .find(|g| g.id.eq_ignore_ascii_case(game_id))
     {
         game.playtime_seconds += seconds;
+        let total: u64 = cfg.games.iter().map(|g| g.playtime_seconds).sum();
+        crate::config::gamification::apply_playtime_delta(&mut cfg.gamification, seconds, total);
         config::save_config(&cfg)?;
         Ok(())
     } else {

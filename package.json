@@ -28,7 +28,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,css,scss,md}": [
-      "bunx prettier . --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+      "prettier --write"
     ]
   },
   "dependencies": {
@@ -50,6 +50,7 @@
     "@types/node": "^22.0.0",
     "esbuild": "^0.24.0",
     "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "3.8.1",
     "serverless": "^4.0.0",
     "typescript": "^5.6.0"

@@ -6,7 +6,8 @@ export type SemanticAction =
   | "navigate_right"
   | "confirm"
   | "back"
-  | "menu";
+  | "menu"
+  | "profile";
 
 export interface FocusNode {
   id: string;

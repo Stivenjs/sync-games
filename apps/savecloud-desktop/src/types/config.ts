@@ -12,6 +12,8 @@ export interface ConfiguredGame {
   readonly imageUrl?: string;
   /** Nombres de ejecutable para detectar si el juego está en ejecución (ej. ["eldenring.exe"]). */
   readonly executableNames?: readonly string[];
+  /** Ruta absoluta al .exe para abrir el juego desde la app. */
+  readonly launchExecutablePath?: string;
   /** Etiqueta de origen/edición (ej. Steam, Empress, RUNE). Solo informativa. */
   readonly editionLabel?: string;
   /** URL de descarga o página de la edición (ej. enlace al release). */
@@ -26,10 +28,18 @@ export interface Config {
   readonly userId?: string;
   readonly games: readonly ConfiguredGame[];
   readonly customScanPaths?: readonly string[];
+  /** Tiempo de juego total acumulado (segundos). */
+  readonly totalPlaytime?: number;
   /** Cuántos backups locales mantener por juego (valor por defecto del selector y auto-limpieza tras descargas). */
   readonly keepBackupsPerGame?: number;
   /** Experimental: backup completo (tar) en streaming, sin .tar temporal. */
   readonly fullBackupStreaming?: boolean;
   /** Modo prueba: streaming sin subir a la nube. */
   readonly fullBackupStreamingDryRun?: boolean;
+  /** URL o ruta local del fondo del perfil (imagen, GIF o vídeo). */
+  readonly profileBackground?: string;
+  /** URL, data URL o ruta local del avatar. */
+  readonly profileAvatar?: string;
+  /** URL o ruta local del marco sobre el avatar. */
+  readonly profileFrame?: string;
 }

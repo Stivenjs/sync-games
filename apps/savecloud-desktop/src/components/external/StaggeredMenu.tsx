@@ -1,5 +1,6 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import { useShellUiStore } from "@store/ShellUiStore";
 
 export interface StaggeredMenuItem {
   label: string;
@@ -416,6 +417,20 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     animateColor(target);
     animateText(target);
   }, [playOpen, playClose, animateIcon, animateColor, animateText, onMenuOpen, onMenuClose]);
+
+  const toggleMenuRef = useRef(toggleMenu);
+  toggleMenuRef.current = toggleMenu;
+
+  useLayoutEffect(() => {
+    let last = useShellUiStore.getState().staggeredMenuToggleRequest;
+    return useShellUiStore.subscribe((state) => {
+      const n = state.staggeredMenuToggleRequest;
+      if (n > last) {
+        last = n;
+        toggleMenuRef.current();
+      }
+    });
+  }, []);
 
   const closeMenu = useCallback(() => {
     if (openRef.current) {

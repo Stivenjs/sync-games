@@ -7,9 +7,11 @@
 use crate::commands::sync::api::{
     api_request, sync_list_remote_saves, sync_list_remote_saves_for_user,
 };
+use crate::config::gamification::GamificationStateDto;
 use crate::config::{self, Config, ConfigDto, ConfiguredGame, GameDto, OperationLogEntryDto};
 use crate::steam;
 use crate::time;
+use crate::utils::launch_exe;
 use base64::Engine;
 use chrono::Utc;
 use regex::Regex;
@@ -60,6 +62,7 @@ fn expand_path(raw: &str) -> Option<PathBuf> {
 #[tauri::command]
 pub fn get_config() -> ConfigDto {
     let combined = config::get_combined_config();
+    let settings = config::load_settings();
 
     #[cfg(target_os = "windows")]
     let steam_map = steam::get_steam_path_to_appid_map();
@@ -75,6 +78,9 @@ pub fn get_config() -> ConfigDto {
         full_backup_streaming: combined.full_backup_streaming,
         full_backup_streaming_dry_run: combined.full_backup_streaming_dry_run,
         total_playtime: time::get_total_playtime(),
+        profile_background: settings.profile_background.clone(),
+        profile_avatar: settings.profile_avatar.clone(),
+        profile_frame: settings.profile_frame.clone(),
         games: combined
             .games
             .into_iter()
@@ -94,6 +100,8 @@ pub fn get_config() -> ConfigDto {
                     edition_label: g.edition_label,
                     source_url: g.source_url,
                     magnet_link: g.magnet_link,
+                    executable_names: g.executable_names.clone(),
+                    launch_executable_path: g.launch_executable_path.clone(),
                     playtime_seconds: g.playtime_seconds,
                 }
             })
@@ -186,6 +194,24 @@ pub fn set_full_backup_streaming_dry_run(enabled: bool) -> Result<(), String> {
     config::save_settings(&settings)
 }
 
+/// Persiste la apariencia del perfil (fondo, avatar, marco). Cadenas vacías o `None` borran el valor.
+#[tauri::command]
+pub fn set_profile_appearance(
+    profile_background: Option<String>,
+    profile_avatar: Option<String>,
+    profile_frame: Option<String>,
+) -> Result<(), String> {
+    fn norm(s: Option<String>) -> Option<String> {
+        s.map(|x| x.trim().to_string()).filter(|x| !x.is_empty())
+    }
+
+    let mut settings = config::load_settings();
+    settings.profile_background = norm(profile_background);
+    settings.profile_avatar = norm(profile_avatar);
+    settings.profile_frame = norm(profile_frame);
+    config::save_settings(&settings)
+}
+
 /// Registra un nuevo juego dentro del manifiesto local.
 ///
 /// Agrupa rutas de guardado bajo un único identificador lógico, ignorando la
@@ -244,6 +270,7 @@ pub fn add_game(
             edition_label: trim_opt(edition_label),
             source_url: trim_opt(source_url),
             magnet_link: None,
+            launch_executable_path: None,
             playtime_seconds: 0,
         });
     }
@@ -348,6 +375,76 @@ pub fn remove_game(game_id: String, path: Option<String>) -> Result<(), String> 
         library.games.remove(idx);
     }
 
+    config::save_library(&library)
+}
+
+/// Lista ejecutables de procesos en ejecución (nombres únicos, ordenados) para el selector manual.
+#[tauri::command]
+pub fn list_running_process_exe_names() -> Vec<String> {
+    crate::system::process_check::list_running_process_exe_names()
+}
+
+/// Inicia el ejecutable configurado para este juego (ruta absoluta guardada en config).
+#[tauri::command]
+pub fn launch_game(game_id: String) -> Result<(), String> {
+    let library = config::load_library();
+    let game_id = game_id.trim();
+    let game = library
+        .games
+        .iter()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| "Juego no encontrado".to_string())?;
+    let path = game
+        .launch_executable_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Configura primero el ejecutable del juego".to_string())?;
+    if !Path::new(path).is_file() {
+        return Err(format!("El archivo no existe: {}", path));
+    }
+    launch_exe::launch_game_executable(path)
+}
+
+/// Guarda la ruta al .exe para abrir el juego desde la app (`None` o cadena vacía borra la ruta).
+#[tauri::command]
+pub fn set_game_launch_executable(game_id: String, path: Option<String>) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+    g.launch_executable_path = path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    config::save_library(&library)
+}
+
+/// Fija los nombres de proceso usados para detectar si el juego está en ejecución.
+/// Lista vacía restaura la detección automática por nombre del juego.
+#[tauri::command]
+pub fn set_game_executable_names(game_id: String, names: Vec<String>) -> Result<(), String> {
+    let mut library = config::load_library();
+    let game_id = game_id.trim();
+    let g = library
+        .games
+        .iter_mut()
+        .find(|g| g.id.eq_ignore_ascii_case(game_id))
+        .ok_or_else(|| format!("Juego no encontrado: {}", game_id))?;
+    let filtered: Vec<String> = names
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    g.executable_names = if filtered.is_empty() {
+        None
+    } else {
+        Some(filtered)
+    };
     config::save_library(&library)
 }
 
@@ -487,6 +584,10 @@ pub fn import_config_from_file(path: String, mode: String) -> Result<(), String>
                 current.custom_scan_paths.push(p);
             }
         }
+        current.gamification = crate::config::gamification::merge_gamification(
+            &current.gamification,
+            &imported.gamification,
+        );
         return config::apply_combined_config(&current);
     }
 
@@ -710,6 +811,9 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
         full_backup_streaming: None,
         full_backup_streaming_dry_run: None,
         total_playtime: 0,
+        profile_background: None,
+        profile_avatar: None,
+        profile_frame: None,
         games: imported
             .games
             .into_iter()
@@ -721,6 +825,8 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
                 edition_label: g.edition_label,
                 source_url: g.source_url,
                 magnet_link: g.magnet_link,
+                executable_names: g.executable_names.clone(),
+                launch_executable_path: g.launch_executable_path.clone(),
                 playtime_seconds: g.playtime_seconds,
             })
             .collect(),
@@ -748,10 +854,11 @@ pub fn add_games_from_friend(friend_games: Vec<GameDto>) -> Result<usize, String
             },
             steam_app_id: g.steam_app_id,
             image_url: g.image_url,
-            executable_names: None,
+            executable_names: g.executable_names.clone(),
             edition_label: g.edition_label,
             source_url: g.source_url,
             magnet_link: None,
+            launch_executable_path: g.launch_executable_path.clone(),
             playtime_seconds: 0,
         });
         existing_ids.insert(g.id.to_lowercase());
@@ -808,4 +915,39 @@ pub async fn import_friend_config(friend_user_id: String) -> Result<(), String> 
     imported.user_id = Some(friend_id.to_string());
 
     config::apply_combined_config(&imported)
+}
+
+#[tauri::command]
+pub fn get_gamification_state() -> GamificationStateDto {
+    let g = config::load_gamification();
+    let total = time::get_total_playtime();
+    config::gamification::build_state_dto(&g, total)
+}
+
+#[tauri::command]
+pub fn consume_achievement_toasts() -> Result<Vec<String>, String> {
+    let mut g = config::load_gamification();
+    let out = std::mem::take(&mut g.pending_achievement_toasts);
+    config::save_gamification(&g)?;
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn mark_shortcuts_hint_seen() -> Result<(), String> {
+    let mut g = config::load_gamification();
+    g.seen_shortcuts_hint = true;
+    config::save_gamification(&g)
+}
+
+#[tauri::command]
+pub fn mark_weekly_digest_notified(week_id: String) -> Result<(), String> {
+    let mut g = config::load_gamification();
+    g.last_weekly_digest_notification_week_id = week_id;
+    config::save_gamification(&g)
+}
+
+#[tauri::command]
+pub fn should_show_weekly_digest_notification(current_week_id: String) -> bool {
+    let g = config::load_gamification();
+    g.last_weekly_digest_notification_week_id != current_week_id && g.weekly_playtime_seconds >= 60
 }

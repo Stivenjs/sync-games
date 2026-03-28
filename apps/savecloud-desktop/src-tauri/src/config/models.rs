@@ -31,6 +31,15 @@ pub struct AppSettings {
     pub full_backup_streaming: Option<bool>,
     #[serde(default)]
     pub full_backup_streaming_dry_run: Option<bool>,
+    /// URL o ruta local: fondo del perfil (imagen, GIF o vídeo).
+    #[serde(default)]
+    pub profile_background: Option<String>,
+    /// URL, data URL o ruta local: avatar del perfil.
+    #[serde(default)]
+    pub profile_avatar: Option<String>,
+    /// URL o ruta local: marco superpuesto al avatar (PNG recomendado).
+    #[serde(default)]
+    pub profile_frame: Option<String>,
 }
 
 /// Biblioteca local de juegos configurados.
@@ -68,6 +77,9 @@ pub struct ConfiguredGame {
     pub source_url: Option<String>,
     #[serde(default)]
     pub magnet_link: Option<String>,
+    /// Ruta absoluta al .exe para abrir el juego desde la app (opcional).
+    #[serde(default)]
+    pub launch_executable_path: Option<String>,
     #[serde(default)]
     pub playtime_seconds: u64,
 }
@@ -81,6 +93,30 @@ pub struct OperationLogEntry {
     pub game_id: String,
     pub file_count: u32,
     pub err_count: u32,
+}
+
+/// Gamificación y estadísticas locales; viaja en el JSON monolítico (export, import, nube).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GamificationConfig {
+    #[serde(default)]
+    pub upload_success_count: u64,
+    #[serde(default)]
+    pub utc_days_with_sync: Vec<String>,
+    #[serde(default)]
+    pub utc_days_with_play: Vec<String>,
+    #[serde(default)]
+    pub weekly_playtime_seconds: u64,
+    #[serde(default)]
+    pub week_id: String,
+    #[serde(default)]
+    pub achievements_unlocked: Vec<String>,
+    #[serde(default)]
+    pub pending_achievement_toasts: Vec<String>,
+    #[serde(default)]
+    pub seen_shortcuts_hint: bool,
+    #[serde(default)]
+    pub last_weekly_digest_notification_week_id: String,
 }
 
 /// Vista unificada de la configuración completa.
@@ -101,6 +137,8 @@ pub struct Config {
     pub games: Vec<ConfiguredGame>,
     #[serde(default)]
     pub operation_history: Vec<OperationLogEntry>,
+    #[serde(default)]
+    pub gamification: GamificationConfig,
 }
 
 /// Objeto de transferencia de datos (DTO) de la configuración principal,
@@ -117,6 +155,12 @@ pub struct ConfigDto {
     pub full_backup_streaming: Option<bool>,
     pub full_backup_streaming_dry_run: Option<bool>,
     pub total_playtime: u64,
+    #[serde(default)]
+    pub profile_background: Option<String>,
+    #[serde(default)]
+    pub profile_avatar: Option<String>,
+    #[serde(default)]
+    pub profile_frame: Option<String>,
 }
 
 /// DTO representativo de un juego para el frontend.
@@ -130,6 +174,10 @@ pub struct GameDto {
     pub edition_label: Option<String>,
     pub source_url: Option<String>,
     pub magnet_link: Option<String>,
+    #[serde(default)]
+    pub executable_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub launch_executable_path: Option<String>,
     pub playtime_seconds: u64,
 }
 

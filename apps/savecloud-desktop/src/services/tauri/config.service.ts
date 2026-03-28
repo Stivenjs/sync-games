@@ -23,6 +23,19 @@ export async function getConfig(): Promise<Config> {
   return invoke<Config>("get_config");
 }
 
+/** Guarda fondo, avatar y marco del perfil (vacío o null borra cada campo). */
+export async function setProfileAppearance(updates: {
+  profileBackground?: string | null;
+  profileAvatar?: string | null;
+  profileFrame?: string | null;
+}): Promise<void> {
+  await invoke("set_profile_appearance", {
+    profileBackground: updates.profileBackground ?? null,
+    profileAvatar: updates.profileAvatar ?? null,
+    profileFrame: updates.profileFrame ?? null,
+  });
+}
+
 /** Ruta del archivo de configuración (para mostrar al usuario) */
 export async function getConfigPath(): Promise<string> {
   return invoke<string>("get_config_path");
@@ -67,6 +80,50 @@ export async function getSteamAppdetailsMediaBatch(
   const ids = appIds.filter((id) => id?.trim());
   if (!ids.length) return {};
   return invoke<Record<string, SteamAppdetailsMediaResult>>("get_steam_appdetails_media_batch", { appIds: ids });
+}
+
+/** Ficha completa de un juego de Steam: descripción, requisitos, géneros, medios, etc. */
+export interface SteamAppDetailsResult {
+  name: string;
+  shortDescription: string;
+  detailedDescription: string;
+  headerImage: string;
+  developers: string[];
+  publishers: string[];
+  genres: string[];
+  categories: string[];
+  releaseDate: string | null;
+  pcRequirementsMinimum: string | null;
+  pcRequirementsRecommended: string | null;
+  media: SteamAppdetailsMediaResult;
+}
+
+/** Obtiene la ficha completa de un juego de Steam (descripción, requisitos, géneros, medios). */
+export async function getSteamAppDetails(appId: string): Promise<SteamAppDetailsResult> {
+  return invoke<SteamAppDetailsResult>("get_steam_app_details", { appId });
+}
+
+/** Lista nombres de ejecutable únicos de procesos en ejecución (para asignar detección manual). */
+export function listRunningProcessExeNames(): Promise<string[]> {
+  return invoke<string[]>("list_running_process_exe_names");
+}
+
+/** Inicia el ejecutable configurado para el juego. */
+export function launchGame(gameId: string): Promise<void> {
+  return invoke("launch_game", { gameId });
+}
+
+/** Guarda la ruta al .exe para abrir el juego desde la app (`null` borra). */
+export function setGameLaunchExecutable(gameId: string, path: string | null): Promise<void> {
+  return invoke("set_game_launch_executable", { gameId, path });
+}
+
+/**
+ * Fija los nombres de proceso para detectar si el juego está en ejecución.
+ * Array vacío restaura la detección automática.
+ */
+export function setGameExecutableNames(gameId: string, names: string[]): Promise<void> {
+  return invoke("set_game_executable_names", { gameId, names });
 }
 
 /** Comprueba si un único juego está en ejecución (para mostrar advertencia) */
@@ -606,18 +663,57 @@ export async function previewDownload(gameId: string): Promise<PreviewDownload> 
 }
 
 /** Inicia la descarga de un torrent */
-export async function startTorrentDownload(magnet: string, savePath: string): Promise<void> {
-  await invoke("start_torrent_download", { magnet, savePath });
+export async function startTorrentDownload(magnet: string, savePath: string): Promise<string> {
+  return invoke<string>("start_torrent_download", { magnet, savePath });
 }
 
 /** Inicia la descarga de un torrent a partir de un archivo .torrent */
-export async function startTorrentFileDownload(file: string, savePath: string): Promise<void> {
-  await invoke("start_torrent_file_download", { file, savePath });
+export async function startTorrentFileDownload(filePath: string, savePath: string): Promise<string> {
+  return invoke<string>("start_torrent_file_download", { filePath, savePath });
 }
 
 /** Cancela la descarga de un torrent */
 export async function cancelTorrent(infoHash: string): Promise<void> {
   await invoke("cancel_torrent", { infoHash });
+}
+
+/** Pausa la descarga de un torrent */
+export async function pauseTorrent(infoHash: string): Promise<void> {
+  await invoke("pause_torrent", { infoHash });
+}
+
+/** Reanuda la descarga de un torrent pausado */
+export async function resumeTorrent(infoHash: string): Promise<void> {
+  await invoke("resume_torrent", { infoHash });
+}
+
+/** Información de un archivo .torrent en la nube */
+export interface CloudTorrentInfo {
+  gameId: string;
+  key: string;
+  filename: string;
+  lastModified: string;
+  size?: number;
+}
+
+/** Sube un archivo .torrent a la nube asociado a un juego */
+export async function uploadTorrentToCloud(gameId: string, torrentPath: string): Promise<void> {
+  await invoke("upload_torrent_to_cloud", { gameId, torrentPath });
+}
+
+/** Lista los archivos .torrent almacenados en la nube para un juego */
+export async function listCloudTorrents(gameId: string): Promise<CloudTorrentInfo[]> {
+  return invoke<CloudTorrentInfo[]>("list_cloud_torrents", { gameId });
+}
+
+/** Descarga un .torrent desde la nube e inicia la descarga P2P del contenido */
+export async function downloadTorrentFromCloud(gameId: string, torrentKey: string, savePath: string): Promise<string> {
+  return invoke<string>("download_torrent_from_cloud", { gameId, torrentKey, savePath });
+}
+
+/** Elimina un .torrent almacenado en la nube */
+export async function deleteCloudTorrent(gameId: string, torrentKey: string): Promise<void> {
+  await invoke("delete_cloud_torrent", { gameId, torrentKey });
 }
 
 /** Obtiene los nombres de los juegos de Steam en batch. */

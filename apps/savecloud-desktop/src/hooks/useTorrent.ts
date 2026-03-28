@@ -1,19 +1,72 @@
-import { useMutation } from "@tanstack/react-query";
-import { startTorrentDownload, startTorrentFileDownload, cancelTorrent } from "@services/tauri";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  startTorrentDownload,
+  startTorrentFileDownload,
+  cancelTorrent,
+  pauseTorrent,
+  resumeTorrent,
+  uploadTorrentToCloud,
+  listCloudTorrents,
+  downloadTorrentFromCloud,
+  deleteCloudTorrent,
+} from "@services/tauri";
+import { useTorrentStore } from "@store/TorrentStore";
 
-export function useTorrent() {
-  const startTorrentDownloadMutation = useMutation({
+export function useTorrent(gameId?: string) {
+  const progress = useTorrentStore((s) => s.progress);
+
+  const startMagnetMutation = useMutation({
     mutationFn: ({ magnet, savePath }: { magnet: string; savePath: string }) => startTorrentDownload(magnet, savePath),
   });
-  const startTorrentFileDownloadMutation = useMutation({
-    mutationFn: ({ file, savePath }: { file: string; savePath: string }) => startTorrentFileDownload(file, savePath),
+
+  const startFileMutation = useMutation({
+    mutationFn: ({ filePath, savePath }: { filePath: string; savePath: string }) =>
+      startTorrentFileDownload(filePath, savePath),
   });
-  const cancelTorrentMutation = useMutation({
+
+  const cancelMutation = useMutation({
     mutationFn: ({ infoHash }: { infoHash: string }) => cancelTorrent(infoHash),
   });
+
+  const pauseMutation = useMutation({
+    mutationFn: ({ infoHash }: { infoHash: string }) => pauseTorrent(infoHash),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: ({ infoHash }: { infoHash: string }) => resumeTorrent(infoHash),
+  });
+
+  const uploadToCloudMutation = useMutation({
+    mutationFn: ({ gameId, torrentPath }: { gameId: string; torrentPath: string }) =>
+      uploadTorrentToCloud(gameId, torrentPath),
+  });
+
+  const deleteFromCloudMutation = useMutation({
+    mutationFn: ({ gameId, torrentKey }: { gameId: string; torrentKey: string }) =>
+      deleteCloudTorrent(gameId, torrentKey),
+  });
+
+  const cloudTorrentsQuery = useQuery({
+    queryKey: ["cloud-torrents", gameId],
+    queryFn: () => listCloudTorrents(gameId!),
+    enabled: !!gameId,
+  });
+
+  const downloadFromCloudMutation = useMutation({
+    mutationFn: ({ gameId, torrentKey, savePath }: { gameId: string; torrentKey: string; savePath: string }) =>
+      downloadTorrentFromCloud(gameId, torrentKey, savePath),
+  });
+
   return {
-    startTorrentDownloadMutation,
-    startTorrentFileDownloadMutation,
-    cancelTorrentMutation,
+    progress,
+    startMagnetMutation,
+    startFileMutation,
+    cancelMutation,
+    pauseMutation,
+    resumeMutation,
+    uploadToCloudMutation,
+    deleteFromCloudMutation,
+    cloudTorrentsQuery,
+    downloadFromCloudMutation,
   };
 }

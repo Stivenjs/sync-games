@@ -15,19 +15,19 @@
       {
         "label": "main",
         "title": "SaveCloud",
-        "center": true,
-        "width": 1280,
-        "height": 720,
-        "minWidth": 900,
-        "minHeight": 720,
+        "maximized": true,
         "resizable": true,
-        "decorations": true,
-        "transparent": false
+        "decorations": true
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      },
       "csp": {
-        "img-src": "'self' data: blob: https: http:"
+        "img-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost",
+        "media-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost"
       }
     }
   },
