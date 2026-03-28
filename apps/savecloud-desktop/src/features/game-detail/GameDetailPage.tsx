@@ -1,21 +1,39 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Spinner } from "@heroui/react";
-import { ArrowLeft, Gamepad2 } from "lucide-react";
+import { Button, Spinner, Tab, Tabs } from "@heroui/react";
+import { ArrowLeft, Cpu, Gamepad2, LayoutList, ScrollText } from "lucide-react";
 import { formatGameDisplayName } from "@utils/gameImage";
 import { launchGame, openSaveFolder, removeGame, syncDownloadGame, syncUploadGame } from "@services/tauri";
 import { createShareLink } from "@services/share.service";
 import { toastError, toastSuccess } from "@utils/toast";
 import { useGameDetail } from "@features/game-detail/useGameDetail";
 import { GameDetailHero } from "@features/game-detail/GameDetailHero";
-import { GameDetailStats } from "@features/game-detail/GameDetailStats";
-import { GameDetailActions } from "@features/game-detail/GameDetailActions";
-import { GameDetailInfo } from "@features/game-detail/GameDetailInfo";
+import { GameDetailActionStrip } from "@features/game-detail/GameDetailActionStrip";
+import {
+  GameDetailLocalSummary,
+  GameDetailRequirementsPanel,
+  GameDetailSteamDetailsPanel,
+  GameDetailSummaryPanel,
+  hasSteamRequirements,
+} from "@features/game-detail/GameDetailInfo";
 import type { ConfiguredGame } from "@app-types/config";
 
 export function GameDetailPage() {
   const navigate = useNavigate();
   const { gameId, game, steamDetails, stats, isGameRunning, mediaUrls, isLoading, hasSyncConfig } = useGameDetail();
+  const [activeTab, setActiveTab] = useState("summary");
+  const tabsShellRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setActiveTab("summary");
+  }, [gameId]);
+
+  const handleTabsSelectionChange = useCallback((key: React.Key) => {
+    setActiveTab(String(key));
+    requestAnimationFrame(() => {
+      tabsShellRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const displayName = steamDetails?.name || formatGameDisplayName(gameId);
 
@@ -102,36 +120,93 @@ export function GameDetailPage() {
     );
   }
 
+  const showRequirementsTab = steamDetails ? hasSteamRequirements(steamDetails) : false;
+
   return (
-    <div className="space-y-6">
-      {/* Hero banner (full-bleed, botón volver aparece en hover) */}
-      <GameDetailHero mediaUrls={mediaUrls} gameName={displayName} gameId={gameId} isLoading={isLoading} />
+    <div className="space-y-5 pb-4">
+      <GameDetailHero
+        mediaUrls={mediaUrls}
+        headerImage={steamDetails?.headerImage}
+        customImageUrl={game.imageUrl}
+        gameName={displayName}
+        editionLabel={game.editionLabel}
+        gameId={gameId}
+        isLoading={isLoading}
+      />
 
-      {/* Título y acciones */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">{displayName}</h1>
-          {game.editionLabel && <p className="text-sm text-default-400">{game.editionLabel}</p>}
+      <GameDetailActionStrip
+        game={game}
+        stats={stats}
+        isGameRunning={isGameRunning}
+        hasSyncConfig={hasSyncConfig}
+        onPlay={handlePlay}
+        onOpenFolder={handleOpenFolder}
+        onSync={hasSyncConfig ? handleSync : undefined}
+        onDownload={hasSyncConfig ? handleDownload : undefined}
+        onShare={hasSyncConfig ? handleShare : undefined}
+        onRemove={handleRemove}
+      />
+
+      {steamDetails ? (
+        <div
+          ref={tabsShellRef}
+          className="scroll-mt-6 overflow-hidden rounded-2xl border border-default-200/80 bg-content1/95 shadow-md ring-1 ring-black/5 dark:border-default-100/25 dark:bg-default-50/15 dark:ring-white/5">
+          <Tabs
+            selectedKey={activeTab}
+            onSelectionChange={handleTabsSelectionChange}
+            variant="solid"
+            color="default"
+            size="md"
+            classNames={{
+              base: "w-full",
+              tabList:
+                "w-full gap-1 rounded-t-2xl border-b border-default-200/70 bg-default-100/90 p-1.5 dark:border-default-100/20 dark:bg-default-100/25",
+              tab: "h-11 max-w-none flex-1 data-[selected=true]:bg-content1 data-[selected=true]:shadow-sm",
+              cursor: "hidden",
+              panel:
+                "min-h-[16rem] border-t border-default-200/40 bg-linear-to-b from-default-50/60 to-content1 px-5 py-6 sm:min-h-[18rem] sm:px-7 sm:py-8 dark:border-default-100/15 dark:from-default-50/10 dark:to-default-50/5",
+            }}
+            aria-label="Secciones del juego">
+            <Tab
+              key="summary"
+              title={
+                <span className="flex items-center justify-center gap-2">
+                  <LayoutList size={17} className="opacity-90" />
+                  <span>Resumen</span>
+                </span>
+              }>
+              <GameDetailSummaryPanel details={steamDetails} />
+            </Tab>
+            <Tab
+              key="details"
+              title={
+                <span className="flex items-center justify-center gap-2">
+                  <ScrollText size={17} className="opacity-90" />
+                  <span>Detalles</span>
+                </span>
+              }>
+              <GameDetailSteamDetailsPanel details={steamDetails} />
+            </Tab>
+            {showRequirementsTab ? (
+              <Tab
+                key="requirements"
+                title={
+                  <span className="flex items-center justify-center gap-2">
+                    <Cpu size={17} className="opacity-90" />
+                    <span>Requisitos</span>
+                  </span>
+                }>
+                <GameDetailRequirementsPanel details={steamDetails} />
+              </Tab>
+            ) : null}
+          </Tabs>
         </div>
-
-        <GameDetailActions
-          game={game}
-          isGameRunning={isGameRunning}
-          hasSyncConfig={hasSyncConfig}
-          onPlay={handlePlay}
-          onOpenFolder={handleOpenFolder}
-          onSync={hasSyncConfig ? handleSync : undefined}
-          onDownload={hasSyncConfig ? handleDownload : undefined}
-          onShare={hasSyncConfig ? handleShare : undefined}
-          onRemove={handleRemove}
-        />
-      </div>
-
-      {/* Stats */}
-      <GameDetailStats stats={stats} isGameRunning={isGameRunning} />
-
-      {/* Información del juego (Steam) */}
-      <GameDetailInfo details={steamDetails} isLoading={!!game && isLoading} />
+      ) : (
+        <section className="rounded-xl border border-default-200/60 bg-content1/40 px-4 py-5 dark:border-default-100/20">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-default-500">Resumen</h2>
+          <GameDetailLocalSummary game={game} />
+        </section>
+      )}
     </div>
   );
 }

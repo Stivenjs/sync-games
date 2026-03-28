@@ -92,14 +92,6 @@ export function GameDetailActions({
         Jugar
       </Button>
 
-      <Button
-        color="primary"
-        variant="bordered"
-        startContent={<FolderOpen size={18} />}
-        onPress={() => onOpenFolder?.(game)}>
-        Abrir carpeta
-      </Button>
-
       <Dropdown placement="bottom-end">
         <DropdownTrigger>
           <Button variant="bordered" endContent={<ChevronDown size={16} />}>
@@ -109,6 +101,10 @@ export function GameDetailActions({
         <DropdownMenu aria-label={`Acciones para ${game.id}`} onAction={handleAction} disabledKeys={disabledKeys}>
           <DropdownItem key="edit" startContent={<Pencil size={16} />}>
             Editar juego
+          </DropdownItem>
+
+          <DropdownItem key="folder" startContent={<FolderOpen size={16} />}>
+            Abrir carpeta
           </DropdownItem>
 
           <DropdownItem
