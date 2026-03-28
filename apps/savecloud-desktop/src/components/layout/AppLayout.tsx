@@ -1,10 +1,9 @@
-import { type ReactNode, startTransition, useRef } from "react";
+import { type ReactNode, startTransition } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@heroui/react";
 import { Moon, Sun } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { NavItem } from "@components/layout/Sidebar";
-import { ScrollContainerRefContext } from "@components/layout/ScrollContainerContext";
 import { StaggeredMenu } from "@components/external/StaggeredMenu";
 
 interface AppLayoutProps {
@@ -26,7 +25,6 @@ export function AppLayout({ navItems, children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isDark = resolvedTheme === "dark";
-  const mainScrollRef = useRef<HTMLElement>(null);
 
   const handleNavigation = (link: string) => {
     if (location.pathname === link) return;
