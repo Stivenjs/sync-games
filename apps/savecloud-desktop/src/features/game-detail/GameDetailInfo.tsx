@@ -4,6 +4,8 @@ import { CalendarDays, Code2, FolderOpen, Tags, Users } from "lucide-react";
 import type { SteamAppDetailsResult } from "@services/tauri";
 import type { ConfiguredGame } from "@app-types/config";
 import { resolveSteamSummaryBlurb } from "@utils/steamText";
+import { useRunCompatibility } from "@hooks/useRunCompatibility";
+import { GameDetailRunCompatibility } from "@features/game-detail/GameDetailRunCompatibility";
 
 function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
   return (
@@ -159,12 +161,32 @@ export function GameDetailSteamDetailsPanel({ details }: { details: SteamAppDeta
 }
 
 export function GameDetailRequirementsPanel({ details }: { details: SteamAppDetailsResult }) {
-  if (!details.pcRequirementsMinimum && !details.pcRequirementsRecommended) {
-    return <p className="text-sm text-default-500">No hay requisitos publicados en la tienda para este título.</p>;
+  const hasStoreRequirements = !!(details.pcRequirementsMinimum || details.pcRequirementsRecommended);
+  const compatibility = useRunCompatibility(
+    details.pcRequirementsMinimum,
+    details.pcRequirementsRecommended,
+    hasStoreRequirements
+  );
+
+  if (!hasStoreRequirements) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-default-500">No hay requisitos publicados en la tienda para este título.</p>
+        <p className="text-xs leading-relaxed text-default-400">
+          Sin texto de requisitos en la ficha de Steam no podemos estimar si tu PC los cumple; busca la información en
+          el sitio del desarrollador o en la tienda donde compraste el juego.
+        </p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
+      <GameDetailRunCompatibility
+        report={compatibility.data}
+        isLoading={compatibility.isLoading}
+        isError={compatibility.isError}
+      />
       <p className="text-sm leading-relaxed text-default-600 dark:text-default-400">
         Especificaciones publicadas en la tienda. Pueden no coincidir con el hardware que uses para jugar desde
         SaveCloud.
@@ -208,9 +230,19 @@ export function GameDetailLocalSummary({ game }: { game: ConfiguredGame }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-default-600 dark:text-default-400">
-        No hay datos de la tienda de Steam para este juego. Puedes seguir gestionando guardados y backups con las
-        acciones de arriba.
+        No hay datos de la tienda de Steam para este juego (no hay App ID o no se pudo cargar la ficha). Puedes seguir
+        gestionando guardados y backups con las acciones de arriba.
       </p>
+      <Card className="border border-default-200/60 bg-default-50/30 dark:border-default-100/20 dark:bg-default-50/10">
+        <CardBody className="px-4 py-3">
+          <p className="text-xs font-medium text-default-700 dark:text-default-300">Compatibilidad con tu PC</p>
+          <p className="mt-2 text-xs leading-relaxed text-default-500">
+            La comparación automática entre tu equipo y los requisitos del juego solo está disponible cuando la app
+            puede obtener la ficha de Steam (requisitos publicados en la tienda). Para títulos fuera de Steam, revisa la
+            web del juego o el lector de requisitos de la tienda donde lo compraste.
+          </p>
+        </CardBody>
+      </Card>
       <Card className="border border-default-200/60 shadow-sm dark:border-default-100/20">
         <CardBody className="space-y-3 px-5 py-4">
           <div className="flex items-start gap-2">
