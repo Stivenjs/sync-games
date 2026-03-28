@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Spinner, Tab, Tabs } from "@heroui/react";
 import { ArrowLeft, Cpu, Gamepad2, LayoutList, ScrollText } from "lucide-react";
 import { formatGameDisplayName } from "@utils/gameImage";
-import { launchGame, openSaveFolder, removeGame, syncDownloadGame, syncUploadGame } from "@services/tauri";
+import { launchGame, openSaveFolder, removeGame, scheduleConfigBackupToCloud } from "@services/tauri";
 import { createShareLink } from "@services/share.service";
 import { toastError, toastSuccess } from "@utils/toast";
-import { useGameDetail } from "@features/game-detail/useGameDetail";
+import { CONFIG_QUERY_KEY } from "@hooks/useConfig";
+import { LARGE_GAME_BLOCK_SIZE_BYTES } from "@utils/packageRecommendation";
+import { GameDrawer } from "@features/games/GameDrawer";
+import { GameTorrentDrawer } from "@features/games/GameTorrentDrawer";
+import { FullBackupConfirmModal } from "@features/games/FullBackupConfirmModal";
+import { RestoreBackupModal } from "@features/games/RestoreBackupModal";
+import { useGameDetail } from "@/hooks/useGameDetail";
+import { useGameDetailCloudActions } from "@/hooks/useGameDetailCloudActions";
 import { GameDetailHero } from "@features/game-detail/GameDetailHero";
 import { GameDetailActionStrip } from "@features/game-detail/GameDetailActionStrip";
 import {
@@ -20,9 +28,16 @@ import type { ConfiguredGame } from "@app-types/config";
 
 export function GameDetailPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { handleSync, handleDownload, handleFullBackupUpload, isSyncing, isDownloading, fullBackupUploadingGameId } =
+    useGameDetailCloudActions();
   const { gameId, game, steamDetails, stats, isGameRunning, mediaUrls, isLoading, hasSyncConfig } = useGameDetail();
   const [activeTab, setActiveTab] = useState("summary");
   const tabsShellRef = useRef<HTMLDivElement>(null);
+  const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
+  const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
+  const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
+  const [gameToRestoreBackup, setGameToRestoreBackup] = useState<ConfiguredGame | null>(null);
 
   useEffect(() => {
     setActiveTab("summary");
@@ -52,24 +67,6 @@ export function GameDetailPage() {
       await launchGame(g.id);
     } catch (e) {
       toastError("No se pudo abrir el juego", e instanceof Error ? e.message : "Error inesperado");
-    }
-  }, []);
-
-  const handleSync = useCallback(async (g: ConfiguredGame) => {
-    try {
-      await syncUploadGame(g.id);
-      toastSuccess("Subido", `${formatGameDisplayName(g.id)} sincronizado con la nube.`);
-    } catch (e) {
-      toastError("Error al sincronizar", e instanceof Error ? e.message : "Error inesperado");
-    }
-  }, []);
-
-  const handleDownload = useCallback(async (g: ConfiguredGame) => {
-    try {
-      await syncDownloadGame(g.id);
-      toastSuccess("Descargado", `${formatGameDisplayName(g.id)} restaurado desde la nube.`);
-    } catch (e) {
-      toastError("Error al descargar", e instanceof Error ? e.message : "Error inesperado");
     }
   }, []);
 
@@ -121,6 +118,7 @@ export function GameDetailPage() {
   }
 
   const showRequirementsTab = steamDetails ? hasSteamRequirements(steamDetails) : false;
+  const isUploadTooLarge = (stats?.localSizeBytes ?? 0) >= LARGE_GAME_BLOCK_SIZE_BYTES;
 
   return (
     <div className="space-y-5 pb-4">
@@ -138,13 +136,57 @@ export function GameDetailPage() {
         game={game}
         stats={stats}
         isGameRunning={isGameRunning}
-        hasSyncConfig={hasSyncConfig}
+        isUploadTooLarge={isUploadTooLarge}
+        isSyncing={isSyncing}
+        isDownloading={isDownloading}
+        isFullBackupUploading={fullBackupUploadingGameId === game.id}
         onPlay={handlePlay}
         onOpenFolder={handleOpenFolder}
+        onEdit={setGameToEdit}
+        onTorrent={setGameForTorrent}
         onSync={hasSyncConfig ? handleSync : undefined}
         onDownload={hasSyncConfig ? handleDownload : undefined}
         onShare={hasSyncConfig ? handleShare : undefined}
         onRemove={handleRemove}
+        onRestoreBackup={setGameToRestoreBackup}
+        onFullBackupUpload={hasSyncConfig ? setGameToFullBackupConfirm : undefined}
+      />
+
+      <GameDrawer
+        isOpen={!!gameToEdit}
+        onClose={() => setGameToEdit(null)}
+        onSuccess={() => {
+          scheduleConfigBackupToCloud();
+          void queryClient.invalidateQueries({ queryKey: CONFIG_QUERY_KEY });
+          setGameToEdit(null);
+        }}
+        mode="edit"
+        game={gameToEdit}
+      />
+      <GameTorrentDrawer
+        isOpen={!!gameForTorrent}
+        onClose={() => setGameForTorrent(null)}
+        game={gameForTorrent}
+        cloudEnabled={hasSyncConfig}
+      />
+      <FullBackupConfirmModal
+        isOpen={!!gameToFullBackupConfirm}
+        onClose={() => setGameToFullBackupConfirm(null)}
+        game={gameToFullBackupConfirm}
+        onConfirm={async () => {
+          if (gameToFullBackupConfirm) {
+            await handleFullBackupUpload(gameToFullBackupConfirm);
+          }
+        }}
+      />
+      <RestoreBackupModal
+        isOpen={!!gameToRestoreBackup}
+        onClose={() => setGameToRestoreBackup(null)}
+        game={gameToRestoreBackup}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: ["game-stats"] });
+          void queryClient.invalidateQueries({ queryKey: CONFIG_QUERY_KEY });
+        }}
       />
 
       {steamDetails ? (
