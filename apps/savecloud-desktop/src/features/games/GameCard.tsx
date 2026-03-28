@@ -1,9 +1,9 @@
-import { memo, useCallback, startTransition, addTransitionType, ViewTransition } from "react";
+import { memo, useCallback, useMemo, startTransition, addTransitionType, ViewTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardFooter, Skeleton, Tooltip } from "@heroui/react";
 import { GameCardHoverMotion } from "@features/games/GameCardHoverMotion";
 import { Clock, Gamepad2 } from "lucide-react";
-import { formatGameDisplayName } from "@utils/gameImage";
+import { formatGameDisplayName, getSteamAppId } from "@utils/gameImage";
 import { formatBytes, formatPlaytime, formatRelativeDate } from "@utils/format";
 import { GameCardHoverCard } from "@features/games/GameCardHoverCard";
 import { GameCardStatusBar } from "@features/games/GameCardStatusBar";
@@ -12,7 +12,7 @@ import { LARGE_GAME_BLOCK_SIZE_BYTES } from "@utils/packageRecommendation";
 import { GameCardActions } from "@features/games/GameCardActions";
 import { useGameMedia } from "@hooks/useGameMedia";
 import { useSyncStore } from "@store/SyncStore";
-import { preloadGameDetail } from "@components/navigation/PageContent";
+import { useGameDetailHoverPrefetch } from "@hooks/useGameDetailHoverPrefetch";
 import type { ConfiguredGame } from "@app-types/config";
 import type { GameStats } from "@services/tauri";
 import type { SteamAppdetailsMediaResult } from "@services/tauri";
@@ -99,6 +99,9 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
 
   const navigate = useNavigate();
 
+  const steamAppId = useMemo(() => getSteamAppId(game, resolvedSteamAppId), [game, resolvedSteamAppId]);
+  const { onHoverStart, onHoverEnd } = useGameDetailHoverPrefetch(steamAppId);
+
   const handleCardClick = useCallback(() => {
     startTransition(() => {
       addTransitionType("game-detail");
@@ -125,7 +128,8 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
         <div
           className="cursor-pointer"
           onClick={handleCardClick}
-          onMouseEnter={preloadGameDetail}
+          onMouseEnter={onHoverStart}
+          onMouseLeave={onHoverEnd}
           role="link"
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && handleCardClick()}>

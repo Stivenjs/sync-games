@@ -3,19 +3,13 @@ import { Gamepad2, History, Info, Settings, Users } from "lucide-react";
 import type { NavItem } from "@components/layout";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { Spinner } from "@heroui/react";
-
-const gameDetailImport = () => import("@features/game-detail");
+import { preloadGameDetailModule } from "@features/game-detail/gameDetailLazy";
 
 const GamesPage = lazy(() => import("@features/games").then((m) => ({ default: m.GamesPage })));
 const FriendsPage = lazy(() => import("@features/friends/FriendsPage").then((m) => ({ default: m.FriendsPage })));
 const HistoryPage = lazy(() => import("@features/history/HistoryPage").then((m) => ({ default: m.HistoryPage })));
 const SettingsPage = lazy(() => import("@features/settings").then((m) => ({ default: m.SettingsPage })));
-const GameDetailPage = lazy(() => gameDetailImport().then((m) => ({ default: m.GameDetailPage })));
-
-/** Precarga el módulo GameDetailPage (llamar en hover de GameCard) */
-export const preloadGameDetail = () => {
-  gameDetailImport();
-};
+const GameDetailPage = lazy(() => preloadGameDetailModule().then((m) => ({ default: m.GameDetailPage })));
 
 export const NAV_ITEMS: NavItem[] = [
   { id: "/", label: "Juegos", icon: <Gamepad2 size={18} /> },
