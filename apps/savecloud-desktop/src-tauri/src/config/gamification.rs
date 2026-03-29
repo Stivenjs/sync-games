@@ -175,7 +175,7 @@ pub fn on_operation_logged_inner(
 }
 
 /// Actualiza rachas, semana ISO y logros tras sumar tiempo de juego.
-/// `total_playtime_seconds` debe ser la suma en memoria tras actualizar el juego (antes de `save_config`).
+/// `total_playtime_seconds` debe ser la suma en memoria tras actualizar el juego (antes de persistir).
 pub fn apply_playtime_delta(g: &mut GamificationConfig, seconds: u64, total_playtime_seconds: u64) {
     if seconds == 0 {
         return;

@@ -9,31 +9,33 @@
 
 #![allow(dead_code)]
 
-use crate::config;
+use crate::config::{self, gamification::apply_playtime_delta};
 
 /// Añade segundos al contador de un juego específico.
 pub fn add_playtime(game_id: &str, seconds: u64) -> Result<(), String> {
-    let mut cfg = config::load_config();
-
-    if let Some(game) = cfg
+    let mut library = config::load_library();
+    let game = library
         .games
         .iter_mut()
         .find(|g| g.id.eq_ignore_ascii_case(game_id))
-    {
-        game.playtime_seconds += seconds;
-        let total: u64 = cfg.games.iter().map(|g| g.playtime_seconds).sum();
-        crate::config::gamification::apply_playtime_delta(&mut cfg.gamification, seconds, total);
-        config::save_config(&cfg)?;
-        Ok(())
-    } else {
-        Err(format!("No se encontró el juego con ID: {}", game_id))
-    }
+        .ok_or_else(|| format!("No se encontró el juego con ID: {}", game_id))?;
+
+    game.playtime_seconds += seconds;
+    let total: u64 = library.games.iter().map(|g| g.playtime_seconds).sum();
+
+    let mut gamification = config::load_gamification();
+    apply_playtime_delta(&mut gamification, seconds, total);
+
+    config::save_library(&library)?;
+    config::save_gamification(&gamification)?;
+    Ok(())
 }
 
 /// Obtiene el tiempo de un juego en segundos.
 pub fn get_game_playtime(game_id: &str) -> u64 {
-    let cfg = config::load_config();
-    cfg.games
+    let library = config::load_library();
+    library
+        .games
         .iter()
         .find(|g| g.id.eq_ignore_ascii_case(game_id))
         .map(|g| g.playtime_seconds)
@@ -42,8 +44,8 @@ pub fn get_game_playtime(game_id: &str) -> u64 {
 
 /// Obtiene la suma de tiempo de todos los juegos.
 pub fn get_total_playtime() -> u64 {
-    let cfg = config::load_config();
-    cfg.games.iter().map(|g| g.playtime_seconds).sum()
+    let library = config::load_library();
+    library.games.iter().map(|g| g.playtime_seconds).sum()
 }
 
 /// Utilidad para convertir segundos a formato legible (ej: "1h 20m" o "45m").

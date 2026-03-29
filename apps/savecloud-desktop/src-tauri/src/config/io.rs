@@ -301,7 +301,10 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
         .profile_background
         .clone()
         .or(current_settings.profile_background);
-    current_settings.profile_avatar = cfg.profile_avatar.clone().or(current_settings.profile_avatar);
+    current_settings.profile_avatar = cfg
+        .profile_avatar
+        .clone()
+        .or(current_settings.profile_avatar);
     current_settings.profile_frame = cfg.profile_frame.clone().or(current_settings.profile_frame);
 
     save_settings(&current_settings)?;
@@ -319,9 +322,4 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
 /// Carga la configuración combinada. Útil para mantener la compatibilidad con código legacy.
 pub fn load_config() -> Config {
     get_combined_config()
-}
-
-/// Guarda la configuración combinada. Útil para mantener la compatibilidad con código legacy.
-pub fn save_config(cfg: &Config) -> Result<(), String> {
-    apply_combined_config(cfg)
 }
