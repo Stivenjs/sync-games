@@ -51,6 +51,7 @@ tokio = { version = "1", features = ["sync", "time", "fs", "io-util"] }
 tokio-util = { version = "0.7.18", features = ["io", "io-util"] }
 walkdir = "2.5.0"
 thiserror = "2.0.18"
+moka = { version = "0.12", default-features = false, features = ["sync"] }
 
 
 [dev-dependencies]

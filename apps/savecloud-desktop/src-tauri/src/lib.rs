@@ -9,6 +9,7 @@ mod network;
 mod plugins;
 mod setup;
 mod steam;
+mod steam_cache;
 mod system;
 mod time;
 mod torrent;
