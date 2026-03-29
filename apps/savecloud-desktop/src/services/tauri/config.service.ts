@@ -252,6 +252,44 @@ export async function resetSteamCatalogSync(): Promise<void> {
   await invoke("reset_steam_catalog_sync");
 }
 
+/** Ítem del catálogo local (SQLite); mismo criterio camelCase que el backend. */
+export interface CatalogListItem {
+  steamAppId: string;
+  name: string;
+}
+
+/** Página del catálogo local con total global. */
+export interface CatalogPage {
+  total: number;
+  offset: number;
+  limit: number;
+  items: CatalogListItem[];
+}
+
+/** Búsqueda por nombre sobre el catálogo sincronizado (mín. 2 caracteres en el backend). */
+export async function searchSteamCatalog(query: string, limit?: number): Promise<CatalogListItem[]> {
+  return invoke<CatalogListItem[]>("search_steam_catalog", {
+    query,
+    limit: limit ?? null,
+  });
+}
+
+/** Listado paginado por `app_id` ascendente. */
+export async function listSteamCatalogPage(offset?: number, limit?: number): Promise<CatalogPage> {
+  return invoke<CatalogPage>("list_steam_catalog_page", {
+    offset: offset ?? null,
+    limit: limit ?? null,
+  });
+}
+
+/**
+ * Ficha completa desde el catálogo local: caché → JSON en disco → Store API.
+ * Misma forma que `getSteamAppDetails`, pero exige que el `appId` exista en el catálogo sincronizado.
+ */
+export async function getSteamCatalogAppDetails(appId: string): Promise<SteamAppDetailsResult> {
+  return invoke<SteamAppDetailsResult>("get_steam_catalog_app_details", { appId });
+}
+
 /** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Opcionalmente la clave Steam Web API (se guarda en el almacén seguro del SO). Devuelve la ruta del archivo. */
 export async function createConfigFile(
   apiBaseUrl: string,

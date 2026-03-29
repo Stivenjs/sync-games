@@ -1,4 +1,4 @@
-//! Base de datos local **SQLite** para el catálogo Steam (sembrado + consultas paginadas).
+//! Base de datos local **SQLite** para el catálogo Steam (sembrado, listados y `details_json` enriquecido).
 //!
 //! Se usa **`rusqlite`** con SQLite embebido (`bundled`) para no depender de binarios del SO.
 //! El SQL **no** se expone al frontend: solo comandos Tauri invocan este módulo.

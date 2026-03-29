@@ -1,15 +1,17 @@
-//! Sembrado y mantenimiento del catálogo Steam en SQLite.
+//! Catálogo Steam en SQLite: sync desde la Web API, consultas locales y enriquecimiento con Store `appdetails`.
 //!
-//! - **Sync completo**: paginación con `last_appid` hasta `have_more == false`, con reanudación
-//!   en `catalog_sync_meta.resume_last_appid` si el proceso se interrumpe.
-//! - **Incremental**: cuando el full terminó, siguientes ejecuciones usan `if_modified_since`
-//!   con la marca de tiempo de la última sync exitosa para traer solo ítems cambiados.
+//! - **Sync** ([`sync`]): `IStoreService/GetAppList` → tabla `steam_catalog_apps` (id + nombre).
+//! - **Consultas** ([`query`]): búsqueda por `name_normalized` y paginación estable por `app_id`.
+//! - **Enriquecimiento** ([`enrichment`]): `appdetails` de la Store, persistido en `details_json` y caché RAM.
 //!
 //! Requiere clave [Steam Web API](https://steamcommunity.com/dev/apikey): campo
 //! `steamWebApiKey` en settings o variable de entorno `STEAM_WEB_API_KEY`.
 
 mod api;
 pub mod commands;
+mod enrichment;
 mod error;
 mod meta;
+mod query;
 pub mod sync;
+mod types;
