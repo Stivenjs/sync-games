@@ -6,7 +6,7 @@
 //! - Emitir las acciones del Gamepad.
 //! - Manejar los eventos del Gamepad.
 //! - Manejar los estados del Gamepad.
-//! - Manejar los repeticiones de las acciones del Gamepad.
+//! - Manejar las repeticiones de las acciones del Gamepad.
 
 pub mod actions;
 pub mod mapper;
@@ -21,7 +21,10 @@ use tauri::{AppHandle, Emitter};
 
 pub fn start_gamepad_loop(app_handle: AppHandle) {
     thread::spawn(move || {
-        let mut gilrs = Gilrs::new().unwrap();
+        let mut gilrs = match Gilrs::new() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
         let mut input_state = InputState::new();
 
         loop {
@@ -57,7 +60,9 @@ pub fn start_gamepad_loop(app_handle: AppHandle) {
                             }
                         }
                     }
-                    _ => {}
+                    EventType::ButtonRepeated(_, _) | EventType::ButtonChanged(_, _, _) => {}
+                    EventType::Dropped => {}
+                    EventType::Connected | EventType::Disconnected => {}
                 }
             }
 
@@ -65,6 +70,7 @@ pub fn start_gamepad_loop(app_handle: AppHandle) {
                 emit_action(&app_handle, player_id, action);
             }
 
+            gilrs.inc();
             thread::sleep(Duration::from_millis(10));
         }
     });

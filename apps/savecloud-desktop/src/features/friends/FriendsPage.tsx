@@ -8,8 +8,11 @@ import { FriendProfileCard } from "@features/friends/FriendProfileCard";
 import { ShareLinkCard } from "@features/friends/ShareLinkCard";
 import { ShareLinkImportConfirmModal } from "@features/friends/ShareLinkImportConfirmModal";
 import { CopyFriendSavesConfirmModal } from "@features/friends/CopyFriendSavesConfirmModal";
+import { useNavigationStore } from "@features/input/store";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 
 export function FriendsPage() {
+  const popLayer = useNavigationStore((s) => s.popLayer);
   const {
     friendIdInput,
     setFriendIdInput,
@@ -41,6 +44,27 @@ export function FriendsPage() {
     handleCopySaves,
     invalidateConfig,
   } = useFriendsPage();
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case !!copyConfirmPreview:
+        setCopyConfirmPreview(null);
+        return true;
+      case !!shareLinkPreview:
+        setShareLinkPreview(null);
+        return true;
+      case templateOpen:
+        setTemplateOpen(false);
+        setTemplateGame(null);
+        return true;
+      case addFriendGamesOpen:
+        setAddFriendGamesOpen(false);
+        return true;
+      default:
+        popLayer();
+        return true;
+    }
+  });
 
   return (
     <div className="space-y-6">

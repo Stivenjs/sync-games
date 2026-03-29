@@ -30,6 +30,7 @@ import { toastError, toastSuccess } from "@utils/toast";
 import { useNavigationStore } from "@features/input/store";
 import { useShellUiStore } from "@store/ShellUiStore";
 import { useGamification } from "@hooks/useGamification";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 
 export function GamesPage() {
   const pushLayer = useNavigationStore((state) => state.pushLayer);
@@ -130,6 +131,52 @@ export function GamesPage() {
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
   const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case profileDrawerOpen:
+        setProfileDrawerOpen(false);
+        return true;
+      case scanModalOpen:
+        setConfigureFromCloudGameId(null);
+        setScanModalOpen(false);
+        popLayer();
+        return true;
+      case addModalOpen:
+        setAddModalOpen(false);
+        return true;
+      case !!gameToRemove:
+        setGameToRemove(null);
+        return true;
+      case !!downloadConflictGame:
+        handleCloseDownloadConflict();
+        return true;
+      case !!bulkConfirm:
+        handleCancelBulkAction();
+        return true;
+      case downloadAllConflictGames.length > 0:
+        handleCloseDownloadAllConflict();
+        return true;
+      case !!(syncPreviewGame && syncPreviewType):
+        handleCloseSyncPreview();
+        return true;
+      case !!gameToFullBackupConfirm:
+        setGameToFullBackupConfirm(null);
+        return true;
+      case !!gameToRestoreBackup:
+        handleCloseRestoreBackup();
+        return true;
+      case !!gameToEdit:
+        setGameToEdit(null);
+        return true;
+      case !!gameForTorrent:
+        setGameForTorrent(null);
+        return true;
+      default:
+        popLayer();
+        return true;
+    }
+  });
 
   const handleShare = async (game: ConfiguredGame) => {
     try {

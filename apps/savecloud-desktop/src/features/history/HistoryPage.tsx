@@ -4,6 +4,8 @@ import { History } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listOperationHistory, type OperationLogEntry } from "@services/tauri";
 import { formatGameDisplayName } from "@utils/gameImage";
+import { useNavigationStore } from "@features/input/store";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 
 type HistoryFilter = "all" | OperationLogEntry["kind"];
 
@@ -28,6 +30,15 @@ function formatTimestamp(ts: string): string {
 
 export function HistoryPage() {
   const [filter, setFilter] = useState<HistoryFilter>("all");
+  const popLayer = useNavigationStore((s) => s.popLayer);
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      default:
+        popLayer();
+        return true;
+    }
+  });
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["operation-history"],
     queryFn: listOperationHistory,

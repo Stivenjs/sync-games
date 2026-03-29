@@ -12,6 +12,8 @@ import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
 import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
+import { useNavigationStore } from "@features/input/store";
 import { DevSdk } from "@features/settings/DevSdk";
 
 const ReleaseNotesDialogLazy = lazy(() =>
@@ -64,6 +66,28 @@ export function SettingsPage() {
     setPullFriendConfigModalOpen,
     setPullFriendUserId,
   } = useSettingsPage();
+
+  const popLayer = useNavigationStore((s) => s.popLayer);
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case releaseNotesOpen:
+        setReleaseNotesOpen(false);
+        return true;
+      case restoreConfirmOpen:
+        setRestoreConfirmOpen(false);
+        return true;
+      case pullFriendConfigModalOpen:
+        setPullFriendConfigModalOpen(false);
+        return true;
+      case createConfigModalOpen:
+        setCreateConfigModalOpen(false);
+        return true;
+      default:
+        popLayer();
+        return true;
+    }
+  });
 
   return (
     <div className="space-y-6">

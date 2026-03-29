@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Spinner, Tab, Tabs } from "@heroui/react";
@@ -38,6 +39,26 @@ export function GameDetailPage() {
   const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
   const [gameToRestoreBackup, setGameToRestoreBackup] = useState<ConfiguredGame | null>(null);
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case !!gameToEdit:
+        setGameToEdit(null);
+        return true;
+      case !!gameForTorrent:
+        setGameForTorrent(null);
+        return true;
+      case !!gameToFullBackupConfirm:
+        setGameToFullBackupConfirm(null);
+        return true;
+      case !!gameToRestoreBackup:
+        setGameToRestoreBackup(null);
+        return true;
+      default:
+        navigate("/");
+        return true;
+    }
+  });
 
   useEffect(() => {
     setActiveTab("summary");

@@ -444,6 +444,20 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
     }
   }, [playClose, animateIcon, animateColor, animateText, onMenuClose]);
 
+  const closeMenuRef = useRef(closeMenu);
+  closeMenuRef.current = closeMenu;
+
+  useLayoutEffect(() => {
+    let last = useShellUiStore.getState().sideMenuCloseRequest;
+    return useShellUiStore.subscribe((state) => {
+      const n = state.sideMenuCloseRequest;
+      if (n > last) {
+        last = n;
+        closeMenuRef.current();
+      }
+    });
+  }, []);
+
   React.useEffect(() => {
     if (!closeOnClickAway || !open) return;
 

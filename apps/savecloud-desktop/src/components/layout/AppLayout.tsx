@@ -5,6 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { NavItem } from "@components/layout/Sidebar";
 import { StaggeredMenu } from "@components/external/StaggeredMenu";
+import { useShellUiStore } from "@store/ShellUiStore";
 
 interface AppLayoutProps {
   navItems: NavItem[];
@@ -25,6 +26,7 @@ export function AppLayout({ navItems, children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isDark = resolvedTheme === "dark";
+  const setSideMenuOpen = useShellUiStore((s) => s.setSideMenuOpen);
 
   const handleNavigation = (link: string) => {
     if (location.pathname === link) return;
@@ -50,6 +52,8 @@ export function AppLayout({ navItems, children }: AppLayoutProps) {
         accentColor="#6366f1"
         showLogo={false}
         closeOnClickAway
+        onMenuOpen={() => setSideMenuOpen(true)}
+        onMenuClose={() => setSideMenuOpen(false)}
         onItemClick={(item) => {
           if (!item.link) return;
 
