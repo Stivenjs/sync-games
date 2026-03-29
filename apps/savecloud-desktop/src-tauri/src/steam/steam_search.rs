@@ -314,13 +314,10 @@ fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
         }
     }
 
+    // No añadir `thumbnail` de trailers: son muy pequeñas y se ven pixeladas en hero/carrusel.
+    // El vídeo sigue disponible en `video_url` para hover / reproductor.
     if let Some(movies) = data.get("movies").and_then(|v| v.as_array()) {
         for item in movies {
-            if let Some(thumb) = item.get("thumbnail").and_then(|v| v.as_str()) {
-                if !thumb.is_empty() && !media_urls.iter().any(|u| u == thumb) {
-                    media_urls.push(thumb.to_owned());
-                }
-            }
             if video_url.is_none() {
                 video_url = extract_best_video_url(item);
             }

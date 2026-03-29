@@ -9,7 +9,7 @@ import {
   type GameStats,
 } from "@services/tauri";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
-import { getSteamAppId } from "@utils/gameImage";
+import { getGameLibraryHeroUrl, getSteamAppId, isSteamMoviePosterUrl } from "@utils/gameImage";
 import type { ConfiguredGame } from "@app-types/config";
 
 interface LocationState {
@@ -56,11 +56,16 @@ export function useGameDetail() {
   const runningByGame = useGameRunningStatus(gameId ? [gameId] : []);
   const isGameRunning = gameId ? (runningByGame[gameId] ?? false) : false;
 
-  // La primera URL es el header/capsule (muy pequeña), se omite del carrusel
+  // Primera URL = header (~460px); se omite. Se excluyen pósters de trailers (baja calidad).
   const mediaUrls = useMemo(() => {
     if (!steamDetails?.media.mediaUrls?.length) return [];
-    return steamDetails.media.mediaUrls.slice(1);
+    return steamDetails.media.mediaUrls.slice(1).filter((u) => !isSteamMoviePosterUrl(u));
   }, [steamDetails]);
+
+  const libraryHeroFallbackUrl = useMemo(() => {
+    if (!game) return null;
+    return getGameLibraryHeroUrl(game, navState?.resolvedSteamAppId);
+  }, [game, navState?.resolvedSteamAppId]);
 
   const isLoading = isConfigLoading || (!!steamAppId && isSteamLoading);
 
@@ -72,6 +77,7 @@ export function useGameDetail() {
     stats,
     isGameRunning,
     mediaUrls,
+    libraryHeroFallbackUrl,
     videoUrl: steamDetails?.media.videoUrl ?? null,
     isLoading,
     hasSyncConfig: !!(config?.apiBaseUrl && config?.apiKey && config?.userId),

@@ -18,6 +18,7 @@ import { useGameDetail } from "@/hooks/useGameDetail";
 import { useGameDetailCloudActions } from "@/hooks/useGameDetailCloudActions";
 import { GameDetailHero } from "@features/game-detail/GameDetailHero";
 import { GameDetailActionStrip } from "@features/game-detail/GameDetailActionStrip";
+import { GameDetailSyncSetupBanner } from "@features/game-detail/GameDetailSyncSetupBanner";
 import {
   GameDetailLocalSummary,
   GameDetailRequirementsPanel,
@@ -32,7 +33,17 @@ export function GameDetailPage() {
   const queryClient = useQueryClient();
   const { handleSync, handleDownload, handleFullBackupUpload, isSyncing, isDownloading, fullBackupUploadingGameId } =
     useGameDetailCloudActions();
-  const { gameId, game, steamDetails, stats, isGameRunning, mediaUrls, isLoading, hasSyncConfig } = useGameDetail();
+  const {
+    gameId,
+    game,
+    steamDetails,
+    stats,
+    isGameRunning,
+    mediaUrls,
+    libraryHeroFallbackUrl,
+    isLoading,
+    hasSyncConfig,
+  } = useGameDetail();
   const [activeTab, setActiveTab] = useState("summary");
   const tabsShellRef = useRef<HTMLDivElement>(null);
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
@@ -146,12 +157,15 @@ export function GameDetailPage() {
       <GameDetailHero
         mediaUrls={mediaUrls}
         headerImage={steamDetails?.headerImage}
+        libraryHeroFallbackUrl={libraryHeroFallbackUrl}
         customImageUrl={game.imageUrl}
         gameName={displayName}
         editionLabel={game.editionLabel}
         gameId={gameId}
         isLoading={isLoading}
       />
+
+      {!hasSyncConfig ? <GameDetailSyncSetupBanner /> : null}
 
       <GameDetailActionStrip
         game={game}
@@ -213,7 +227,7 @@ export function GameDetailPage() {
       {steamDetails ? (
         <div
           ref={tabsShellRef}
-          className="scroll-mt-6 overflow-hidden rounded-2xl border border-default-200/80 bg-content1/95 shadow-md ring-1 ring-black/5 dark:border-default-100/25 dark:bg-default-50/15 dark:ring-white/5">
+          className="scroll-mt-6 rounded-2xl border border-default-200/80 bg-content1/95 shadow-md ring-1 ring-black/5 dark:border-default-100/25 dark:bg-default-50/15 dark:ring-white/5">
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={handleTabsSelectionChange}
@@ -223,8 +237,8 @@ export function GameDetailPage() {
             classNames={{
               base: "w-full",
               tabList:
-                "w-full gap-1 rounded-t-2xl border-b border-default-200/70 bg-default-100/90 p-1.5 dark:border-default-100/20 dark:bg-default-100/25",
-              tab: "h-11 max-w-none flex-1 data-[selected=true]:bg-content1 data-[selected=true]:shadow-sm",
+                "sticky top-0 z-20 w-full min-h-[3rem] flex-nowrap gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-t-2xl border-b border-default-200/70 bg-default-100/95 p-1.5 shadow-sm backdrop-blur-md [scrollbar-width:thin] dark:border-default-100/20 dark:bg-default-100/90 supports-[backdrop-filter]:bg-default-100/85",
+              tab: "h-11 min-w-[9.25rem] max-w-none shrink-0 flex-none data-[selected=true]:bg-content1 data-[selected=true]:shadow-sm sm:min-w-0 sm:flex-1",
               cursor: "hidden",
               panel:
                 "min-h-[16rem] border-t border-default-200/40 bg-linear-to-b from-default-50/60 to-content1 px-5 py-6 sm:min-h-[18rem] sm:px-7 sm:py-8 dark:border-default-100/15 dark:from-default-50/10 dark:to-default-50/5",
