@@ -1,5 +1,5 @@
-import { Button, Card, CardBody, Skeleton } from "@heroui/react";
-import { FileJson, Cloud, HardDrive, FolderOpen, Zap } from "lucide-react";
+import { Button, Card, CardBody, Divider, Skeleton } from "@heroui/react";
+import { FileJson, Cloud, HardDrive, FolderOpen, Link2, Zap } from "lucide-react";
 
 interface ConfigSectionProps {
   exporting: boolean;
@@ -38,90 +38,131 @@ export function ConfigSection({
   onBackupToCloud,
   onRestoreFromCloud,
 }: ConfigSectionProps) {
+  const showS3TransferBlock = isLoadingData || (s3TransferEndpointType != null && s3TransferEndpointType !== "unknown");
+
   return (
     <Card>
-      <CardBody className="flex flex-col gap-6">
-        <div className="flex items-center gap-2">
-          <FileJson size={22} className="text-primary" />
-          <h2 className="text-base font-semibold text-foreground">Archivo de configuración y respaldos</h2>
-        </div>
-        <p className="text-sm text-default-600">
-          Aquí se gestiona tu <strong>config.json</strong>: ruta, crear/editar, exportar e importar en tu PC, y
-          respaldar o restaurar desde la nube.
-        </p>
-
-        {/* Zona del Endpoint S3 */}
-        {isLoadingData ? (
-          <Skeleton className="h-10 w-full md:w-64 rounded-lg" />
-        ) : s3TransferEndpointType != null && s3TransferEndpointType !== "unknown" ? (
-          <div className="flex items-center gap-2 rounded-lg border border-default-200 bg-default-50/50 px-3 py-2 w-fit">
-            <Zap size={18} className="text-warning" />
-            <span className="text-sm text-default-700">
-              Transferencia S3: <strong>{s3TransferEndpointType === "accelerated" ? "Acelerada" : "Estándar"}</strong>
-            </span>
+      <CardBody className="flex flex-col gap-0">
+        <div className="flex flex-col gap-2 pb-4">
+          <div className="flex items-center gap-2">
+            <FileJson size={22} className="text-primary" />
+            <h2 className="text-base font-semibold text-foreground">Archivo de configuración y respaldos</h2>
           </div>
+          <p className="text-sm text-default-600">
+            Todo lo relacionado con <strong>config.json</strong>: ubicación, conexión a la nube, copias locales y
+            respaldos en el servidor.
+          </p>
+        </div>
+
+        {showS3TransferBlock ? (
+          <>
+            <Divider className="mb-5" />
+            <section aria-labelledby="config-s3-status">
+              <p id="config-s3-status" className="text-xs font-semibold uppercase tracking-wider text-default-500">
+                Estado de transferencia
+              </p>
+              <div className="mt-2">
+                {isLoadingData ? (
+                  <Skeleton className="h-10 w-full max-w-md rounded-lg" />
+                ) : (
+                  <div className="inline-flex items-center gap-2 rounded-lg border border-default-200 bg-default-50/50 px-3 py-2">
+                    <Zap size={18} className="text-warning" />
+                    <span className="text-sm text-default-700">
+                      S3: <strong>{s3TransferEndpointType === "accelerated" ? "Acelerada" : "Estándar"}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+          </>
         ) : null}
 
-        {/* Zona de la Ruta del archivo y User ID */}
-        <div className="space-y-3 rounded-lg border border-default-200 bg-default-50/50 p-4">
-          <div className="flex items-center gap-2">
-            <FolderOpen size={18} className="text-default-500" />
-            <span className="text-sm font-medium text-default-700">Ruta del archivo</span>
-          </div>
+        <Divider className="my-5" />
 
-          {isLoadingData ? (
-            <Skeleton className="h-4 w-full md:w-3/4 rounded-lg" />
-          ) : configPath ? (
-            <p className="break-all font-mono text-xs text-default-600">{configPath}</p>
-          ) : (
-            <p className="text-xs text-default-400 italic">Ruta no disponible.</p>
-          )}
-
-          <p className="text-xs text-default-500">
-            La app solo lee <code className="rounded bg-default-200 px-1">config.json</code> desde esta carpeta. Si te
-            enviaron un JSON, usa &quot;Importar (reemplazar)&quot; más abajo.
+        {/* Ruta y usuario */}
+        <section aria-labelledby="config-path-user" className="space-y-3">
+          <p id="config-path-user" className="text-xs font-semibold uppercase tracking-wider text-default-500">
+            Archivo y usuario
           </p>
+          <div className="rounded-lg border border-default-200 bg-default-50/50 p-4">
+            <div className="flex items-center gap-2">
+              <FolderOpen size={18} className="text-default-500" />
+              <span className="text-sm font-medium text-default-700">Ruta de config.json</span>
+            </div>
 
-          <div className="pt-2 border-t border-default-200">
-            <span className="text-xs font-medium text-default-500">Tu User ID: </span>
             {isLoadingData ? (
-              <Skeleton className="h-4 w-32 inline-block ml-2 align-middle rounded-lg" />
-            ) : userId ? (
-              <span className="font-mono text-sm text-foreground ml-1">{userId}</span>
+              <Skeleton className="mt-3 h-4 w-full max-w-xl rounded-lg" />
+            ) : configPath ? (
+              <p className="mt-2 break-all font-mono text-xs text-default-600">{configPath}</p>
             ) : (
-              <span className="text-xs text-default-400 italic ml-1">No configurado</span>
+              <p className="mt-2 text-xs text-default-400 italic">Ruta no disponible.</p>
             )}
-            <p className="mt-1 text-xs text-default-500">
-              Comparte este ID con amigos para que puedan ver tu perfil en la pestaña Amigos (o usa un link de compartir
-              desde el juego).
-            </p>
-          </div>
-        </div>
 
-        {/* Configurar Conexión */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-default-700">Configurar conexión a la nube</p>
-          <p className="text-xs text-default-500">
-            Ingresa tu URL de API, API Key y User ID para habilitar las funciones en la nube, o para recuperar tu
-            configuración previa al estar en un PC nuevo.
+            <p className="mt-2 text-xs text-default-500">
+              La app solo lee <code className="rounded bg-default-200 px-1">config.json</code> aquí. Si recibiste un
+              JSON completo, usa &quot;Importar (reemplazar)&quot; más abajo.
+            </p>
+
+            <div className="mt-4 border-t border-default-200 pt-4">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-xs font-medium text-default-500">User ID</span>
+                {isLoadingData ? (
+                  <Skeleton className="h-4 w-32 rounded-lg" />
+                ) : userId ? (
+                  <span className="font-mono text-sm text-foreground">{userId}</span>
+                ) : (
+                  <span className="text-xs text-default-400 italic">No configurado</span>
+                )}
+              </div>
+              <p className="mt-1 flex items-start gap-1.5 text-xs text-default-500">
+                <Link2 size={14} className="mt-0.5 shrink-0 text-default-400" />
+                Compártelo con amigos para el perfil en Amigos, o usa un enlace de compartir desde un juego.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <Divider className="my-5" />
+
+        {/* Conexión */}
+        <section aria-labelledby="config-cloud-link" className="space-y-2">
+          <p id="config-cloud-link" className="text-xs font-semibold uppercase tracking-wider text-default-500">
+            Conexión a la nube
+          </p>
+          <p className="text-sm text-default-600">
+            API, clave y User ID para sincronizar o recuperar la configuración en un equipo nuevo.
           </p>
           <Button size="sm" variant="flat" color="primary" onPress={onCreateConfig} startContent={<Cloud size={16} />}>
             Configurar conexión
           </Button>
-        </div>
+        </section>
 
-        {/* Exportar / Importar (local) */}
-        <div className="space-y-2">
+        <Divider className="my-5" />
+
+        {/* Local */}
+        <section aria-labelledby="config-local-files" className="space-y-3">
           <div className="flex items-center gap-2">
             <HardDrive size={18} className="text-default-500" />
-            <p className="text-sm font-medium text-default-700">Exportar / Importar (archivo en tu PC)</p>
+            <p id="config-local-files" className="text-sm font-semibold text-foreground">
+              Archivos en este equipo
+            </p>
           </div>
-          <p className="text-xs text-default-500">
-            <strong>Exportar:</strong> guarda tu lista de juegos y rutas en un JSON en la ubicación que elijas.{" "}
-            <strong>Importar (fusionar):</strong> añade los juegos del JSON sin borrar los que ya tienes.{" "}
-            <strong>Importar (reemplazar):</strong> sustituye toda tu configuración por el contenido del JSON (útil si
-            te pasaron un config.json completo).
-          </p>
+          <ul className="list-inside list-disc space-y-1 text-xs text-default-500">
+            <li>
+              <strong className="text-default-600">Exportar:</strong> guarda juegos y rutas en un JSON donde elijas.
+            </li>
+            <li>
+              <strong className="text-default-600">Fusionar:</strong> añade juegos del JSON sin borrar los actuales.
+            </li>
+            <li>
+              <strong className="text-default-600">Reemplazar:</strong> sustituye toda la config (p. ej. un config.json
+              recibido).
+            </li>
+            <li>
+              <strong className="text-default-600">Importar de usuario:</strong> trae la configuración pública de otro
+              User ID.
+            </li>
+          </ul>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="flat" onPress={onExport} isLoading={exporting}>
               Exportar
@@ -136,17 +177,21 @@ export function ConfigSection({
               Importar de usuario
             </Button>
           </div>
-        </div>
+        </section>
+
+        <Divider className="my-5" />
 
         {/* Nube */}
-        <div className="space-y-2">
+        <section aria-labelledby="config-cloud-backup" className="space-y-3">
           <div className="flex items-center gap-2">
             <Cloud size={18} className="text-default-500" />
-            <p className="text-sm font-medium text-default-700">Respaldar y restaurar en la nube</p>
+            <p id="config-cloud-backup" className="text-sm font-semibold text-foreground">
+              Respaldos en la nube
+            </p>
           </div>
           <p className="text-xs text-default-500">
-            <strong>Respaldar en la nube:</strong> sube tu config.json al servidor asociado a tu usuario.{" "}
-            <strong>Restaurar desde la nube:</strong> descarga la última configuración guardada y la aplica (la app se
+            <strong className="text-default-600">Respaldar:</strong> sube tu config al servidor de tu usuario.{" "}
+            <strong className="text-default-600">Restaurar:</strong> aplica la última copia guardada (la app se
             reiniciará).
           </p>
           <div className="flex flex-wrap gap-2">
@@ -157,7 +202,7 @@ export function ConfigSection({
               Restaurar desde la nube
             </Button>
           </div>
-        </div>
+        </section>
       </CardBody>
     </Card>
   );
