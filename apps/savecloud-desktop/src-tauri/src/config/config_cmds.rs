@@ -81,6 +81,11 @@ pub fn get_config() -> ConfigDto {
         profile_background: settings.profile_background.clone(),
         profile_avatar: settings.profile_avatar.clone(),
         profile_frame: settings.profile_frame.clone(),
+        steam_web_api_key: settings
+            .steam_web_api_key
+            .as_ref()
+            .filter(|k| !k.trim().is_empty())
+            .map(|_| config::MASKED_STEAM_WEB_API_KEY.to_string()),
         games: combined
             .games
             .into_iter()
@@ -143,6 +148,7 @@ pub fn create_config_file(
     api_base_url: Option<String>,
     api_key: Option<String>,
     user_id: Option<String>,
+    steam_web_api_key: Option<String>,
 ) -> Result<String, String> {
     let mut settings = config::load_settings();
 
@@ -164,6 +170,14 @@ pub fn create_config_file(
 
     if let Some(id) = user_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         settings.user_id = Some(id.to_string());
+    }
+
+    if let Some(key) = steam_web_api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|k| *k != config::MASKED_STEAM_WEB_API_KEY && !k.is_empty())
+    {
+        settings.steam_web_api_key = Some(key.to_string());
     }
 
     config::save_settings(&settings)?;
@@ -823,6 +837,7 @@ pub async fn get_friend_config(friend_user_id: String) -> Result<ConfigDto, Stri
         profile_background: None,
         profile_avatar: None,
         profile_frame: None,
+        steam_web_api_key: None,
         games: imported
             .games
             .into_iter()

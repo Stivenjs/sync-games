@@ -1,5 +1,5 @@
 import { Button, Card, CardBody, Divider, Skeleton } from "@heroui/react";
-import { FileJson, Cloud, HardDrive, FolderOpen, Link2, Zap } from "lucide-react";
+import { FileJson, Cloud, HardDrive, FolderOpen, Link2, Library, Zap } from "lucide-react";
 
 interface ConfigSectionProps {
   exporting: boolean;
@@ -8,10 +8,13 @@ interface ConfigSectionProps {
   restoringConfig: boolean;
   configPath: string;
   userId?: string | null;
+  /** True si hay clave Steam Web API (valor enmascarado desde get_config). */
+  hasSteamWebApiKey?: boolean;
   /** "accelerated" = S3 Transfer Acceleration activo; "standard" = endpoint estándar; "unknown" o null = no comprobado. */
   s3TransferEndpointType?: "accelerated" | "standard" | "unknown" | null;
   /** Indica si la información principal aún se está cargando (útil para skeletons) */
   isLoadingData?: boolean;
+  steamCatalogBusy?: boolean;
   onCreateConfig: () => void;
   onExport: () => void | Promise<void>;
   onImportMerge: () => void | Promise<void>;
@@ -19,6 +22,8 @@ interface ConfigSectionProps {
   onPullFriendConfig: () => void | Promise<void>;
   onBackupToCloud: () => void | Promise<void>;
   onRestoreFromCloud: () => void | Promise<void>;
+  onSyncSteamCatalog?: () => void | Promise<void>;
+  onResetSteamCatalogSync?: () => void | Promise<void>;
 }
 
 export function ConfigSection({
@@ -28,8 +33,10 @@ export function ConfigSection({
   restoringConfig,
   configPath,
   userId,
+  hasSteamWebApiKey = false,
   s3TransferEndpointType,
   isLoadingData = false,
+  steamCatalogBusy = false,
   onCreateConfig,
   onExport,
   onImportMerge,
@@ -37,6 +44,8 @@ export function ConfigSection({
   onPullFriendConfig,
   onBackupToCloud,
   onRestoreFromCloud,
+  onSyncSteamCatalog,
+  onResetSteamCatalogSync,
 }: ConfigSectionProps) {
   const showS3TransferBlock = isLoadingData || (s3TransferEndpointType != null && s3TransferEndpointType !== "unknown");
 
@@ -135,6 +144,55 @@ export function ConfigSection({
           <Button size="sm" variant="flat" color="primary" onPress={onCreateConfig} startContent={<Cloud size={16} />}>
             Configurar conexión
           </Button>
+        </section>
+
+        <Divider className="my-5" />
+
+        {/* Catálogo Steam local */}
+        <section aria-labelledby="config-steam-catalog" className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Library size={18} className="text-default-500" />
+            <p id="config-steam-catalog" className="text-xs font-semibold uppercase tracking-wider text-default-500">
+              Catálogo Steam (local)
+            </p>
+          </div>
+          <p className="text-sm text-default-600">
+            La clave Steam Web API (misma que en &quot;Configurar conexión&quot;) permite mantener en SQLite el listado
+            de aplicaciones para búsquedas y metadatos. Las sincronizaciones posteriores solo traen cambios.
+          </p>
+          <div className="rounded-lg border border-default-200 bg-default-50/50 px-3 py-2">
+            <span className="text-xs font-medium text-default-500">Clave Steam Web API</span>
+            {isLoadingData ? (
+              <Skeleton className="mt-1 h-4 w-40 rounded-lg" />
+            ) : (
+              <p className="mt-1 text-sm text-foreground">
+                {hasSteamWebApiKey ? (
+                  <span className="text-success-600">Configurada</span>
+                ) : (
+                  <span className="text-default-400 italic">No configurada — añádela en Configurar conexión</span>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="flat"
+              color="secondary"
+              isDisabled={!hasSteamWebApiKey || steamCatalogBusy}
+              isLoading={steamCatalogBusy}
+              onPress={() => onSyncSteamCatalog?.()}>
+              Sincronizar catálogo ahora
+            </Button>
+            <Button
+              size="sm"
+              variant="light"
+              color="warning"
+              isDisabled={steamCatalogBusy}
+              onPress={() => onResetSteamCatalogSync?.()}>
+              Restablecer progreso de sync
+            </Button>
+          </div>
         </section>
 
         <Divider className="my-5" />

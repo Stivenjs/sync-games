@@ -38,6 +38,7 @@ export function SettingsPage() {
     createApiBaseUrl,
     createApiKey,
     createUserId,
+    createSteamWebApiKey,
     creatingConfig,
     createConfigError,
     pullFriendConfigModalOpen,
@@ -57,10 +58,14 @@ export function SettingsPage() {
     handleAutostartChange,
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
+    handleSyncSteamCatalog,
+    handleResetSteamCatalogSync,
+    steamCatalogBusy,
     openCreateConfigModal,
     setCreateApiBaseUrl,
     setCreateApiKey,
     setCreateUserId,
+    setCreateSteamWebApiKey,
     setCreateConfigModalOpen,
     setRestoreConfirmOpen,
     setPullFriendConfigModalOpen,
@@ -124,8 +129,10 @@ export function SettingsPage() {
             restoringConfig={restoringConfig}
             configPath={configPath}
             userId={config?.userId}
+            hasSteamWebApiKey={!!config?.steamWebApiKey?.trim()}
             s3TransferEndpointType={s3TransferEndpointType}
             isLoadingData={loadingConfigData}
+            steamCatalogBusy={steamCatalogBusy}
             onCreateConfig={openCreateConfigModal}
             onPullFriendConfig={() => setPullFriendConfigModalOpen(true)}
             onExport={handleExportConfig}
@@ -133,6 +140,8 @@ export function SettingsPage() {
             onImportReplace={() => handleImportConfig("replace")}
             onBackupToCloud={handleBackupConfigToCloud}
             onRestoreFromCloud={() => setRestoreConfirmOpen(true)}
+            onSyncSteamCatalog={handleSyncSteamCatalog}
+            onResetSteamCatalogSync={handleResetSteamCatalogSync}
           />
         </Tab>
 
@@ -179,11 +188,13 @@ export function SettingsPage() {
         apiBaseUrl={createApiBaseUrl}
         apiKey={createApiKey}
         userId={createUserId}
+        steamWebApiKey={createSteamWebApiKey}
         error={createConfigError}
         creating={creatingConfig}
         onApiBaseUrlChange={setCreateApiBaseUrl}
         onApiKeyChange={setCreateApiKey}
         onUserIdChange={setCreateUserId}
+        onSteamWebApiKeyChange={setCreateSteamWebApiKey}
         onClose={() => setCreateConfigModalOpen(false)}
         onSubmit={handleCreateConfigFile}
       />

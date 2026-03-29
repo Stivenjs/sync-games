@@ -235,12 +235,35 @@ export async function addGamesFromFriend(
   });
 }
 
-/** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Devuelve la ruta del archivo. */
-export async function createConfigFile(apiBaseUrl: string, apiKey: string, userId: string): Promise<string> {
+/** Resultado de `sync_steam_catalog` (serde camelCase en el backend). */
+export interface CatalogSyncStats {
+  mode: string;
+  appsUpserted: number;
+  batches: number;
+}
+
+/** Sincroniza el catálogo Steam en SQLite (requiere clave Steam Web API). */
+export async function syncSteamCatalog(): Promise<CatalogSyncStats> {
+  return invoke<CatalogSyncStats>("sync_steam_catalog");
+}
+
+/** Borra metadatos de sync del catálogo; la próxima ejecución hará sync completo de nuevo. */
+export async function resetSteamCatalogSync(): Promise<void> {
+  await invoke("reset_steam_catalog_sync");
+}
+
+/** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Opcionalmente la clave Steam Web API (se guarda en el almacén seguro del SO). Devuelve la ruta del archivo. */
+export async function createConfigFile(
+  apiBaseUrl: string,
+  apiKey: string,
+  userId: string,
+  steamWebApiKey?: string | null
+): Promise<string> {
   return invoke<string>("create_config_file", {
     apiBaseUrl: apiBaseUrl.trim() || null,
     apiKey: apiKey.trim() || null,
     userId: userId.trim() || null,
+    steamWebApiKey: steamWebApiKey === undefined || steamWebApiKey === null ? null : steamWebApiKey.trim() || null,
   });
 }
 

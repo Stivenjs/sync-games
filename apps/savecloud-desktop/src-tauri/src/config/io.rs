@@ -10,6 +10,7 @@ use std::fs;
 
 pub const KEYRING_SERVICE: &str = "savecloud_api";
 pub const KEYRING_ACCOUNT: &str = "default_user";
+const KEYRING_ACCOUNT_STEAM_WEB_API: &str = "steam_web_api";
 
 /// Recupera la clave de la API desde el almacenamiento seguro del sistema operativo.
 fn get_secure_api_key() -> Option<String> {
@@ -35,6 +36,23 @@ fn set_secure_api_key(key: &str) -> Result<(), String> {
     }
 
     let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map_err(|e| e.to_string())?;
+    entry.set_password(key).map_err(|e| e.to_string())
+}
+
+fn get_secure_steam_web_api_key() -> Option<String> {
+    Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT_STEAM_WEB_API)
+        .ok()
+        .and_then(|entry| entry.get_password().ok())
+        .filter(|k| k != MASKED_STEAM_WEB_API_KEY)
+}
+
+fn set_secure_steam_web_api_key(key: &str) -> Result<(), String> {
+    if key == MASKED_STEAM_WEB_API_KEY {
+        return Ok(());
+    }
+
+    let entry =
+        Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT_STEAM_WEB_API).map_err(|e| e.to_string())?;
     entry.set_password(key).map_err(|e| e.to_string())
 }
 
@@ -99,6 +117,20 @@ pub fn load_settings() -> AppSettings {
         settings.api_key = Some(sk);
     }
 
+    let secure_steam = get_secure_steam_web_api_key();
+    if secure_steam.is_none()
+        && settings
+            .steam_web_api_key
+            .as_ref()
+            .map_or(false, |k| !k.trim().is_empty())
+    {
+        if let Some(ref k) = settings.steam_web_api_key {
+            let _ = set_secure_steam_web_api_key(k);
+        }
+    } else if let Some(sk) = secure_steam {
+        settings.steam_web_api_key = Some(sk);
+    }
+
     apply_env_fallback(
         &mut settings.api_base_url,
         option_env!("SYNC_GAMES_API_URL"),
@@ -114,14 +146,19 @@ pub fn load_settings() -> AppSettings {
         option_env!("SYNC_GAMES_USER_ID"),
         "SYNC_GAMES_USER_ID",
     );
+    apply_env_fallback(
+        &mut settings.steam_web_api_key,
+        option_env!("STEAM_WEB_API_KEY"),
+        "STEAM_WEB_API_KEY",
+    );
 
     settings
 }
 
 /// Persiste las configuraciones de la aplicación en disco.
 ///
-/// Extrae automáticamente la clave API de la estructura en memoria e intenta
-/// guardarla en el backend criptográfico antes de proceder con la escritura JSON.
+/// Extrae automáticamente la clave API y la clave Steam Web API de la estructura
+/// en memoria e intenta guardarlas en el backend criptográfico antes de escribir el JSON.
 ///
 /// # Errors
 ///
@@ -130,6 +167,11 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     if let Some(ref key) = settings.api_key {
         if !key.trim().is_empty() {
             set_secure_api_key(key)?;
+        }
+    }
+    if let Some(ref key) = settings.steam_web_api_key {
+        if !key.trim().is_empty() {
+            set_secure_steam_web_api_key(key)?;
         }
     }
     let path = paths::settings_path().ok_or("Ruta no disponible")?;

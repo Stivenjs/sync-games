@@ -8,8 +8,10 @@ mod manifest;
 mod network;
 mod plugins;
 mod setup;
+mod sqlite;
 mod steam;
 mod steam_cache;
+mod steam_catalog;
 mod system;
 mod time;
 mod torrent;
@@ -58,7 +60,7 @@ pub fn run() {
         .setup(|app| {
             tray::create_tray(app)?;
 
-            setup::init_states_and_background_tasks(app);
+            setup::init_states_and_background_tasks(app)?;
 
             Ok(())
         })
