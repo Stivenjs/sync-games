@@ -1,4 +1,6 @@
 import { useState, lazy, Suspense } from "react";
+import { Tab, Tabs } from "@heroui/react";
+import { AppWindow, Cloud, FlaskConical } from "lucide-react";
 import { AutostartCard } from "@features/settings/AutostartCard";
 import { ConfigSection } from "@features/settings/ConfigSection";
 import { CreateConfigModal } from "@features/settings/CreateConfigModal";
@@ -10,6 +12,8 @@ import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
 import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
+import { useNavigationStore } from "@features/input/store";
 import { DevSdk } from "@features/settings/DevSdk";
 
 const ReleaseNotesDialogLazy = lazy(() =>
@@ -18,6 +22,7 @@ const ReleaseNotesDialogLazy = lazy(() =>
 
 export function SettingsPage() {
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<string>("account");
   const {
     autostart,
     loading,
@@ -33,6 +38,7 @@ export function SettingsPage() {
     createApiBaseUrl,
     createApiKey,
     createUserId,
+    createSteamWebApiKey,
     creatingConfig,
     createConfigError,
     pullFriendConfigModalOpen,
@@ -52,63 +58,143 @@ export function SettingsPage() {
     handleAutostartChange,
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
+    handleSyncSteamCatalog,
+    handleResetSteamCatalogSync,
+    steamCatalogBusy,
     openCreateConfigModal,
     setCreateApiBaseUrl,
     setCreateApiKey,
     setCreateUserId,
+    setCreateSteamWebApiKey,
     setCreateConfigModalOpen,
     setRestoreConfirmOpen,
     setPullFriendConfigModalOpen,
     setPullFriendUserId,
   } = useSettingsPage();
 
+  const popLayer = useNavigationStore((s) => s.popLayer);
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case releaseNotesOpen:
+        setReleaseNotesOpen(false);
+        return true;
+      case restoreConfirmOpen:
+        setRestoreConfirmOpen(false);
+        return true;
+      case pullFriendConfigModalOpen:
+        setPullFriendConfigModalOpen(false);
+        return true;
+      case createConfigModalOpen:
+        setCreateConfigModalOpen(false);
+        return true;
+      default:
+        popLayer();
+        return true;
+    }
+  });
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Configuración</h1>
         <p className="mt-1 text-sm text-default-500">
-          Archivo de config, respaldos, inicio con Windows, actualizaciones y notificaciones.
+          Cuenta y datos de la app, preferencias del sistema y opciones avanzadas.
         </p>
       </div>
-      <ConfigSection
-        exporting={exporting}
-        importing={importing}
-        backingUpConfig={backingUpConfig}
-        restoringConfig={restoringConfig}
-        configPath={configPath}
-        userId={config?.userId}
-        s3TransferEndpointType={s3TransferEndpointType}
-        isLoadingData={loadingConfigData}
-        onCreateConfig={openCreateConfigModal}
-        onPullFriendConfig={() => setPullFriendConfigModalOpen(true)}
-        onExport={handleExportConfig}
-        onImportMerge={() => handleImportConfig("merge")}
-        onImportReplace={() => handleImportConfig("replace")}
-        onBackupToCloud={handleBackupConfigToCloud}
-        onRestoreFromCloud={() => setRestoreConfirmOpen(true)}
-      />
-      <AutostartCard autostart={autostart} loading={loading} onChange={handleAutostartChange} />
-      <UpdatesCard checkingUpdate={checkingUpdate} onCheckUpdates={handleCheckUpdates} />
-      <ReleaseNotesCard onOpenNotes={() => setReleaseNotesOpen(true)} />
-      <NotificationsCard testingNotification={testingNotification} onTestNotification={handleTestNotification} />
-      <LocalBackupInfoCard />
-      <DevSdk />
-      <ExperimentalFeaturesCard
-        fullBackupStreaming={!!config?.fullBackupStreaming}
-        onFullBackupStreamingChange={handleFullBackupStreamingChange}
-        fullBackupStreamingDryRun={!!config?.fullBackupStreamingDryRun}
-        onFullBackupStreamingDryRunChange={handleFullBackupStreamingDryRunChange}
-      />
+
+      <Tabs
+        aria-label="Secciones de configuración"
+        selectedKey={settingsTab}
+        onSelectionChange={(key) => setSettingsTab(String(key))}
+        variant="underlined"
+        color="primary"
+        classNames={{
+          tabList: "gap-4 w-full border-b border-default-200",
+          tab: "h-11 px-0 data-[selected=true]:font-semibold",
+          panel: "pt-5",
+        }}>
+        <Tab
+          key="account"
+          title={
+            <span className="flex items-center gap-2">
+              <Cloud size={17} className="opacity-90" />
+              Cuenta y datos
+            </span>
+          }>
+          <ConfigSection
+            exporting={exporting}
+            importing={importing}
+            backingUpConfig={backingUpConfig}
+            restoringConfig={restoringConfig}
+            configPath={configPath}
+            userId={config?.userId}
+            hasSteamWebApiKey={!!config?.steamWebApiKey?.trim()}
+            s3TransferEndpointType={s3TransferEndpointType}
+            isLoadingData={loadingConfigData}
+            steamCatalogBusy={steamCatalogBusy}
+            onCreateConfig={openCreateConfigModal}
+            onPullFriendConfig={() => setPullFriendConfigModalOpen(true)}
+            onExport={handleExportConfig}
+            onImportMerge={() => handleImportConfig("merge")}
+            onImportReplace={() => handleImportConfig("replace")}
+            onBackupToCloud={handleBackupConfigToCloud}
+            onRestoreFromCloud={() => setRestoreConfirmOpen(true)}
+            onSyncSteamCatalog={handleSyncSteamCatalog}
+            onResetSteamCatalogSync={handleResetSteamCatalogSync}
+          />
+        </Tab>
+
+        <Tab
+          key="app"
+          title={
+            <span className="flex items-center gap-2">
+              <AppWindow size={17} className="opacity-90" />
+              Aplicación
+            </span>
+          }>
+          <div className="space-y-4">
+            <AutostartCard autostart={autostart} loading={loading} onChange={handleAutostartChange} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <UpdatesCard checkingUpdate={checkingUpdate} onCheckUpdates={handleCheckUpdates} />
+              <ReleaseNotesCard onOpenNotes={() => setReleaseNotesOpen(true)} />
+            </div>
+            <NotificationsCard testingNotification={testingNotification} onTestNotification={handleTestNotification} />
+          </div>
+        </Tab>
+
+        <Tab
+          key="advanced"
+          title={
+            <span className="flex items-center gap-2">
+              <FlaskConical size={17} className="opacity-90" />
+              Avanzado
+            </span>
+          }>
+          <div className="space-y-4">
+            <LocalBackupInfoCard />
+            <ExperimentalFeaturesCard
+              fullBackupStreaming={!!config?.fullBackupStreaming}
+              onFullBackupStreamingChange={handleFullBackupStreamingChange}
+              fullBackupStreamingDryRun={!!config?.fullBackupStreamingDryRun}
+              onFullBackupStreamingDryRunChange={handleFullBackupStreamingDryRunChange}
+            />
+            <DevSdk />
+          </div>
+        </Tab>
+      </Tabs>
       <CreateConfigModal
         isOpen={createConfigModalOpen}
         apiBaseUrl={createApiBaseUrl}
         apiKey={createApiKey}
         userId={createUserId}
+        steamWebApiKey={createSteamWebApiKey}
         error={createConfigError}
         creating={creatingConfig}
         onApiBaseUrlChange={setCreateApiBaseUrl}
         onApiKeyChange={setCreateApiKey}
         onUserIdChange={setCreateUserId}
+        onSteamWebApiKeyChange={setCreateSteamWebApiKey}
         onClose={() => setCreateConfigModalOpen(false)}
         onSubmit={handleCreateConfigFile}
       />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Spinner, Tab, Tabs } from "@heroui/react";
@@ -17,6 +18,7 @@ import { useGameDetail } from "@/hooks/useGameDetail";
 import { useGameDetailCloudActions } from "@/hooks/useGameDetailCloudActions";
 import { GameDetailHero } from "@features/game-detail/GameDetailHero";
 import { GameDetailActionStrip } from "@features/game-detail/GameDetailActionStrip";
+import { GameDetailSyncSetupBanner } from "@features/game-detail/GameDetailSyncSetupBanner";
 import {
   GameDetailLocalSummary,
   GameDetailRequirementsPanel,
@@ -31,13 +33,43 @@ export function GameDetailPage() {
   const queryClient = useQueryClient();
   const { handleSync, handleDownload, handleFullBackupUpload, isSyncing, isDownloading, fullBackupUploadingGameId } =
     useGameDetailCloudActions();
-  const { gameId, game, steamDetails, stats, isGameRunning, mediaUrls, isLoading, hasSyncConfig } = useGameDetail();
+  const {
+    gameId,
+    game,
+    steamDetails,
+    stats,
+    isGameRunning,
+    mediaUrls,
+    libraryHeroFallbackUrl,
+    isLoading,
+    hasSyncConfig,
+  } = useGameDetail();
   const [activeTab, setActiveTab] = useState("summary");
   const tabsShellRef = useRef<HTMLDivElement>(null);
   const [gameToEdit, setGameToEdit] = useState<ConfiguredGame | null>(null);
   const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
   const [gameToRestoreBackup, setGameToRestoreBackup] = useState<ConfiguredGame | null>(null);
+
+  useRegisterGlobalBack(() => {
+    switch (true) {
+      case !!gameToEdit:
+        setGameToEdit(null);
+        return true;
+      case !!gameForTorrent:
+        setGameForTorrent(null);
+        return true;
+      case !!gameToFullBackupConfirm:
+        setGameToFullBackupConfirm(null);
+        return true;
+      case !!gameToRestoreBackup:
+        setGameToRestoreBackup(null);
+        return true;
+      default:
+        navigate("/");
+        return true;
+    }
+  });
 
   useEffect(() => {
     setActiveTab("summary");
@@ -125,12 +157,15 @@ export function GameDetailPage() {
       <GameDetailHero
         mediaUrls={mediaUrls}
         headerImage={steamDetails?.headerImage}
+        libraryHeroFallbackUrl={libraryHeroFallbackUrl}
         customImageUrl={game.imageUrl}
         gameName={displayName}
         editionLabel={game.editionLabel}
         gameId={gameId}
         isLoading={isLoading}
       />
+
+      {!hasSyncConfig ? <GameDetailSyncSetupBanner /> : null}
 
       <GameDetailActionStrip
         game={game}
@@ -190,30 +225,28 @@ export function GameDetailPage() {
       />
 
       {steamDetails ? (
-        <div
-          ref={tabsShellRef}
-          className="scroll-mt-6 overflow-hidden rounded-2xl border border-default-200/80 bg-content1/95 shadow-md ring-1 ring-black/5 dark:border-default-100/25 dark:bg-default-50/15 dark:ring-white/5">
+        <div ref={tabsShellRef} className="scroll-mt-6">
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={handleTabsSelectionChange}
-            variant="solid"
-            color="default"
-            size="md"
+            variant="underlined"
+            color="primary"
+            size="lg"
             classNames={{
               base: "w-full",
               tabList:
-                "w-full gap-1 rounded-t-2xl border-b border-default-200/70 bg-default-100/90 p-1.5 dark:border-default-100/20 dark:bg-default-100/25",
-              tab: "h-11 max-w-none flex-1 data-[selected=true]:bg-content1 data-[selected=true]:shadow-sm",
-              cursor: "hidden",
-              panel:
-                "min-h-[16rem] border-t border-default-200/40 bg-linear-to-b from-default-50/60 to-content1 px-5 py-6 sm:min-h-[18rem] sm:px-7 sm:py-8 dark:border-default-100/15 dark:from-default-50/10 dark:to-default-50/5",
+                "sticky top-0 z-20 w-full min-h-[3.25rem] flex-nowrap gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-default-200/80 bg-background/85 px-0 pt-1 backdrop-blur-md [scrollbar-width:thin] supports-[backdrop-filter]:bg-background/75 dark:border-default-100/25 dark:bg-background/70",
+              tab: "min-w-[9rem] shrink-0 gap-2 px-3 py-2 text-default-600 data-[selected=true]:font-semibold data-[selected=true]:text-foreground sm:min-w-0 sm:flex-1 sm:justify-center",
+              tabContent: "group flex items-center gap-2",
+              cursor: "bg-primary",
+              panel: "min-h-[16rem] px-0 pb-2 pt-8 sm:min-h-[18rem] sm:pt-10",
             }}
             aria-label="Secciones del juego">
             <Tab
               key="summary"
               title={
-                <span className="flex items-center justify-center gap-2">
-                  <LayoutList size={17} className="opacity-90" />
+                <span className="flex items-center gap-2">
+                  <LayoutList size={18} className="text-default-400 group-data-[selected=true]:text-primary" />
                   <span>Resumen</span>
                 </span>
               }>
@@ -222,8 +255,8 @@ export function GameDetailPage() {
             <Tab
               key="details"
               title={
-                <span className="flex items-center justify-center gap-2">
-                  <ScrollText size={17} className="opacity-90" />
+                <span className="flex items-center gap-2">
+                  <ScrollText size={18} className="text-default-400 group-data-[selected=true]:text-primary" />
                   <span>Detalles</span>
                 </span>
               }>
@@ -233,8 +266,8 @@ export function GameDetailPage() {
               <Tab
                 key="requirements"
                 title={
-                  <span className="flex items-center justify-center gap-2">
-                    <Cpu size={17} className="opacity-90" />
+                  <span className="flex items-center gap-2">
+                    <Cpu size={18} className="text-default-400 group-data-[selected=true]:text-primary" />
                     <span>Requisitos</span>
                   </span>
                 }>
@@ -244,8 +277,8 @@ export function GameDetailPage() {
           </Tabs>
         </div>
       ) : (
-        <section className="rounded-xl border border-default-200/60 bg-content1/40 px-4 py-5 dark:border-default-100/20">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-default-500">Resumen</h2>
+        <section className="rounded-2xl border border-default-200/60 bg-content1 px-5 py-6 shadow-sm dark:border-default-100/20 dark:bg-content1/80 sm:px-7 sm:py-8">
+          <h2 className="mb-6 text-lg font-semibold tracking-tight text-foreground">Resumen</h2>
           <GameDetailLocalSummary game={game} />
         </section>
       )}

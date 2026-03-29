@@ -9,8 +9,10 @@ import "swiper/css/effect-fade";
 
 interface GameDetailHeroProps {
   mediaUrls: string[];
-  /** Imagen ancha de Steam (header) cuando no hay capturas en carrusel. */
+  /** Imagen ancha de Steam (header ~460px) solo si no hay capturas ni library hero. */
   headerImage?: string | null;
+  /** Imagen ancha de biblioteca Steam (~3840px); mejor que header para hero. */
+  libraryHeroFallbackUrl?: string | null;
   /** Imagen personalizada del juego (no Steam). */
   customImageUrl?: string | null;
   gameName: string;
@@ -22,6 +24,7 @@ interface GameDetailHeroProps {
 export function GameDetailHero({
   mediaUrls,
   headerImage,
+  libraryHeroFallbackUrl,
   customImageUrl,
   gameName,
   editionLabel,
@@ -32,7 +35,15 @@ export function GameDetailHero({
   const [loadedSlides, setLoadedSlides] = useState<Set<number>>(new Set());
 
   const heroSlides =
-    mediaUrls.length > 0 ? mediaUrls : headerImage ? [headerImage] : customImageUrl ? [customImageUrl] : [];
+    mediaUrls.length > 0
+      ? mediaUrls
+      : customImageUrl
+        ? [customImageUrl]
+        : libraryHeroFallbackUrl
+          ? [libraryHeroFallbackUrl]
+          : headerImage
+            ? [headerImage]
+            : [];
 
   const handleSlideLoad = useCallback((index: number) => {
     setLoadedSlides((prev) => new Set(prev).add(index));
@@ -91,6 +102,8 @@ export function GameDetailHero({
                   src={url}
                   alt={`${gameName} captura ${i + 1}`}
                   className="size-full object-cover object-center"
+                  decoding="async"
+                  fetchPriority={i === 0 ? "high" : "auto"}
                   onLoad={() => handleSlideLoad(i)}
                 />
               </SwiperSlide>
@@ -103,6 +116,8 @@ export function GameDetailHero({
               src={heroSlides[0]}
               alt={gameName}
               className="size-full object-cover object-center"
+              decoding="async"
+              fetchPriority="high"
               onLoad={() => handleSlideLoad(0)}
             />
           </div>

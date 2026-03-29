@@ -9,6 +9,7 @@ pub const SETTINGS_FILE_NAME: &str = "settings.json";
 pub const LIBRARY_FILE_NAME: &str = "library.json";
 pub const HISTORY_FILE_NAME: &str = "history.json";
 pub const GAMIFICATION_FILE_NAME: &str = "gamification.json";
+pub const SQLITE_CATALOG_DB_NAME: &str = "catalog.sqlite";
 
 /// Obtiene el directorio base de configuración de la aplicación.
 ///
@@ -58,4 +59,9 @@ pub fn history_path() -> Option<PathBuf> {
 /// Estado de gamificación local (también incluido en el JSON monolítico para nube/export).
 pub fn gamification_path() -> Option<PathBuf> {
     data_dir().map(|d| d.join(GAMIFICATION_FILE_NAME))
+}
+
+/// Base de datos SQLite del catálogo Steam (lista local + metadatos enriquecidos).
+pub fn sqlite_catalog_path() -> Option<PathBuf> {
+    data_dir().map(|d| d.join(SQLITE_CATALOG_DB_NAME))
 }

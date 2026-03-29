@@ -6,6 +6,15 @@ import { useShellUiStore } from "@store/ShellUiStore";
 
 const NAVIGATION_THROTTLE_MS = 120;
 
+function dispatchBackAction() {
+  const shell = useShellUiStore.getState();
+  if (shell.sideMenuOpen) {
+    shell.requestCloseSideMenu();
+    return;
+  }
+  shell.requestGlobalBack();
+}
+
 /**
  * Atajos de teclado (además del mando):
  * - Menú lateral: F10, Alt+M, o Ctrl+Shift+M (este último suele funcionar aunque el WebView se coma F10).
@@ -14,7 +23,7 @@ const NAVIGATION_THROTTLE_MS = 120;
  * El listener usa fase capture para recibir la pulsación antes que el SO/WebView la consuma.
  */
 export function useInputManager() {
-  const { setInputMode, navigate, confirm, popLayer } = useNavigationStore();
+  const { setInputMode, navigate, confirm } = useNavigationStore();
   const mouseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGamepadInput = useRef<number>(0);
   const lastKeyInput = useRef<number>(0);
@@ -96,7 +105,8 @@ export function useInputManager() {
           confirm();
           break;
         case "Escape":
-          popLayer();
+          e.preventDefault();
+          dispatchBackAction();
           break;
       }
     };
@@ -130,7 +140,7 @@ export function useInputManager() {
           confirm();
           break;
         case "back":
-          popLayer();
+          dispatchBackAction();
           break;
         case "menu":
           useShellUiStore.getState().requestStaggeredMenuToggle();
@@ -146,5 +156,5 @@ export function useInputManager() {
       document.removeEventListener("keydown", handleKeyDown, true);
       unlisten.then((f) => f());
     };
-  }, [navigate, confirm, popLayer, setInputMode]);
+  }, [navigate, confirm, setInputMode]);
 }

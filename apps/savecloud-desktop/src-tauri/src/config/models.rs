@@ -40,6 +40,11 @@ pub struct AppSettings {
     /// URL o ruta local: marco superpuesto al avatar (PNG recomendado).
     #[serde(default)]
     pub profile_frame: Option<String>,
+    /// Clave [Steam Web API](https://steamcommunity.com/dev/apikey) para `IStoreService/GetAppList` (catálogo local).
+    ///
+    /// No se serializa en JSON; se guarda en el almacén seguro del SO (Keyring), igual que `api_key`.
+    #[serde(skip_serializing, default)]
+    pub steam_web_api_key: Option<String>,
 }
 
 /// Biblioteca local de juegos configurados.
@@ -168,6 +173,9 @@ pub struct ConfigDto {
     pub profile_avatar: Option<String>,
     #[serde(default)]
     pub profile_frame: Option<String>,
+    /// Presente solo si hay clave configurada; valor enmascarado hacia la UI.
+    #[serde(default)]
+    pub steam_web_api_key: Option<String>,
 }
 
 /// DTO representativo de un juego para el frontend.
@@ -202,3 +210,6 @@ pub struct OperationLogEntryDto {
 /// Valor centinela utilizado para enmascarar la API Key hacia el frontend.
 /// Evita que secretos viajen en texto plano a la interfaz gráfica.
 pub const MASKED_API_KEY: &str = "******** (Protegida por el sistema)";
+
+/// Mismo criterio que [`MASKED_API_KEY`] para la clave Steam Web API.
+pub const MASKED_STEAM_WEB_API_KEY: &str = MASKED_API_KEY;

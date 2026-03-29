@@ -1,15 +1,19 @@
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ExternalLink } from "lucide-react";
 
 interface CreateConfigModalProps {
   isOpen: boolean;
   apiBaseUrl: string;
   apiKey: string;
   userId: string;
+  steamWebApiKey: string;
   error: string | null;
   creating: boolean;
   onApiBaseUrlChange: (value: string) => void;
   onApiKeyChange: (value: string) => void;
   onUserIdChange: (value: string) => void;
+  onSteamWebApiKeyChange: (value: string) => void;
   onClose: () => void;
   onSubmit: (restoreAfter: boolean) => void | Promise<void>;
 }
@@ -19,11 +23,13 @@ export function CreateConfigModal({
   apiBaseUrl,
   apiKey,
   userId,
+  steamWebApiKey,
   error,
   creating,
   onApiBaseUrlChange,
   onApiKeyChange,
   onUserIdChange,
+  onSteamWebApiKeyChange,
   onClose,
   onSubmit,
 }: CreateConfigModalProps) {
@@ -64,6 +70,25 @@ export function CreateConfigModal({
             onValueChange={onApiKeyChange}
             variant="bordered"
           />
+          <div className="space-y-2">
+            <Input
+              label="Steam Web API Key (opcional)"
+              placeholder="Clave de Valve para el catálogo local"
+              description="Se guarda en el almacén seguro del sistema, no en config.json."
+              type="password"
+              value={steamWebApiKey}
+              onValueChange={onSteamWebApiKeyChange}
+              variant="bordered"
+            />
+            <Button
+              size="sm"
+              variant="light"
+              className="min-w-0 px-0 text-default-500"
+              startContent={<ExternalLink size={14} />}
+              onPress={() => void openUrl("https://steamcommunity.com/dev/apikey")}>
+              Crear o ver tu clave en steamcommunity.com
+            </Button>
+          </div>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
         </ModalBody>
         <ModalFooter>

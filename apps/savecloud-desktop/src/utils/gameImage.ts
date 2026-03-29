@@ -50,6 +50,14 @@ export function getGameLibraryHeroUrl(game: ConfiguredGame, resolvedSteamAppId?:
 }
 
 /**
+ * Miniaturas de trailers en la API de Steam (`movie_max.jpg`, etc.): baja calidad; no usar en hero.
+ * (El backend ya no las mezcla; esto filtra cachés antiguas o URLs sueltas.)
+ */
+export function isSteamMoviePosterUrl(url: string): boolean {
+  return /\/steam\/apps\/\d+\/movie[^/]*$/i.test(url.trim());
+}
+
+/**
  * Extrae Steam App ID del id cuando sigue convenciones de cracks (ej. -2050650).
  */
 export function extractAppIdFromId(id: string): string | null {

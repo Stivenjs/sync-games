@@ -14,7 +14,10 @@ import {
   setFullBackupStreaming,
   setFullBackupStreamingDryRun,
   importFriendConfig,
+  syncSteamCatalog,
+  resetSteamCatalogSync,
 } from "@services/tauri";
+import { MASKED_CONFIG_SECRET } from "@/constants/configMask";
 import { useConfig } from "@hooks/useConfig";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toastError, toastSuccess } from "@utils/toast";
@@ -32,11 +35,13 @@ type SettingsPageState = {
   createApiBaseUrl: string;
   createApiKey: string;
   createUserId: string;
+  createSteamWebApiKey: string;
   creatingConfig: boolean;
   createConfigError: string | null;
   backingUpConfig: boolean;
   restoringConfig: boolean;
   restoreConfirmOpen: boolean;
+  steamCatalogBusy: boolean;
 };
 
 type SettingsPageAction =
@@ -50,6 +55,7 @@ type SettingsPageAction =
       apiBaseUrl?: string;
       apiKey?: string;
       userId?: string;
+      steamWebApiKey?: string;
     }
   | { type: "SET_PULL_FRIEND_MODAL"; open: boolean }
   | { type: "SET_PULL_FRIEND_USER_ID"; payload: string }
@@ -59,15 +65,18 @@ type SettingsPageAction =
       apiBaseUrl: string;
       apiKey: string;
       userId: string;
+      steamWebApiKey: string;
     }
   | { type: "SET_CREATE_API_BASE_URL"; payload: string }
   | { type: "SET_CREATE_API_KEY"; payload: string }
   | { type: "SET_CREATE_USER_ID"; payload: string }
+  | { type: "SET_CREATE_STEAM_WEB_API_KEY"; payload: string }
   | { type: "SET_CREATING_CONFIG"; payload: boolean }
   | { type: "SET_CREATE_CONFIG_ERROR"; payload: string | null }
   | { type: "SET_BACKING_UP_CONFIG"; payload: boolean }
   | { type: "SET_RESTORING_CONFIG"; payload: boolean }
-  | { type: "SET_RESTORE_CONFIRM_OPEN"; payload: boolean };
+  | { type: "SET_RESTORE_CONFIRM_OPEN"; payload: boolean }
+  | { type: "SET_STEAM_CATALOG_BUSY"; payload: boolean };
 
 const initialState: SettingsPageState = {
   testingNotification: false,
@@ -81,11 +90,13 @@ const initialState: SettingsPageState = {
   createApiBaseUrl: "",
   createApiKey: "",
   createUserId: "",
+  createSteamWebApiKey: "",
   creatingConfig: false,
   createConfigError: null,
   backingUpConfig: false,
   restoringConfig: false,
   restoreConfirmOpen: false,
+  steamCatalogBusy: false,
 };
 
 function settingsPageReducer(state: SettingsPageState, action: SettingsPageAction): SettingsPageState {
@@ -113,6 +124,7 @@ function settingsPageReducer(state: SettingsPageState, action: SettingsPageActio
         }),
         ...(action.apiKey !== undefined && { createApiKey: action.apiKey }),
         ...(action.userId !== undefined && { createUserId: action.userId }),
+        ...(action.steamWebApiKey !== undefined && { createSteamWebApiKey: action.steamWebApiKey }),
         ...(action.open && { createConfigError: null }),
       };
     case "SET_CREATE_FORM_FROM_CONFIG":
@@ -121,6 +133,7 @@ function settingsPageReducer(state: SettingsPageState, action: SettingsPageActio
         createApiBaseUrl: action.apiBaseUrl,
         createApiKey: action.apiKey,
         createUserId: action.userId,
+        createSteamWebApiKey: action.steamWebApiKey,
       };
     case "SET_CREATE_API_BASE_URL":
       return { ...state, createApiBaseUrl: action.payload };
@@ -128,6 +141,8 @@ function settingsPageReducer(state: SettingsPageState, action: SettingsPageActio
       return { ...state, createApiKey: action.payload };
     case "SET_CREATE_USER_ID":
       return { ...state, createUserId: action.payload };
+    case "SET_CREATE_STEAM_WEB_API_KEY":
+      return { ...state, createSteamWebApiKey: action.payload };
     case "SET_CREATING_CONFIG":
       return { ...state, creatingConfig: action.payload };
     case "SET_CREATE_CONFIG_ERROR":
@@ -138,6 +153,8 @@ function settingsPageReducer(state: SettingsPageState, action: SettingsPageActio
       return { ...state, restoringConfig: action.payload };
     case "SET_RESTORE_CONFIRM_OPEN":
       return { ...state, restoreConfirmOpen: action.payload };
+    case "SET_STEAM_CATALOG_BUSY":
+      return { ...state, steamCatalogBusy: action.payload };
     default:
       return state;
   }
@@ -180,9 +197,10 @@ export function useSettingsPage() {
         apiBaseUrl: config.apiBaseUrl ?? "",
         apiKey: state.createApiKey || config.apiKey || "",
         userId: config.userId ?? "",
+        steamWebApiKey: state.createSteamWebApiKey || config.steamWebApiKey || "",
       });
     }
-  }, [state.createConfigModalOpen, config?.apiBaseUrl, config?.apiKey, config?.userId]);
+  }, [state.createConfigModalOpen, config?.apiBaseUrl, config?.apiKey, config?.userId, config?.steamWebApiKey]);
   const handleExportConfig = async () => {
     dispatch({ type: "SET_EXPORTING", payload: true });
     try {
@@ -296,8 +314,20 @@ export function useSettingsPage() {
     dispatch({ type: "SET_CREATE_CONFIG_ERROR", payload: null });
     try {
       const apiKeyToSave =
-        state.createApiKey === "********" ? (config?.apiKey === "********" ? "" : config?.apiKey) : state.createApiKey;
-      const path = await createConfigFile(state.createApiBaseUrl, apiKeyToSave ?? "", state.createUserId);
+        state.createApiKey === MASKED_CONFIG_SECRET || state.createApiKey === "********"
+          ? config?.apiKey === MASKED_CONFIG_SECRET || config?.apiKey === "********"
+            ? ""
+            : (config?.apiKey ?? "")
+          : state.createApiKey;
+      const steamUnchanged =
+        state.createSteamWebApiKey === MASKED_CONFIG_SECRET || state.createSteamWebApiKey === "********";
+      const steamWebApiKeyArg = steamUnchanged ? null : state.createSteamWebApiKey.trim() || null;
+      const path = await createConfigFile(
+        state.createApiBaseUrl,
+        apiKeyToSave ?? "",
+        state.createUserId,
+        steamWebApiKeyArg
+      );
       dispatch({ type: "SET_CREATE_MODAL", open: false });
 
       refetchConfig?.();
@@ -370,6 +400,39 @@ export function useSettingsPage() {
     dispatch({ type: "SET_CREATE_MODAL", open: true });
   };
 
+  const handleSyncSteamCatalog = async () => {
+    dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: true });
+    try {
+      const stats = await syncSteamCatalog();
+      toastSuccess(
+        "Catálogo Steam actualizado",
+        `Modo: ${stats.mode}. Entradas: ${stats.appsUpserted} (lotes: ${stats.batches}).`
+      );
+      refetchConfig?.();
+      queryClient.invalidateQueries({ queryKey: ["config"] });
+    } catch (e) {
+      toastError("Error al sincronizar catálogo", e instanceof Error ? e.message : String(e));
+    } finally {
+      dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: false });
+    }
+  };
+
+  const handleResetSteamCatalogSync = async () => {
+    const ok = window.confirm(
+      "¿Restablecer el progreso del catálogo Steam? La próxima sincronización volverá a descargar el listado completo (puede tardar)."
+    );
+    if (!ok) return;
+    dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: true });
+    try {
+      await resetSteamCatalogSync();
+      toastSuccess("Progreso del catálogo restablecido", "La próxima sincronización será un sync completo.");
+    } catch (e) {
+      toastError("Error al restablecer", e instanceof Error ? e.message : String(e));
+    } finally {
+      dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: false });
+    }
+  };
+
   return {
     ...state,
     config,
@@ -389,10 +452,13 @@ export function useSettingsPage() {
     handleAutostartChange,
     handleFullBackupStreamingChange,
     handleFullBackupStreamingDryRunChange,
+    handleSyncSteamCatalog,
+    handleResetSteamCatalogSync,
     openCreateConfigModal,
     setCreateApiBaseUrl: (v: string) => dispatch({ type: "SET_CREATE_API_BASE_URL", payload: v }),
     setCreateApiKey: (v: string) => dispatch({ type: "SET_CREATE_API_KEY", payload: v }),
     setCreateUserId: (v: string) => dispatch({ type: "SET_CREATE_USER_ID", payload: v }),
+    setCreateSteamWebApiKey: (v: string) => dispatch({ type: "SET_CREATE_STEAM_WEB_API_KEY", payload: v }),
     setCreateConfigModalOpen: (open: boolean) => dispatch({ type: "SET_CREATE_MODAL", open }),
     setRestoreConfirmOpen: (v: boolean) => dispatch({ type: "SET_RESTORE_CONFIRM_OPEN", payload: v }),
     setPullFriendConfigModalOpen: (open: boolean) => dispatch({ type: "SET_PULL_FRIEND_MODAL", open }),

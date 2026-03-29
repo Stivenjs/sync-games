@@ -16,6 +16,8 @@ export interface UserBadgeProps {
   connectionStatus?: ConnectionStatus;
   /** Abre el drawer de perfil (apariencia y estadísticas). */
   onOpenProfile?: () => void;
+  /** Precarga el módulo del drawer (p. ej. al pasar el ratón) para abrir más rápido. */
+  onIntentOpenProfile?: () => void;
 }
 
 export function UserBadge({
@@ -25,6 +27,7 @@ export function UserBadge({
   hasSyncConfig,
   connectionStatus,
   onOpenProfile,
+  onIntentOpenProfile,
 }: UserBadgeProps) {
   const isConfigured = !!userId?.trim();
 
@@ -78,7 +81,12 @@ export function UserBadge({
   return (
     <div className="flex w-fit items-center gap-2 rounded-lg border border-default-200 bg-default-50 px-3 py-1.5 dark:border-default-100 dark:bg-default-50/50">
       {onOpenProfile ? (
-        <Button variant="light" className="h-auto min-h-0 flex-1 justify-start gap-0 px-1 py-0" onPress={onOpenProfile}>
+        <Button
+          variant="light"
+          className="h-auto min-h-0 flex-1 justify-start gap-0 px-1 py-0"
+          onPointerEnter={() => onIntentOpenProfile?.()}
+          onFocus={() => onIntentOpenProfile?.()}
+          onPress={onOpenProfile}>
           {userBlock}
         </Button>
       ) : (

@@ -10,10 +10,13 @@
 //! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
 use crate::network::STEAM_CLIENT;
+use crate::steam_cache::{normalize_steam_app_id, steam_api_cache};
 use futures_util::StreamExt;
 use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, RwLock};
+use std::sync::LazyLock;
+
+pub use crate::steam_cache::{SteamAppDetails, SteamAppdetailsMedia};
 
 static APP_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"/app/(\d{4,10})/"#).unwrap());
 static SUGGEST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -26,9 +29,6 @@ static NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"class="[^"]*match_name[^"]*"[^>]*>([^<]+)<"#).unwrap());
 
 const STEAM_CONCURRENCY_LIMIT: usize = 3;
-
-static MEDIA_CACHE: LazyLock<RwLock<HashMap<String, SteamAppdetailsMedia>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 async fn fetch_single_app_name(app_id: &str) -> Option<(String, String)> {
     let url = format!(
@@ -86,10 +86,7 @@ pub async fn get_steam_app_names_batch(app_ids: Vec<String>) -> HashMap<String, 
 
 #[tauri::command]
 pub async fn get_steam_app_name(app_id: String) -> Option<String> {
-    let app_id = app_id.trim().to_string();
-    if app_id.is_empty() || !app_id.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
+    let app_id = normalize_steam_app_id(&app_id)?;
 
     let mut results = get_steam_app_names_batch(vec![app_id.clone()]).await;
     results.remove(&app_id)
@@ -201,14 +198,6 @@ pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
     results
 }
 
-/// URLs de medios de una aplicación de Steam (portada, capturas, vídeo).
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SteamAppdetailsMedia {
-    pub media_urls: Vec<String>,
-    pub video_url: Option<String>,
-}
-
 // Helpers compartidos entre media y details
 
 /// Realiza una petición a `appdetails` y retorna el campo `data` tomando
@@ -314,13 +303,10 @@ fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
         }
     }
 
+    // No añadir `thumbnail` de trailers: son muy pequeñas y se ven pixeladas en hero/carrusel.
+    // El vídeo sigue disponible en `video_url` para hover / reproductor.
     if let Some(movies) = data.get("movies").and_then(|v| v.as_array()) {
         for item in movies {
-            if let Some(thumb) = item.get("thumbnail").and_then(|v| v.as_str()) {
-                if !thumb.is_empty() && !media_urls.iter().any(|u| u == thumb) {
-                    media_urls.push(thumb.to_owned());
-                }
-            }
             if video_url.is_none() {
                 video_url = extract_best_video_url(item);
             }
@@ -375,24 +361,17 @@ async fn fetch_steam_appdetails_media_impl(app_id: &str) -> Result<SteamAppdetai
 
 #[tauri::command]
 pub async fn get_steam_appdetails_media(app_id: String) -> Result<SteamAppdetailsMedia, String> {
-    let app_id = app_id.trim().to_string();
-    if app_id.is_empty() || !app_id.chars().all(|c| c.is_ascii_digit()) {
+    let Some(app_id) = normalize_steam_app_id(&app_id) else {
         return Err("App ID inválido".to_string());
-    }
+    };
 
-    {
-        let cache = MEDIA_CACHE.read().unwrap();
-        if let Some(cached_media) = cache.get(&app_id) {
-            return Ok(cached_media.clone());
-        }
+    if let Some(cached) = steam_api_cache().get_media(&app_id) {
+        return Ok(cached);
     }
 
     let result = fetch_steam_appdetails_media_impl(&app_id).await?;
 
-    {
-        let mut cache = MEDIA_CACHE.write().unwrap();
-        cache.insert(app_id, result.clone());
-    }
+    steam_api_cache().insert_media(app_id, result.clone());
 
     Ok(result)
 }
@@ -405,10 +384,7 @@ pub async fn get_steam_appdetails_media_batch(
     let valid_ids: Vec<String> = app_ids
         .into_iter()
         .filter_map(|id| {
-            let id = id.trim().to_string();
-            if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
-                return None;
-            }
+            let id = normalize_steam_app_id(&id)?;
             if seen.insert(id.clone()) {
                 Some(id)
             } else {
@@ -424,14 +400,12 @@ pub async fn get_steam_appdetails_media_batch(
     let mut final_results = HashMap::new();
     let mut ids_to_fetch = Vec::new();
 
-    {
-        let cache = MEDIA_CACHE.read().unwrap();
-        for id in valid_ids {
-            if let Some(cached_data) = cache.get(&id) {
-                final_results.insert(id, cached_data.clone());
-            } else {
-                ids_to_fetch.push(id);
-            }
+    let cache = steam_api_cache();
+    for id in valid_ids {
+        if let Some(cached_data) = cache.get_media(&id) {
+            final_results.insert(id, cached_data);
+        } else {
+            ids_to_fetch.push(id);
         }
     }
 
@@ -455,53 +429,35 @@ pub async fn get_steam_appdetails_media_batch(
 
     let fetched_results: Vec<(String, SteamAppdetailsMedia)> = stream.collect().await;
 
-    let mut cache = MEDIA_CACHE.write().unwrap();
+    let api_cache = steam_api_cache();
     for (id, media) in fetched_results {
-        cache.insert(id.clone(), media.clone());
+        api_cache.insert_media(id.clone(), media.clone());
         final_results.insert(id, media);
     }
 
     Ok(final_results)
 }
 
-/// Ficha completa de una aplicación de Steam.
-///
-/// Incluye textos descriptivos (en español), metadatos (desarrollador,
-/// editor, géneros, fecha de lanzamiento) y los mismos medios que
-/// [`SteamAppdetailsMedia`]. Si los medios ya existían en [`MEDIA_CACHE`],
-/// se reutilizan sin una petición adicional de screenshots/movies.
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SteamAppDetails {
-    pub name: String,
-    pub short_description: String,
-    pub detailed_description: String,
-    pub header_image: String,
-    pub developers: Vec<String>,
-    pub publishers: Vec<String>,
-    pub genres: Vec<String>,
-    pub categories: Vec<String>,
-    pub release_date: Option<String>,
-    pub pc_requirements_minimum: Option<String>,
-    pub pc_requirements_recommended: Option<String>,
-    pub media: SteamAppdetailsMedia,
-}
-
-static DETAILS_CACHE: LazyLock<RwLock<HashMap<String, SteamAppDetails>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// Filtros para `appdetails`: `basic` no incluye desarrolladores, géneros, etc.
+/// Hay que listarlos explícitamente o la API los omite.
+const STEAM_APPDETAILS_FILTERS_FULL: &str =
+    "basic,developers,publishers,genres,categories,release_date,screenshots,movies";
+const STEAM_APPDETAILS_FILTERS_WITHOUT_MEDIA: &str =
+    "basic,developers,publishers,genres,categories,release_date";
 
 /// Obtiene la ficha completa de un juego de Steam.
 ///
-/// Reutiliza [`MEDIA_CACHE`] para evitar pedir screenshots/movies si ya
-/// se obtuvieron previamente: cuando hay cache usa `filters=basic`
-/// (payload ~5× menor). Los textos se solicitan en español (`l=spanish`).
+/// Reutiliza el caché de medios ([`crate::steam_cache`]) para evitar pedir
+/// screenshots/movies si ya se obtuvieron: cuando hay medios en caché se omiten
+/// en la URL (payload menor). Los metadatos (devs, géneros, fecha…) se piden siempre.
+/// Los textos se solicitan en español (`l=spanish`).
 async fn fetch_steam_app_details_impl(app_id: &str) -> Result<SteamAppDetails, String> {
-    let cached_media = { MEDIA_CACHE.read().unwrap().get(app_id).cloned() };
+    let cached_media = steam_api_cache().get_media(app_id);
 
     let filters = if cached_media.is_some() {
-        "basic"
+        STEAM_APPDETAILS_FILTERS_WITHOUT_MEDIA
     } else {
-        "basic,screenshots,movies"
+        STEAM_APPDETAILS_FILTERS_FULL
     };
 
     let data = fetch_appdetails_data(app_id, "spanish", filters)
@@ -533,8 +489,7 @@ async fn fetch_steam_app_details_impl(app_id: &str) -> Result<SteamAppDetails, S
         cached
     } else {
         let parsed = parse_media_from_data(&data);
-        let mut cache = MEDIA_CACHE.write().unwrap();
-        cache.insert(app_id.to_owned(), parsed.clone());
+        steam_api_cache().insert_media(app_id.to_owned(), parsed.clone());
         parsed
     };
 
@@ -562,24 +517,17 @@ async fn fetch_steam_app_details_impl(app_id: &str) -> Result<SteamAppDetails, S
 /// o si Steam no tiene datos para esa app.
 #[tauri::command]
 pub async fn get_steam_app_details(app_id: String) -> Result<SteamAppDetails, String> {
-    let app_id = app_id.trim().to_string();
-    if app_id.is_empty() || !app_id.chars().all(|c| c.is_ascii_digit()) {
+    let Some(app_id) = normalize_steam_app_id(&app_id) else {
         return Err("App ID inválido".to_string());
-    }
+    };
 
-    {
-        let cache = DETAILS_CACHE.read().unwrap();
-        if let Some(cached) = cache.get(&app_id) {
-            return Ok(cached.clone());
-        }
+    if let Some(cached) = steam_api_cache().get_details(&app_id) {
+        return Ok(cached);
     }
 
     let result = fetch_steam_app_details_impl(&app_id).await?;
 
-    {
-        let mut cache = DETAILS_CACHE.write().unwrap();
-        cache.insert(app_id, result.clone());
-    }
+    steam_api_cache().insert_details(app_id, result.clone());
 
     Ok(result)
 }

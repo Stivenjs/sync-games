@@ -25,7 +25,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 keyring = "2"
-gilrs = "0.10"
 dirs = "5"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking", "stream"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -52,15 +51,23 @@ tokio = { version = "1", features = ["sync", "time", "fs", "io-util"] }
 tokio-util = { version = "0.7.18", features = ["io", "io-util"] }
 walkdir = "2.5.0"
 thiserror = "2.0.18"
+moka = { version = "0.12", default-features = false, features = ["sync"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }
 
 
 [dev-dependencies]
 tempfile = "3.10"
 
+# Windows: WGI (default de gilrs) suele requerir ventana enfocada y puede no emitir en un hilo aparte.
+# XInput funciona bien con el bucle en segundo plano (ver gilrs / Windows Gaming Input).
 [target.'cfg(windows)'.dependencies]
+gilrs = { version = "0.10", default-features = false, features = ["xinput"] }
 winreg = "0.52"
 windows-sys = { version = "0.59", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 wmi = "0.14"
+
+[target.'cfg(not(windows))'.dependencies]
+gilrs = "0.10"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

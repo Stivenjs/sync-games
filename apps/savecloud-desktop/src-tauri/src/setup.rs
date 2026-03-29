@@ -9,6 +9,7 @@ use crate::system::game_exit_sync;
 //use crate::system::watch_sync;
 use crate::controller::start_gamepad_loop;
 use crate::plugins::{log_buffer::new_log_buffer, AppPluginManager};
+use crate::sqlite::AppDb;
 use crate::system::process_check::start_process_watcher;
 use crate::torrent::{engine::TorrentEngine, state::TorrentState};
 use crate::tray::tray_state::TrayState;
@@ -22,7 +23,7 @@ use tokio::sync::Mutex;
 /// # Arguments
 ///
 /// * `app` - Referencia mutable a la instancia principal de la aplicación Tauri.
-pub fn init_states_and_background_tasks(app: &mut App) {
+pub fn init_states_and_background_tasks(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // 1. Herramientas de desarrollo
     // Habilitar DevTools automáticamente en el frontend si compilamos en modo debug.
     #[cfg(debug_assertions)]
@@ -42,6 +43,10 @@ pub fn init_states_and_background_tasks(app: &mut App) {
     if !plugins_dir.exists() {
         let _ = std::fs::create_dir_all(&plugins_dir);
     }
+
+    let db = AppDb::open()?;
+    db.ping()?;
+    app.manage(db);
 
     let logs = new_log_buffer();
     app.manage(logs.clone());
@@ -92,4 +97,6 @@ pub fn init_states_and_background_tasks(app: &mut App) {
 
     // Bucle del Controlador: Inicia la escucha activa de inputs de mandos/gamepads.
     start_gamepad_loop(app.handle().clone());
+
+    Ok(())
 }

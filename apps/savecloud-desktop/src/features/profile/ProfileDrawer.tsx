@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Accordion,
   AccordionItem,
@@ -46,17 +46,35 @@ function connectionLabel(status: ConnectionStatus | undefined): { text: string; 
   }
 }
 
-function ProfileHeroBackground({ rawUrl }: { rawUrl: string }) {
+const ProfileHeroBackground = memo(function ProfileHeroBackground({ rawUrl }: { rawUrl: string }) {
   const resolved = useMemo(() => resolveProfileAsset(rawUrl), [rawUrl]);
   const isVideo = isProfileVideoSource(rawUrl);
 
   if (!resolved) return null;
 
   if (isVideo) {
-    return <video src={resolved} className="absolute inset-0 size-full object-cover" autoPlay muted loop playsInline />;
+    return (
+      <video
+        src={resolved}
+        className="absolute inset-0 size-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="none"
+      />
+    );
   }
-  return <img src={resolved} alt="" className="absolute inset-0 size-full object-cover" />;
-}
+  return (
+    <img
+      src={resolved}
+      alt=""
+      decoding="async"
+      fetchPriority="low"
+      className="absolute inset-0 size-full object-cover"
+    />
+  );
+});
 
 export function ProfileDrawer({
   isOpen,
@@ -180,7 +198,7 @@ export function ProfileDrawer({
               <div className="relative size-[72px] shrink-0">
                 <div className="relative size-full overflow-hidden rounded-md border border-white/10 bg-black/30 shadow-lg">
                   {avatarResolved ? (
-                    <img src={avatarResolved} alt="" className="size-full object-cover" />
+                    <img src={avatarResolved} alt="" decoding="async" className="size-full object-cover" />
                   ) : (
                     <div className="flex size-full items-center justify-center text-default-400">
                       <User size={36} strokeWidth={1.2} />
@@ -191,6 +209,7 @@ export function ProfileDrawer({
                   <img
                     src={frameResolved}
                     alt=""
+                    decoding="async"
                     className="pointer-events-none absolute inset-0 size-full object-contain"
                   />
                 )}

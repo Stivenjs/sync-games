@@ -28,8 +28,6 @@ impl PluginManager {
     }
 
     pub fn load_all(&mut self, plugins_dir: PathBuf, app_handle: AppHandle, logs: AppLogs) {
-        println!("Escaneando carpeta de plugins en: {:?}", plugins_dir);
-
         if let Ok(entries) = std::fs::read_dir(plugins_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -37,8 +35,6 @@ impl PluginManager {
                 if path.is_dir() {
                     match Plugin::load_from_dir(&path, app_handle.clone(), logs.clone()) {
                         Ok(plugin) => {
-                            println!("Plugin registrado exitosamente: {}", plugin.name);
-
                             if let Err(e) = plugin.trigger_on_init() {
                                 eprintln!(
                                     "Error en on_init de '{}': {}",

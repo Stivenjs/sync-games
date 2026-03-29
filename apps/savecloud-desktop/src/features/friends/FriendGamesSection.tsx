@@ -9,6 +9,33 @@ import { formatSize } from "@utils/format";
 import { getSteamAppId } from "@utils/gameImage";
 import type { FriendGameSummary } from "./useFriendsPage";
 
+interface FriendProfileBannerProps {
+  userIdDisplay: string;
+  gameCount: number;
+  onAddGamesPress: () => void;
+}
+
+function FriendProfileBanner({ userIdDisplay, gameCount, onAddGamesPress }: FriendProfileBannerProps) {
+  return (
+    <Card className="border border-primary-200/50 bg-primary-50/30 dark:border-primary-500/20 dark:bg-primary-500/10">
+      <CardBody className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400">
+            Perfil cargado
+          </p>
+          <p className="font-mono text-sm text-foreground">{userIdDisplay}</p>
+          <p className="text-xs text-default-500">
+            {gameCount} juego{gameCount !== 1 ? "s" : ""} en este perfil
+          </p>
+        </div>
+        <Button variant="bordered" color="primary" startContent={<UserPlus size={18} />} onPress={onAddGamesPress}>
+          Añadir juegos de este perfil
+        </Button>
+      </CardBody>
+    </Card>
+  );
+}
+
 interface FriendGamesSectionProps {
   userIdDisplay: string;
   summaries: FriendGameSummary[];
@@ -45,24 +72,24 @@ export function FriendGamesSection({
 
   if (summaries.length === 0) {
     return (
-      <Card>
-        <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
-          <p className="text-default-500">Este amigo no tiene juegos configurados en su config.</p>
-        </CardBody>
-      </Card>
+      <div className="space-y-4">
+        <FriendProfileBanner userIdDisplay={userIdDisplay} gameCount={0} onAddGamesPress={onAddGamesPress} />
+        <Card>
+          <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-default-500">Este amigo no tiene juegos configurados en su config.</p>
+          </CardBody>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-default-500">
-          Perfil de: <span className="font-mono text-default-700">{userIdDisplay}</span>
-        </p>
-        <Button variant="bordered" color="primary" startContent={<UserPlus size={18} />} onPress={onAddGamesPress}>
-          Añadir juegos de este perfil
-        </Button>
-      </div>
+      <FriendProfileBanner
+        userIdDisplay={userIdDisplay}
+        gameCount={summaries.length}
+        onAddGamesPress={onAddGamesPress}
+      />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
         {summaries.map(({ game, fileCount, totalSize }) => {
           const hasSaves = fileCount > 0;

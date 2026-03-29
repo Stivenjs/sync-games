@@ -10,6 +10,9 @@ const FriendsPage = lazy(() => import("@features/friends/FriendsPage").then((m) 
 const HistoryPage = lazy(() => import("@features/history/HistoryPage").then((m) => ({ default: m.HistoryPage })));
 const SettingsPage = lazy(() => import("@features/settings").then((m) => ({ default: m.SettingsPage })));
 const GameDetailPage = lazy(() => preloadGameDetailModule().then((m) => ({ default: m.GameDetailPage })));
+const PlaceholderPage = lazy(() =>
+  import("@components/navigation/PlaceholderPage").then((m) => ({ default: m.PlaceholderPage }))
+);
 
 export const NAV_ITEMS: NavItem[] = [
   { id: "/", label: "Juegos", icon: <Gamepad2 size={18} /> },
@@ -86,9 +89,7 @@ export function AppRoutes() {
           path="*"
           element={
             <AnimatedPage>
-              <div className="flex min-h-[40vh] items-center justify-center">
-                <p className="text-default-500">Sección en desarrollo</p>
-              </div>
+              <PlaceholderPage />
             </AnimatedPage>
           }
         />

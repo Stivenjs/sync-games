@@ -25,6 +25,8 @@ export interface ConfiguredGame {
 export interface Config {
   readonly apiBaseUrl?: string;
   readonly apiKey?: string;
+  /** Clave Steam Web API si está configurada; valor enmascarado desde el backend. */
+  readonly steamWebApiKey?: string;
   readonly userId?: string;
   readonly games: readonly ConfiguredGame[];
   readonly customScanPaths?: readonly string[];

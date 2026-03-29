@@ -93,5 +93,7 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::logs::command_logs::get_plugin_logs,
         crate::commands::share::share::resolve_remote_share_token,
         crate::commands::share::share::create_remote_share_link,
+        crate::steam_catalog::commands::sync_steam_catalog,
+        crate::steam_catalog::commands::reset_steam_catalog_sync,
     ])
 }

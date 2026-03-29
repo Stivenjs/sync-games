@@ -5,13 +5,44 @@ interface ShellUiStore {
   staggeredMenuToggleRequest: number;
   /** Contador: cada incremento pide abrir el drawer de perfil (GamesPage). */
   profileOpenRequest: number;
+  /** Si el menú lateral está abierto (lo actualiza StaggeredMenu vía AppLayout). */
+  sideMenuOpen: boolean;
+  /** Contador: cada incremento pide cerrar el menú lateral sin toggle (p. ej. botón B / Escape). */
+  sideMenuCloseRequest: number;
+  /**
+   * Manejadores de “atrás” (B / Escape), en orden de registro.
+   * En `requestGlobalBack` se invocan del último al primero (LIFO): gana el overlay más reciente.
+   */
+  backHandlers: Array<() => boolean>;
   requestStaggeredMenuToggle: () => void;
   requestProfileOpen: () => void;
+  setSideMenuOpen: (open: boolean) => void;
+  requestCloseSideMenu: () => void;
+  /** Registra un manejador; devuelve función para desregistrar al desmontar. */
+  registerBackHandler: (handler: () => boolean) => () => void;
+  requestGlobalBack: () => void;
 }
 
-export const useShellUiStore = create<ShellUiStore>((set) => ({
+export const useShellUiStore = create<ShellUiStore>((set, get) => ({
   staggeredMenuToggleRequest: 0,
   profileOpenRequest: 0,
+  sideMenuOpen: false,
+  sideMenuCloseRequest: 0,
+  backHandlers: [],
   requestStaggeredMenuToggle: () => set((s) => ({ staggeredMenuToggleRequest: s.staggeredMenuToggleRequest + 1 })),
   requestProfileOpen: () => set((s) => ({ profileOpenRequest: s.profileOpenRequest + 1 })),
+  setSideMenuOpen: (open) => set({ sideMenuOpen: open }),
+  requestCloseSideMenu: () => set((s) => ({ sideMenuCloseRequest: s.sideMenuCloseRequest + 1 })),
+  registerBackHandler: (handler) => {
+    set((s) => ({ backHandlers: [...s.backHandlers, handler] }));
+    return () => {
+      set((s) => ({ backHandlers: s.backHandlers.filter((h) => h !== handler) }));
+    };
+  },
+  requestGlobalBack: () => {
+    const list = get().backHandlers;
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i]()) return;
+    }
+  },
 }));

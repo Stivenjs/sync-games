@@ -1,39 +1,38 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SaveCloud",
-  "version": "1.10.1",
-  "identifier": "com.savecloud.app",
-  "build": {
-    "beforeDevCommand": "bun run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
-    "frontendDist": "../dist"
-  },
   "app": {
-    "withGlobalTauri": false,
-    "windows": [
-      {
-        "label": "main",
-        "title": "SaveCloud",
-        "maximized": true,
-        "resizable": true,
-        "decorations": true
-      }
-    ],
     "security": {
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       },
       "csp": {
         "img-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost",
         "media-src": "'self' data: blob: https: http: asset: http://asset.localhost https://asset.localhost"
       }
-    }
+    },
+    "windows": [
+      {
+        "decorations": true,
+        "label": "main",
+        "maximized": true,
+        "resizable": true,
+        "title": "SaveCloud"
+      }
+    ],
+    "withGlobalTauri": false
+  },
+  "build": {
+    "beforeBuildCommand": "bun run build",
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "copyright": "Copyright (c) Stivenjs 2026. All rights reserved.",
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
@@ -41,14 +40,20 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "longDescription": "SaveCloud es una aplicación de escritorio para administrar tu almacenamiento en la nube. Permite subir, descargar y gestionar tus archivos en la nube. Es una aplicación simple y fácil de usar que te permite administrar tu almacenamiento en la nube en unos pocos clicks.",
+    "shortDescription": "SaveCloud es una aplicación de escritorio para administrar tu almacenamiento en la nube.",
+    "targets": "all"
   },
+  "identifier": "com.savecloud.app",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2MzZEOUM0OTJEOTc1NDUKUldSRmRkbVN4TmsyTnJEQ2NOYUZVZzRyajNFbWo3eWdmSllJcCtxb0RxcE1MMXFIbFZqTzNYdEwK",
       "endpoints": [
         "https://github.com/Stivenjs/savecloud/releases/latest/download/latest.json"
-      ]
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2MzZEOUM0OTJEOTc1NDUKUldSRmRkbVN4TmsyTnJEQ2NOYUZVZzRyajNFbWo3eWdmSllJcCtxb0RxcE1MMXFIbFZqTzNYdEwK"
     }
-  }
+  },
+  "productName": "SaveCloud",
+  "version": "1.10.1"
 }
