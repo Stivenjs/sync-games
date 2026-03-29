@@ -490,18 +490,26 @@ pub struct SteamAppDetails {
 static DETAILS_CACHE: LazyLock<RwLock<HashMap<String, SteamAppDetails>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Filtros para `appdetails`: `basic` no incluye desarrolladores, géneros, etc.
+/// Hay que listarlos explícitamente o la API los omite.
+const STEAM_APPDETAILS_FILTERS_FULL: &str =
+    "basic,developers,publishers,genres,categories,release_date,screenshots,movies";
+const STEAM_APPDETAILS_FILTERS_WITHOUT_MEDIA: &str =
+    "basic,developers,publishers,genres,categories,release_date";
+
 /// Obtiene la ficha completa de un juego de Steam.
 ///
 /// Reutiliza [`MEDIA_CACHE`] para evitar pedir screenshots/movies si ya
-/// se obtuvieron previamente: cuando hay cache usa `filters=basic`
-/// (payload ~5× menor). Los textos se solicitan en español (`l=spanish`).
+/// se obtuvieron previamente: cuando hay cache de medios se omiten en la URL
+/// (payload menor). Los metadatos (devs, géneros, fecha…) se piden siempre.
+/// Los textos se solicitan en español (`l=spanish`).
 async fn fetch_steam_app_details_impl(app_id: &str) -> Result<SteamAppDetails, String> {
     let cached_media = { MEDIA_CACHE.read().unwrap().get(app_id).cloned() };
 
     let filters = if cached_media.is_some() {
-        "basic"
+        STEAM_APPDETAILS_FILTERS_WITHOUT_MEDIA
     } else {
-        "basic,screenshots,movies"
+        STEAM_APPDETAILS_FILTERS_FULL
     };
 
     let data = fetch_appdetails_data(app_id, "spanish", filters)
