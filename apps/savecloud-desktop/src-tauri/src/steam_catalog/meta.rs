@@ -8,6 +8,12 @@ pub const META_FULL_SYNC_DONE: &str = "full_sync_done";
 pub const META_RESUME_LAST_APPID: &str = "resume_last_appid";
 /// Epoch Unix (segundos) de la última sincronización exitosa (full o incremental) para `if_modified_since`.
 pub const META_LAST_INCREMENTAL_AT: &str = "last_incremental_sync_at";
+/// Hash de los flags `include_*` de `GetAppList` usados en el último sync completo; si cambia el código, hay que reindexar.
+pub const META_APP_LIST_SCOPE: &str = "app_list_scope";
+/// Epoch Unix cuando terminó el último **sync completo** (todas las páginas). Sirve para forzar un rescaneo cada N días.
+pub const META_FULL_CATALOG_COMPLETED_AT: &str = "full_catalog_completed_at_unix";
+/// Versión de la lógica de paginación (`have_more` + lote lleno); si cambia, se fuerza sync completo otra vez.
+pub const META_CATALOG_SYNC_LOGIC_VERSION: &str = "catalog_sync_logic_version";
 
 pub fn get_meta(conn: &Connection, key: &str) -> Result<Option<String>, rusqlite::Error> {
     conn.query_row(

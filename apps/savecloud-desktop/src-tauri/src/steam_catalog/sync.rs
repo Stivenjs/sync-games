@@ -8,10 +8,11 @@ use tokio::time::sleep;
 use crate::config::load_settings;
 use crate::sqlite::AppDb;
 
-use super::api::fetch_app_list_page;
+use super::api::{fetch_app_list_page, GET_APP_LIST_QUERY_INCLUDES};
 use super::error::CatalogSyncError;
 use super::meta::{
-    delete_meta, get_meta, set_meta, META_FULL_SYNC_DONE, META_LAST_INCREMENTAL_AT,
+    delete_meta, get_meta, set_meta, META_APP_LIST_SCOPE, META_CATALOG_SYNC_LOGIC_VERSION,
+    META_FULL_CATALOG_COMPLETED_AT, META_FULL_SYNC_DONE, META_LAST_INCREMENTAL_AT,
     META_RESUME_LAST_APPID,
 };
 
@@ -19,6 +20,13 @@ use super::meta::{
 const MAX_BATCHES_PER_RUN: u32 = 10_000;
 /// Pausa entre peticiones a la API de Steam para reducir 429.
 const INTER_REQUEST: Duration = Duration::from_millis(250);
+
+/// Steam no garantiza que `if_modified_since` cubra todo el catálogo; un paso completo por `last_appid` de vez en cuando
+/// recoge juegos nuevos y cambios que el incremental pudo omitir.
+const FULL_CATALOG_MAX_AGE_SECS: u64 = 45 * 24 * 3600;
+
+/// Subir cuando cambie la paginación / interpretación de `have_more` (p. ej. lote de 50k con `have_more: false`).
+const CATALOG_SYNC_LOGIC_VERSION: &str = "2-have-more-full-page";
 
 /// Resultado expuesto al frontend tras un sync.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -76,16 +84,110 @@ fn upsert_apps_batch(conn: &Connection, rows: &[(u32, String)]) -> Result<u64, r
     Ok(n)
 }
 
-fn next_cursor_from_batch(apps: &[(u32, String)], previous_cursor: u32) -> u32 {
-    apps.iter()
-        .map(|(id, _)| *id)
-        .max()
-        .unwrap_or(previous_cursor)
+/// Cursor para la siguiente petición `last_appid`. Steam pide el último appid del lote (orden ascendente → el máximo).
+/// Si la respuesta fuera anómala (ningún id > al enviado), forzamos `sent + 1` para no repetir el mismo lote en bucle.
+fn advance_last_appid(cursor_sent: u32, batch: &[(u32, String)]) -> u32 {
+    let Some(max_id) = batch.iter().map(|(id, _)| *id).max() else {
+        return cursor_sent.saturating_add(1);
+    };
+    if max_id > cursor_sent {
+        max_id
+    } else {
+        cursor_sent.saturating_add(1)
+    }
+}
+
+#[cfg(test)]
+mod cursor_tests {
+    use super::advance_last_appid;
+
+    #[test]
+    fn next_page_uses_max_appid_in_batch() {
+        assert_eq!(
+            advance_last_appid(10, &[(100, "a".into()), (50, "b".into())]),
+            100
+        );
+    }
+
+    #[test]
+    fn stale_batch_must_not_repeat_same_cursor() {
+        assert_eq!(advance_last_appid(500, &[(100, "x".into())]), 501);
+    }
+
+    #[test]
+    fn duplicate_max_equal_to_sent_advances() {
+        assert_eq!(advance_last_appid(42, &[(42, "dup".into())]), 43);
+    }
+}
+
+/// Si cambian los flags `include_*` de [`GET_APP_LIST_QUERY_INCLUDES`], el incremental no rellena tipos viejos:
+/// borramos el progreso y el próximo sync vuelve a ser completo.
+fn invalidate_sync_if_scope_mismatch(db: &AppDb) -> Result<(), CatalogSyncError> {
+    let stored = db.with_conn(|c| get_meta(c, META_APP_LIST_SCOPE))?;
+    if stored.as_deref() == Some(GET_APP_LIST_QUERY_INCLUDES) {
+        return Ok(());
+    }
+    reset_catalog_sync_progress(db)
+}
+
+fn invalidate_sync_if_logic_version_mismatch(db: &AppDb) -> Result<(), CatalogSyncError> {
+    let stored = db.with_conn(|c| get_meta(c, META_CATALOG_SYNC_LOGIC_VERSION))?;
+    if stored.as_deref() == Some(CATALOG_SYNC_LOGIC_VERSION) {
+        return Ok(());
+    }
+    let full_done = db
+        .with_conn(|c| get_meta(c, META_FULL_SYNC_DONE))?
+        .as_deref()
+        == Some("1");
+    if !full_done {
+        // Ya reindexando o sync incompleto; no volver a borrar metadatos.
+        return Ok(());
+    }
+    db.with_conn(|c| {
+        delete_meta(c, META_FULL_SYNC_DONE)?;
+        delete_meta(c, META_RESUME_LAST_APPID)?;
+        delete_meta(c, META_LAST_INCREMENTAL_AT)?;
+        delete_meta(c, META_FULL_CATALOG_COMPLETED_AT)?;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Si el último sync completo es antiguo, fuerza otro (misma lógica que reset manual).
+fn invalidate_sync_if_full_catalog_stale(db: &AppDb) -> Result<(), CatalogSyncError> {
+    let full_done = db
+        .with_conn(|c| get_meta(c, META_FULL_SYNC_DONE))?
+        .as_deref()
+        == Some("1");
+    if !full_done {
+        return Ok(());
+    }
+    let ts_str = db.with_conn(|c| get_meta(c, META_FULL_CATALOG_COMPLETED_AT))?;
+    let ts_str = match ts_str {
+        Some(s) if !s.is_empty() => s,
+        _ => {
+            // Bases antiguas sin esta clave: no forzar un full inmediato; empezar a contar desde ahora.
+            let now = now_unix_secs().to_string();
+            db.with_conn(|c| set_meta(c, META_FULL_CATALOG_COMPLETED_AT, &now))?;
+            return Ok(());
+        }
+    };
+    let Ok(ts) = ts_str.parse::<u64>() else {
+        return reset_catalog_sync_progress(db);
+    };
+    let age = now_unix_secs().saturating_sub(ts);
+    if age <= FULL_CATALOG_MAX_AGE_SECS {
+        return Ok(());
+    }
+    reset_catalog_sync_progress(db)
 }
 
 /// Ejecuta un sync completo (o reanuda) o uno incremental según metadatos en `catalog_sync_meta`.
 pub async fn run_catalog_sync(db: &AppDb) -> Result<CatalogSyncStats, CatalogSyncError> {
     let key = resolve_api_key()?;
+    invalidate_sync_if_scope_mismatch(db)?;
+    invalidate_sync_if_logic_version_mismatch(db)?;
+    invalidate_sync_if_full_catalog_stale(db)?;
     let full_done = db
         .with_conn(|c| get_meta(c, META_FULL_SYNC_DONE))?
         .as_deref()
@@ -113,11 +215,12 @@ async fn run_full_sync(db: &AppDb, key: &str) -> Result<CatalogSyncStats, Catalo
             return Err(CatalogSyncError::BatchLimit);
         }
 
+        let cursor_sent = last_appid;
         let (apps, have_more) = fetch_app_list_page(key, last_appid, None).await?;
         if !apps.is_empty() {
             let n = db.with_conn(|c| upsert_apps_batch(c, &apps))?;
             total += n;
-            last_appid = next_cursor_from_batch(&apps, last_appid);
+            last_appid = advance_last_appid(cursor_sent, &apps);
             db.with_conn(|c| set_meta(c, META_RESUME_LAST_APPID, &last_appid.to_string()))?;
         }
 
@@ -129,6 +232,13 @@ async fn run_full_sync(db: &AppDb, key: &str) -> Result<CatalogSyncStats, Catalo
                 set_meta(c, META_FULL_SYNC_DONE, "1")?;
                 delete_meta(c, META_RESUME_LAST_APPID)?;
                 set_meta(c, META_LAST_INCREMENTAL_AT, &ts.to_string())?;
+                set_meta(c, META_APP_LIST_SCOPE, GET_APP_LIST_QUERY_INCLUDES)?;
+                set_meta(c, META_FULL_CATALOG_COMPLETED_AT, &ts.to_string())?;
+                set_meta(
+                    c,
+                    META_CATALOG_SYNC_LOGIC_VERSION,
+                    CATALOG_SYNC_LOGIC_VERSION,
+                )?;
                 Ok::<(), rusqlite::Error>(())
             })?;
             return Ok(CatalogSyncStats {
@@ -162,11 +272,12 @@ async fn run_incremental_sync(db: &AppDb, key: &str) -> Result<CatalogSyncStats,
             return Err(CatalogSyncError::BatchLimit);
         }
 
+        let cursor_sent = last_appid;
         let (apps, have_more) = fetch_app_list_page(key, last_appid, Some(since)).await?;
         if !apps.is_empty() {
             let n = db.with_conn(|c| upsert_apps_batch(c, &apps))?;
             total += n;
-            last_appid = next_cursor_from_batch(&apps, last_appid);
+            last_appid = advance_last_appid(cursor_sent, &apps);
         }
 
         sleep(INTER_REQUEST).await;
@@ -197,6 +308,8 @@ pub fn reset_catalog_sync_progress(db: &AppDb) -> Result<(), CatalogSyncError> {
         delete_meta(c, META_FULL_SYNC_DONE)?;
         delete_meta(c, META_RESUME_LAST_APPID)?;
         delete_meta(c, META_LAST_INCREMENTAL_AT)?;
+        delete_meta(c, META_FULL_CATALOG_COMPLETED_AT)?;
+        delete_meta(c, META_CATALOG_SYNC_LOGIC_VERSION)?;
         Ok::<(), rusqlite::Error>(())
     })?;
     Ok(())
