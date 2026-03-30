@@ -10,7 +10,6 @@
 //! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
 use std::ops::Deref;
-use std::time::Duration;
 
 use rusqlite::Connection;
 use tauri::State;
@@ -19,8 +18,10 @@ use crate::network::STEAM_CLIENT;
 use crate::sqlite::AppDb;
 use crate::steam::appdetails::fetch_steam_app_details_from_store;
 use crate::steam::appdetails::fetch_steam_appdetails_media_from_store;
-use crate::steam_cache::{normalize_steam_app_id, steam_api_cache};
-use futures_util::StreamExt;
+use crate::steam_cache::{
+    normalize_steam_app_id, normalize_steam_appdetails_media, steam_api_cache,
+};
+use futures_util::stream::{self, StreamExt};
 use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
@@ -38,9 +39,6 @@ static NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"class="[^"]*match_name[^"]*"[^>]*>([^<]+)<"#).unwrap());
 
 const STEAM_CONCURRENCY_LIMIT: usize = 3;
-
-/// Pausa entre peticiones a la Store para medios (reduce 429); secuencial tras RAM/DB.
-const STORE_MEDIA_FETCH_DELAY_MS: u64 = 220;
 
 /// Caché persistente en `steam_appdetails_media_cache` (JSON de `SteamAppdetailsMedia`).
 fn load_persistent_media_cache_map(
@@ -85,7 +83,8 @@ fn upsert_persistent_media_cache_batch(
         let Ok(pid) = id.parse::<i64>() else {
             continue;
         };
-        let Ok(json) = serde_json::to_string(media) else {
+        let media = normalize_steam_appdetails_media(media.clone());
+        let Ok(json) = serde_json::to_string(&media) else {
             continue;
         };
         stmt.execute((pid, json))?;
@@ -111,7 +110,10 @@ fn load_combined_media_from_db(
     for (k, v) in from_catalog {
         out.insert(k, v);
     }
-    Ok(out)
+    Ok(out
+        .into_iter()
+        .map(|(k, v)| (k, normalize_steam_appdetails_media(v)))
+        .collect())
 }
 
 /// Medios ya enriquecidos en el catálogo local (`details_json`); evita golpear la Store.
@@ -419,23 +421,27 @@ pub async fn get_steam_appdetails_media_batch(
         name: String::new(),
     };
 
+    let stream = stream::iter(ids_to_fetch.into_iter().map(|app_id| async move {
+        let result = fetch_steam_appdetails_media_from_store(&app_id).await;
+        (app_id, result)
+    }))
+    .buffer_unordered(STEAM_CONCURRENCY_LIMIT);
+
+    let fetched: Vec<(String, Result<SteamAppdetailsMedia, String>)> = stream.collect().await;
+
     let mut to_persist: Vec<(String, SteamAppdetailsMedia)> = Vec::new();
     let api_cache = steam_api_cache();
 
-    for (i, app_id) in ids_to_fetch.iter().enumerate() {
-        if i > 0 {
-            tokio::time::sleep(Duration::from_millis(STORE_MEDIA_FETCH_DELAY_MS)).await;
-        }
-        let result = fetch_steam_appdetails_media_from_store(app_id).await;
-        let media = match &result {
+    for (app_id, result) in fetched {
+        let media = match result {
             Ok(m) => {
                 to_persist.push((app_id.clone(), m.clone()));
-                m.clone()
+                m
             }
             Err(_) => empty.clone(),
         };
         api_cache.insert_media(app_id.clone(), media.clone());
-        final_results.insert(app_id.clone(), media);
+        final_results.insert(app_id, media);
     }
 
     if !to_persist.is_empty() {
