@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Accordion, AccordionItem, Button, Checkbox, Chip, Input, Skeleton } from "@heroui/react";
 import type { CatalogFilterFacet } from "@services/tauri";
+import { useDebouncedValue } from "@hooks/useDebouncedValue";
 
 type SteamCatalogFiltersProps = {
   genres: CatalogFilterFacet[];
@@ -30,7 +31,8 @@ function FacetFilterPanel({
   filterPlaceholder: string;
 }) {
   const [filterText, setFilterText] = useState("");
-  const needle = normalizeFilter(filterText);
+  const debouncedFilterText = useDebouncedValue(filterText, 300);
+  const needle = normalizeFilter(debouncedFilterText);
 
   const filtered = useMemo(() => {
     if (!needle) return items;
