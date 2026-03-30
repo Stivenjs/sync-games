@@ -17,3 +17,6 @@ pub mod error;
 mod migrations;
 
 pub use connection::AppDb;
+
+#[cfg(test)]
+pub(crate) use migrations::run_migrations;

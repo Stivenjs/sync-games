@@ -10,6 +10,7 @@
 //! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
 use std::ops::Deref;
+use std::time::Duration;
 
 use rusqlite::Connection;
 use tauri::State;
@@ -24,7 +25,6 @@ use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-
 pub use crate::steam_cache::{SteamAppDetails, SteamAppdetailsMedia};
 
 static APP_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"/app/(\d{4,10})/"#).unwrap());
@@ -38,6 +38,81 @@ static NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"class="[^"]*match_name[^"]*"[^>]*>([^<]+)<"#).unwrap());
 
 const STEAM_CONCURRENCY_LIMIT: usize = 3;
+
+/// Pausa entre peticiones a la Store para medios (reduce 429); secuencial tras RAM/DB.
+const STORE_MEDIA_FETCH_DELAY_MS: u64 = 220;
+
+/// Caché persistente en `steam_appdetails_media_cache` (JSON de `SteamAppdetailsMedia`).
+fn load_persistent_media_cache_map(
+    conn: &Connection,
+    app_ids: &[String],
+) -> Result<HashMap<String, SteamAppdetailsMedia>, rusqlite::Error> {
+    let pids: Vec<i64> = app_ids.iter().filter_map(|s| s.parse().ok()).collect();
+    if pids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = pids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT app_id, media_json FROM steam_appdetails_media_cache WHERE app_id IN ({placeholders})"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query(rusqlite::params_from_iter(pids.iter().copied()))?;
+    let mut out = HashMap::new();
+    while let Some(row) = rows.next()? {
+        let pid: i64 = row.get(0)?;
+        let json: String = row.get(1)?;
+        if let Ok(media) = serde_json::from_str::<SteamAppdetailsMedia>(&json) {
+            out.insert(pid.to_string(), media);
+        }
+    }
+    Ok(out)
+}
+
+fn upsert_persistent_media_cache_batch(
+    conn: &Connection,
+    items: &[(String, SteamAppdetailsMedia)],
+) -> Result<(), rusqlite::Error> {
+    if items.is_empty() {
+        return Ok(());
+    }
+    let mut stmt = conn.prepare_cached(
+        "INSERT INTO steam_appdetails_media_cache (app_id, media_json, updated_at) \
+         VALUES (?1, ?2, unixepoch()) \
+         ON CONFLICT(app_id) DO UPDATE SET \
+         media_json = excluded.media_json, updated_at = unixepoch()",
+    )?;
+    for (id, media) in items {
+        let Ok(pid) = id.parse::<i64>() else {
+            continue;
+        };
+        let Ok(json) = serde_json::to_string(media) else {
+            continue;
+        };
+        stmt.execute((pid, json))?;
+    }
+    Ok(())
+}
+
+/// Disco (tabla dedicada) y luego `details_json` del catálogo; el catálogo sobrescribe si ambos existen.
+fn load_combined_media_from_db(
+    conn: &Connection,
+    app_ids: &[String],
+) -> Result<HashMap<String, SteamAppdetailsMedia>, rusqlite::Error> {
+    let mut out = load_persistent_media_cache_map(conn, app_ids)?;
+    let missing: Vec<String> = app_ids
+        .iter()
+        .filter(|id| !out.contains_key(*id))
+        .cloned()
+        .collect();
+    if missing.is_empty() {
+        return Ok(out);
+    }
+    let from_catalog = load_catalog_media_map(conn, &missing)?;
+    for (k, v) in from_catalog {
+        out.insert(k, v);
+    }
+    Ok(out)
+}
 
 /// Medios ya enriquecidos en el catálogo local (`details_json`); evita golpear la Store.
 fn load_catalog_media_map(
@@ -237,7 +312,10 @@ pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
 }
 
 #[tauri::command]
-pub async fn get_steam_appdetails_media(app_id: String) -> Result<SteamAppdetailsMedia, String> {
+pub async fn get_steam_appdetails_media(
+    db: State<'_, AppDb>,
+    app_id: String,
+) -> Result<SteamAppdetailsMedia, String> {
     let Some(app_id) = normalize_steam_app_id(&app_id) else {
         return Err("App ID inválido".to_string());
     };
@@ -246,9 +324,30 @@ pub async fn get_steam_appdetails_media(app_id: String) -> Result<SteamAppdetail
         return Ok(cached);
     }
 
-    let result = fetch_steam_appdetails_media_from_store(&app_id).await?;
+    let db_conn = db.deref().clone();
+    let id_for_db = app_id.clone();
+    let from_db = tokio::task::spawn_blocking(move || {
+        db_conn.with_conn(|c| load_combined_media_from_db(c, std::slice::from_ref(&id_for_db)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e: crate::sqlite::error::SqliteError| e.to_string())?;
 
-    steam_api_cache().insert_media(app_id, result.clone());
+    if let Some(media) = from_db.get(&app_id).cloned() {
+        steam_api_cache().insert_media(app_id.clone(), media.clone());
+        return Ok(media);
+    }
+
+    let result = fetch_steam_appdetails_media_from_store(&app_id).await?;
+    steam_api_cache().insert_media(app_id.clone(), result.clone());
+
+    let db_conn = db.deref().clone();
+    let id_copy = app_id.clone();
+    let res_clone = result.clone();
+    let _ = tokio::task::spawn_blocking(move || {
+        db_conn.with_conn(|c| upsert_persistent_media_cache_batch(c, &[(id_copy, res_clone)]))
+    })
+    .await;
 
     Ok(result)
 }
@@ -291,7 +390,7 @@ pub async fn get_steam_appdetails_media_batch(
         let db = db.deref().clone();
         let ids_for_db = missing_after_cache.clone();
         let from_db = tokio::task::spawn_blocking(move || {
-            db.with_conn(|c| load_catalog_media_map(c, &ids_for_db))
+            db.with_conn(|c| load_combined_media_from_db(c, &ids_for_db))
         })
         .await
         .map_err(|e| e.to_string())?
@@ -320,21 +419,31 @@ pub async fn get_steam_appdetails_media_batch(
         name: String::new(),
     };
 
-    let stream = futures_util::stream::iter(ids_to_fetch.into_iter().map(|app_id| {
-        let fallback = empty.clone();
-        async move {
-            let result = fetch_steam_appdetails_media_from_store(&app_id).await;
-            (app_id, result.unwrap_or(fallback))
-        }
-    }))
-    .buffer_unordered(5);
-
-    let fetched_results: Vec<(String, SteamAppdetailsMedia)> = stream.collect().await;
-
+    let mut to_persist: Vec<(String, SteamAppdetailsMedia)> = Vec::new();
     let api_cache = steam_api_cache();
-    for (id, media) in fetched_results {
-        api_cache.insert_media(id.clone(), media.clone());
-        final_results.insert(id, media);
+
+    for (i, app_id) in ids_to_fetch.iter().enumerate() {
+        if i > 0 {
+            tokio::time::sleep(Duration::from_millis(STORE_MEDIA_FETCH_DELAY_MS)).await;
+        }
+        let result = fetch_steam_appdetails_media_from_store(app_id).await;
+        let media = match &result {
+            Ok(m) => {
+                to_persist.push((app_id.clone(), m.clone()));
+                m.clone()
+            }
+            Err(_) => empty.clone(),
+        };
+        api_cache.insert_media(app_id.clone(), media.clone());
+        final_results.insert(app_id.clone(), media);
+    }
+
+    if !to_persist.is_empty() {
+        let db = db.deref().clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            db.with_conn(|c| upsert_persistent_media_cache_batch(c, &to_persist))
+        })
+        .await;
     }
 
     Ok(final_results)
@@ -361,4 +470,43 @@ pub async fn get_steam_app_details(app_id: String) -> Result<SteamAppDetails, St
     steam_api_cache().insert_details(app_id, result.clone());
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod media_cache_tests {
+    use super::*;
+    use crate::sqlite::run_migrations;
+    use rusqlite::Connection;
+
+    #[test]
+    fn persistent_media_cache_roundtrips() {
+        let conn = Connection::open_in_memory().expect("in memory");
+        run_migrations(&conn).expect("migrate");
+        let m = SteamAppdetailsMedia {
+            media_urls: vec!["https://x/img.png".to_string()],
+            video_url: None,
+            genres: vec!["Acción".to_string()],
+            name: "Test".to_string(),
+        };
+        upsert_persistent_media_cache_batch(&conn, &[("730".to_string(), m.clone())])
+            .expect("upsert");
+        let map = load_persistent_media_cache_map(&conn, &["730".to_string()]).expect("load");
+        assert_eq!(map.get("730").unwrap().name, "Test");
+        assert_eq!(map.get("730").unwrap().genres, vec!["Acción".to_string()]);
+    }
+
+    #[test]
+    fn combined_load_includes_persistent_table() {
+        let conn = Connection::open_in_memory().expect("in memory");
+        run_migrations(&conn).expect("migrate");
+        let m = SteamAppdetailsMedia {
+            media_urls: vec![],
+            video_url: None,
+            genres: vec![],
+            name: "FromDisk".to_string(),
+        };
+        upsert_persistent_media_cache_batch(&conn, &[("440".to_string(), m)]).expect("upsert");
+        let map = load_combined_media_from_db(&conn, &["440".to_string()]).expect("combined");
+        assert_eq!(map.get("440").unwrap().name, "FromDisk");
+    }
 }
