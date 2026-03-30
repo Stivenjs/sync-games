@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode, ViewTransition } from "react";
-import { Gamepad2, History, Info, Settings, Users } from "lucide-react";
+import { Gamepad2, History, Info, Library, Settings, Users } from "lucide-react";
 import type { NavItem } from "@components/layout";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { Spinner } from "@heroui/react";
@@ -13,9 +13,13 @@ const GameDetailPage = lazy(() => preloadGameDetailModule().then((m) => ({ defau
 const PlaceholderPage = lazy(() =>
   import("@components/navigation/PlaceholderPage").then((m) => ({ default: m.PlaceholderPage }))
 );
+const SteamCatalogPage = lazy(() =>
+  import("@features/steam-catalog/pages/SteamCatalogPage").then((m) => ({ default: m.SteamCatalogPage }))
+);
 
 export const NAV_ITEMS: NavItem[] = [
   { id: "/", label: "Juegos", icon: <Gamepad2 size={18} /> },
+  { id: "/catalog", label: "Catálogo Steam", icon: <Library size={18} /> },
   { id: "/friends", label: "Amigos", icon: <Users size={18} /> },
   { id: "/history", label: "Historial", icon: <History size={18} /> },
   { id: "/settings", label: "Configuración", icon: <Settings size={18} /> },
@@ -58,6 +62,14 @@ export function AppRoutes() {
           element={
             <AnimatedPage>
               <GameDetailPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/catalog"
+          element={
+            <AnimatedPage>
+              <SteamCatalogPage />
             </AnimatedPage>
           }
         />

@@ -1,0 +1,38 @@
+import { memo } from "react";
+import { Pagination } from "@heroui/react";
+
+type SteamCatalogPaginationProps = {
+  totalPages: number;
+  page: number;
+  onChange: (page: number) => void;
+  isDisabled?: boolean;
+};
+
+export const SteamCatalogPagination = memo(function SteamCatalogPagination({
+  totalPages,
+  page,
+  onChange,
+  isDisabled,
+}: SteamCatalogPaginationProps) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2 pt-4">
+      <Pagination
+        aria-label="Páginas del catálogo"
+        total={totalPages}
+        page={page}
+        onChange={onChange}
+        showControls
+        color="primary"
+        variant="bordered"
+        size="sm"
+        isDisabled={isDisabled}
+        boundaries={1}
+        siblings={1}
+      />
+    </div>
+  );
+});

@@ -10,10 +10,13 @@ import {
 } from "@services/tauri";
 import { useGameRunningStatus } from "@hooks/useGameRunningStatus";
 import { getGameLibraryHeroUrl, getSteamAppId, isSteamMoviePosterUrl } from "@utils/gameImage";
+import { configuredGameFromSteamCatalogRouteId, isSteamCatalogRouteGameId } from "@utils/steamCatalogGameId";
 import type { ConfiguredGame } from "@app-types/config";
 
 interface LocationState {
   resolvedSteamAppId?: string | null;
+  /** Ruta desde la que se abrió el detalle (lista, catálogo, etc.). */
+  from?: string;
 }
 
 export function useGameDetail() {
@@ -28,7 +31,12 @@ export function useGameDetail() {
     refetchOnWindowFocus: false,
   });
 
-  const game: ConfiguredGame | undefined = useMemo(() => config?.games.find((g) => g.id === gameId), [config, gameId]);
+  const game: ConfiguredGame | undefined = useMemo(() => {
+    if (!gameId) return undefined;
+    const fromConfig = config?.games.find((g) => g.id === gameId);
+    if (fromConfig) return fromConfig;
+    return configuredGameFromSteamCatalogRouteId(gameId) ?? undefined;
+  }, [config?.games, gameId]);
 
   const steamAppId = useMemo(
     () => (game ? getSteamAppId(game, navState?.resolvedSteamAppId) : null),
@@ -67,7 +75,9 @@ export function useGameDetail() {
     return getGameLibraryHeroUrl(game, navState?.resolvedSteamAppId);
   }, [game, navState?.resolvedSteamAppId]);
 
-  const isLoading = isConfigLoading || (!!steamAppId && isSteamLoading);
+  const isCatalogRoute = isSteamCatalogRouteGameId(gameId);
+
+  const isLoading = !gameId || (!isCatalogRoute && isConfigLoading) || (!!steamAppId && isSteamLoading);
 
   return {
     gameId: gameId ?? "",
@@ -81,5 +91,8 @@ export function useGameDetail() {
     videoUrl: steamDetails?.media.videoUrl ?? null,
     isLoading,
     hasSyncConfig: !!(config?.apiBaseUrl && config?.apiKey && config?.userId),
+    isSteamCatalogOnly: isCatalogRoute,
+    /** Ruta para volver con atrás; si falta, el detalle usa `navigate(-1)`. */
+    backToPath: navState?.from ?? null,
   };
 }

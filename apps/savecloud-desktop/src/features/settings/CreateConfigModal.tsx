@@ -72,8 +72,8 @@ export function CreateConfigModal({
           />
           <div className="space-y-2">
             <Input
-              label="Steam Web API Key (opcional)"
-              placeholder="Clave de Valve para el catálogo local"
+              label="Clave de Steam (opcional)"
+              placeholder="Para el listado de juegos en el catálogo"
               description="Se guarda en el almacén seguro del sistema, no en config.json."
               type="password"
               value={steamWebApiKey}

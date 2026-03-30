@@ -93,7 +93,12 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::commands::logs::command_logs::get_plugin_logs,
         crate::commands::share::share::resolve_remote_share_token,
         crate::commands::share::share::create_remote_share_link,
-        crate::steam_catalog::commands::sync_steam_catalog,
-        crate::steam_catalog::commands::reset_steam_catalog_sync,
+        crate::steam_catalog::commands::sync::sync_steam_catalog,
+        crate::steam_catalog::commands::sync::reset_steam_catalog_sync,
+        crate::steam_catalog::commands::trending::sync_steam_store_trending,
+        crate::steam_catalog::commands::listing::search_steam_catalog,
+        crate::steam_catalog::commands::listing::list_steam_catalog_page,
+        crate::steam_catalog::commands::listing::get_steam_catalog_filter_facets,
+        crate::steam_catalog::commands::details::get_steam_catalog_app_details,
     ])
 }

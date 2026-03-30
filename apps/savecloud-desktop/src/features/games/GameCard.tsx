@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, startTransition, addTransitionType, ViewTransition } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardFooter, Skeleton, Tooltip } from "@heroui/react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Card, CardFooter, Chip, Skeleton, Tooltip } from "@heroui/react";
 import { GameCardHoverMotion } from "@features/games/GameCardHoverMotion";
 import { Clock, Gamepad2 } from "lucide-react";
 import { formatGameDisplayName, getSteamAppId } from "@utils/gameImage";
@@ -64,6 +64,10 @@ export interface GameCardProps {
   actionsMenuOpen?: boolean;
   /** Callback estable desde la lista; incluye gameId para no crear closures por tarjeta en cada render. */
   onActionsMenuOpenChange?: (isOpen: boolean, gameId: string) => void;
+  /** Título del pie de tarjeta (si no, se deriva de `game.id`). Útil para catálogo Steam con nombre oficial. */
+  cardTitle?: string;
+  /** Navegación al pulsar la tarjeta; por defecto va a `/games/:id`. */
+  onCardNavigate?: (game: ConfiguredGame) => void;
 }
 
 export const GameCard = memo(function GameCard(props: GameCardProps) {
@@ -78,6 +82,8 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     mediaBySteamAppId,
     mediaFromBatch = false,
     onActionsMenuOpenChange: onActionsMenuFromParent,
+    cardTitle,
+    onCardNavigate,
     ...cardRest
   } = props;
 
@@ -92,6 +98,8 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     displayImageUrl,
     mediaUrls,
     videoUrl,
+    genres,
+    steamStoreName,
     isEffectivelyLoading,
     imgLoaded,
     imgError,
@@ -106,16 +114,23 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const steamAppId = useMemo(() => getSteamAppId(game, resolvedSteamAppId), [game, resolvedSteamAppId]);
   const { onHoverStart, onHoverEnd } = useGameDetailHoverPrefetch(steamAppId);
 
   const handleCardClick = useCallback(() => {
+    if (onCardNavigate) {
+      onCardNavigate(game);
+      return;
+    }
     startTransition(() => {
       addTransitionType("game-detail");
-      navigate(`/games/${game.id}`, { state: { resolvedSteamAppId } });
+      navigate(`/games/${game.id}`, {
+        state: { resolvedSteamAppId, from: location.pathname },
+      });
     });
-  }, [navigate, game.id, resolvedSteamAppId]);
+  }, [navigate, game, location.pathname, onCardNavigate, resolvedSteamAppId]);
 
   const isUploadTooLarge = (stats?.localSizeBytes ?? 0) >= LARGE_GAME_BLOCK_SIZE_BYTES;
 
@@ -138,7 +153,13 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
   }
 
   return (
-    <GameCardHoverCard game={game} mediaUrls={mediaUrls} videoUrl={videoUrl} stats={stats}>
+    <GameCardHoverCard
+      game={game}
+      mediaUrls={mediaUrls}
+      videoUrl={videoUrl}
+      genres={genres}
+      storeName={steamStoreName || undefined}
+      stats={stats}>
       <GameCardHoverMotion>
         <div
           className="cursor-pointer"
@@ -189,8 +210,21 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
 
             <CardFooter className="flex flex-col items-center justify-center gap-0.5 border-t border-default-200/80 bg-default-100 px-3 py-2 dark:bg-default-50/80">
               <p className="truncate w-full text-center text-xs font-bold uppercase tracking-wider text-foreground">
-                {formatGameDisplayName(game.id)}
+                {cardTitle ?? formatGameDisplayName(game.id)}
               </p>
+              {genres.length > 0 && (
+                <div className="flex max-w-full flex-wrap justify-center gap-0.5">
+                  {genres.slice(0, 3).map((g, i) => (
+                    <Chip
+                      key={`${g}-${i}`}
+                      size="sm"
+                      variant="flat"
+                      className="h-4 min-h-4 max-w-28 truncate px-1 py-0 text-[9px]">
+                      {g}
+                    </Chip>
+                  ))}
+                </div>
+              )}
 
               <GameCardStatusBar
                 isGameRunning={isGameRunning}

@@ -60,10 +60,17 @@ export async function getSteamAppName(appId: string): Promise<string | null> {
   return invoke<string | null>("get_steam_app_name", { appId });
 }
 
-/** Medios para hovercard: portada, capturas, thumbnails y opcionalmente URL de vídeo (Store API appdetails) */
+/**
+ * Respuesta ligera de Store `appdetails` (una petición por app): galería, vídeo, géneros y nombre en tienda.
+ * No incluye descripciones largas ni requisitos — adecuado para listas tipo biblioteca.
+ */
 export interface SteamAppdetailsMediaResult {
   mediaUrls: string[];
   videoUrl?: string | null;
+  /** Géneros (misma respuesta que medios; sin segunda llamada). */
+  genres?: string[];
+  /** Nombre oficial en Steam (locale del backend, p. ej. español). */
+  name?: string;
 }
 
 /** Obtiene URLs de medios (portada, capturas, thumbnails de vídeos) desde la Store API para el hovercard. */
@@ -250,6 +257,82 @@ export async function syncSteamCatalog(): Promise<CatalogSyncStats> {
 /** Borra metadatos de sync del catálogo; la próxima ejecución hará sync completo de nuevo. */
 export async function resetSteamCatalogSync(): Promise<void> {
   await invoke("reset_steam_catalog_sync");
+}
+
+/**
+ * Actualiza el orden de “tendencia” desde la tienda pública (más vendidos, ofertas, novedades).
+ * No requiere clave Steam Web API. Devuelve cuántas apps quedaron en el ranking local.
+ */
+export async function syncSteamStoreTrending(): Promise<number> {
+  return invoke<number>("sync_steam_store_trending");
+}
+
+/** Ítem del catálogo local; mismo criterio camelCase que el backend. */
+export interface CatalogListItem {
+  steamAppId: string;
+  name: string;
+}
+
+/** Página del catálogo local con total global (o total filtrado si hay géneros/etiquetas). */
+export interface CatalogPage {
+  total: number;
+  offset: number;
+  limit: number;
+  items: CatalogListItem[];
+}
+
+/** Faceta de filtro (género o etiqueta) con número de juegos enriquecidos que la tienen. */
+export interface CatalogFilterFacet {
+  label: string;
+  count: number;
+}
+
+export interface CatalogFilterFacets {
+  genres: CatalogFilterFacet[];
+  tags: CatalogFilterFacet[];
+}
+
+/** Facetas para filtros del catálogo (solo juegos con ficha descargada). */
+export async function getSteamCatalogFilterFacets(): Promise<CatalogFilterFacets> {
+  return invoke<CatalogFilterFacets>("get_steam_catalog_filter_facets");
+}
+
+/** Búsqueda por nombre sobre el catálogo sincronizado (mín. 2 caracteres en el backend). */
+export async function searchSteamCatalog(
+  query: string,
+  limit?: number,
+  genres?: string[] | null,
+  tags?: string[] | null
+): Promise<CatalogListItem[]> {
+  return invoke<CatalogListItem[]>("search_steam_catalog", {
+    query,
+    limit: limit ?? null,
+    genres: genres?.length ? genres : null,
+    tags: tags?.length ? tags : null,
+  });
+}
+
+/** Listado paginado: primero según tendencia sincronizada (`syncSteamStoreTrending`), luego por `app_id` descendente. */
+export async function listSteamCatalogPage(
+  offset?: number,
+  limit?: number,
+  genres?: string[] | null,
+  tags?: string[] | null
+): Promise<CatalogPage> {
+  return invoke<CatalogPage>("list_steam_catalog_page", {
+    offset: offset ?? null,
+    limit: limit ?? null,
+    genres: genres?.length ? genres : null,
+    tags: tags?.length ? tags : null,
+  });
+}
+
+/**
+ * Ficha completa desde el catálogo local: caché → JSON en disco → Store API.
+ * Misma forma que `getSteamAppDetails`, pero exige que el `appId` exista en el catálogo sincronizado.
+ */
+export async function getSteamCatalogAppDetails(appId: string): Promise<SteamAppDetailsResult> {
+  return invoke<SteamAppDetailsResult>("get_steam_catalog_app_details", { appId });
 }
 
 /** Crea o actualiza el archivo de configuración con apiBaseUrl, apiKey y userId. Opcionalmente la clave Steam Web API (se guarda en el almacén seguro del SO). Devuelve la ruta del archivo. */

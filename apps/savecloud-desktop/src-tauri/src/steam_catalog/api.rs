@@ -35,25 +35,36 @@ pub async fn fetch_app_list_page(
     parse_app_list_response(&body)
 }
 
+fn parse_app_id(v: &Value) -> Option<u32> {
+    v.as_u64()
+        .or_else(|| v.as_i64().map(|i| i as u64))
+        .and_then(|n| u32::try_from(n).ok())
+        .or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))
+}
+
 fn parse_app_list_response(body: &Value) -> Result<(Vec<(u32, String)>, bool), CatalogSyncError> {
     let response = body
         .get("response")
         .ok_or(CatalogSyncError::InvalidResponse)?;
-    let apps_arr = response
-        .get("apps")
-        .and_then(|a| a.as_array())
-        .ok_or(CatalogSyncError::InvalidResponse)?;
+
+    // Con `if_modified_since`, Steam suele devolver `apps: null` o omitir `apps` cuando no hay cambios.
+    let apps_arr: &[Value] = match response.get("apps") {
+        Some(Value::Array(a)) => a,
+        Some(Value::Null) | None => &[],
+        Some(_) => return Err(CatalogSyncError::InvalidResponse),
+    };
+
     let have_more = response
         .get("have_more")
-        .and_then(|v| v.as_bool())
+        .and_then(|v| v.as_bool().or_else(|| v.as_u64().map(|n| n != 0)))
         .unwrap_or(false);
 
     let mut out = Vec::with_capacity(apps_arr.len());
     for item in apps_arr {
         let appid = item
             .get("appid")
-            .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
-            .ok_or(CatalogSyncError::InvalidResponse)? as u32;
+            .and_then(parse_app_id)
+            .ok_or(CatalogSyncError::InvalidResponse)?;
         let name = item
             .get("name")
             .and_then(|v| v.as_str())

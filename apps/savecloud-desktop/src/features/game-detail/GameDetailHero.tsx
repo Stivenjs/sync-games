@@ -1,5 +1,4 @@
-import { useState, useCallback, startTransition, addTransitionType, ViewTransition } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback, ViewTransition } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, EffectFade } from "swiper/modules";
 import { Button, Skeleton } from "@heroui/react";
@@ -19,6 +18,8 @@ interface GameDetailHeroProps {
   editionLabel?: string | null;
   gameId: string;
   isLoading?: boolean;
+  /** Vuelve a la lista anterior (misma lógica que atrás global / estado `from`). */
+  onBack: () => void;
 }
 
 export function GameDetailHero({
@@ -30,8 +31,8 @@ export function GameDetailHero({
   editionLabel,
   gameId,
   isLoading,
+  onBack,
 }: GameDetailHeroProps) {
-  const navigate = useNavigate();
   const [loadedSlides, setLoadedSlides] = useState<Set<number>>(new Set());
 
   const heroSlides =
@@ -48,13 +49,6 @@ export function GameDetailHero({
   const handleSlideLoad = useCallback((index: number) => {
     setLoadedSlides((prev) => new Set(prev).add(index));
   }, []);
-
-  const handleBack = useCallback(() => {
-    startTransition(() => {
-      addTransitionType("game-detail");
-      navigate("/");
-    });
-  }, [navigate]);
 
   if (isLoading) {
     return (
@@ -75,7 +69,7 @@ export function GameDetailHero({
           </div>
           <HeroGradient />
           <TitleOverlay editionLabel={editionLabel} gameName={gameName} />
-          <BackButton onPress={handleBack} />
+          <BackButton onPress={onBack} />
         </div>
       </ViewTransition>
     );
@@ -125,7 +119,7 @@ export function GameDetailHero({
 
         <HeroGradient />
         <TitleOverlay editionLabel={editionLabel} gameName={gameName} />
-        <BackButton onPress={handleBack} />
+        <BackButton onPress={onBack} />
       </div>
     </ViewTransition>
   );
@@ -159,7 +153,7 @@ function BackButton({ onPress }: { onPress: () => void }) {
       isIconOnly
       onPress={onPress}
       className="absolute left-4 top-4 z-30 bg-black/45 text-white backdrop-blur-md hover:bg-black/65"
-      aria-label="Volver a juegos">
+      aria-label="Volver">
       <ArrowLeft size={18} />
     </Button>
   );

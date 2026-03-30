@@ -419,13 +419,13 @@ export function useSettingsPage() {
 
   const handleResetSteamCatalogSync = async () => {
     const ok = window.confirm(
-      "¿Restablecer el progreso del catálogo Steam? La próxima sincronización volverá a descargar el listado completo (puede tardar)."
+      "¿Quieres volver a descargar todo el listado de juegos? La próxima sincronización traerá el catálogo completo y puede tardar un poco."
     );
     if (!ok) return;
     dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: true });
     try {
       await resetSteamCatalogSync();
-      toastSuccess("Progreso del catálogo restablecido", "La próxima sincronización será un sync completo.");
+      toastSuccess("Listado restablecido", "La próxima vez se descargará el catálogo completo de nuevo.");
     } catch (e) {
       toastError("Error al restablecer", e instanceof Error ? e.message : String(e));
     } finally {

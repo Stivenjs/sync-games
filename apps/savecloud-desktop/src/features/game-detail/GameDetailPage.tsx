@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { addTransitionType, startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { useRegisterGlobalBack } from "@hooks/useRegisterGlobalBack";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,6 +43,8 @@ export function GameDetailPage() {
     libraryHeroFallbackUrl,
     isLoading,
     hasSyncConfig,
+    isSteamCatalogOnly,
+    backToPath,
   } = useGameDetail();
   const [activeTab, setActiveTab] = useState("summary");
   const tabsShellRef = useRef<HTMLDivElement>(null);
@@ -50,6 +52,21 @@ export function GameDetailPage() {
   const [gameForTorrent, setGameForTorrent] = useState<ConfiguredGame | null>(null);
   const [gameToFullBackupConfirm, setGameToFullBackupConfirm] = useState<ConfiguredGame | null>(null);
   const [gameToRestoreBackup, setGameToRestoreBackup] = useState<ConfiguredGame | null>(null);
+
+  const goBackFromDetail = useCallback(() => {
+    if (backToPath) {
+      navigate(backToPath);
+    } else {
+      navigate(-1);
+    }
+  }, [navigate, backToPath]);
+
+  const handleBackWithTransition = useCallback(() => {
+    startTransition(() => {
+      addTransitionType("game-detail");
+      goBackFromDetail();
+    });
+  }, [goBackFromDetail]);
 
   useRegisterGlobalBack(() => {
     switch (true) {
@@ -66,7 +83,7 @@ export function GameDetailPage() {
         setGameToRestoreBackup(null);
         return true;
       default:
-        navigate("/");
+        handleBackWithTransition();
         return true;
     }
   });
@@ -83,8 +100,6 @@ export function GameDetailPage() {
   }, []);
 
   const displayName = steamDetails?.name || formatGameDisplayName(gameId);
-
-  const handleBack = useCallback(() => navigate("/"), [navigate]);
 
   const handleOpenFolder = useCallback(async (g: ConfiguredGame) => {
     try {
@@ -142,8 +157,12 @@ export function GameDetailPage() {
         <p className="text-sm text-default-400">
           El juego <span className="font-mono text-default-500">{gameId}</span> no está configurado.
         </p>
-        <Button color="primary" variant="bordered" startContent={<ArrowLeft size={18} />} onPress={handleBack}>
-          Volver a juegos
+        <Button
+          color="primary"
+          variant="bordered"
+          startContent={<ArrowLeft size={18} />}
+          onPress={handleBackWithTransition}>
+          Volver
         </Button>
       </div>
     );
@@ -163,6 +182,7 @@ export function GameDetailPage() {
         editionLabel={game.editionLabel}
         gameId={gameId}
         isLoading={isLoading}
+        onBack={handleBackWithTransition}
       />
 
       {!hasSyncConfig ? <GameDetailSyncSetupBanner /> : null}
@@ -175,16 +195,16 @@ export function GameDetailPage() {
         isSyncing={isSyncing}
         isDownloading={isDownloading}
         isFullBackupUploading={fullBackupUploadingGameId === game.id}
-        onPlay={handlePlay}
-        onOpenFolder={handleOpenFolder}
-        onEdit={setGameToEdit}
-        onTorrent={setGameForTorrent}
-        onSync={hasSyncConfig ? handleSync : undefined}
-        onDownload={hasSyncConfig ? handleDownload : undefined}
-        onShare={hasSyncConfig ? handleShare : undefined}
-        onRemove={handleRemove}
-        onRestoreBackup={setGameToRestoreBackup}
-        onFullBackupUpload={hasSyncConfig ? setGameToFullBackupConfirm : undefined}
+        onPlay={isSteamCatalogOnly ? undefined : handlePlay}
+        onOpenFolder={isSteamCatalogOnly ? undefined : handleOpenFolder}
+        onEdit={isSteamCatalogOnly ? undefined : setGameToEdit}
+        onTorrent={isSteamCatalogOnly ? undefined : setGameForTorrent}
+        onSync={!isSteamCatalogOnly && hasSyncConfig ? handleSync : undefined}
+        onDownload={!isSteamCatalogOnly && hasSyncConfig ? handleDownload : undefined}
+        onShare={!isSteamCatalogOnly && hasSyncConfig ? handleShare : undefined}
+        onRemove={isSteamCatalogOnly ? undefined : handleRemove}
+        onRestoreBackup={isSteamCatalogOnly ? undefined : setGameToRestoreBackup}
+        onFullBackupUpload={!isSteamCatalogOnly && hasSyncConfig ? setGameToFullBackupConfirm : undefined}
       />
 
       <GameDrawer
