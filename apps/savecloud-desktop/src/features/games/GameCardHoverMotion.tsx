@@ -12,9 +12,19 @@ const SHADOW_HOVER = "0 28px 56px -12px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 /
 export interface GameCardHoverMotionProps {
   children: ReactNode;
   className?: string;
+  /** Sin tilt ni sombra al pasar el ratón (p. ej. catálogo Steam). */
+  disableMotion?: boolean;
 }
 
-export function GameCardHoverMotion({ children, className = "rounded-2xl" }: GameCardHoverMotionProps) {
+export function GameCardHoverMotion({
+  children,
+  className = "rounded-2xl",
+  disableMotion = false,
+}: GameCardHoverMotionProps) {
+  if (disableMotion) {
+    return <div className={className}>{children}</div>;
+  }
+
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
   const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);

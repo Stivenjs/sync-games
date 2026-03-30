@@ -4,7 +4,10 @@
 //! ([`crate::steam_catalog::enrichment`]).
 
 use crate::network::STEAM_CLIENT;
-use crate::steam_cache::{steam_api_cache, SteamAppDetails, SteamAppdetailsMedia};
+use crate::steam_cache::{
+    normalize_steam_app_details, normalize_steam_appdetails_media, steam_api_cache,
+    SteamAppDetails, SteamAppdetailsMedia,
+};
 
 /// Filtros para `appdetails`: `basic` no incluye desarrolladores, géneros, etc.
 const STEAM_APPDETAILS_FILTERS_FULL: &str =
@@ -126,12 +129,12 @@ pub fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
 
     let genres = extract_keyed_string_array(data, "genres", "description");
 
-    SteamAppdetailsMedia {
+    normalize_steam_appdetails_media(SteamAppdetailsMedia {
         media_urls,
         video_url,
         genres,
         name,
-    }
+    })
 }
 
 fn extract_plain_string_array(value: &serde_json::Value, field: &str) -> Vec<String> {
@@ -210,14 +213,14 @@ pub async fn fetch_steam_app_details_from_store(app_id: &str) -> Result<SteamApp
         .map(String::from);
 
     let media = if let Some(cached) = cached_media {
-        cached
+        normalize_steam_appdetails_media(cached)
     } else {
         let parsed = parse_media_from_data(&data);
         steam_api_cache().insert_media(app_id.to_owned(), parsed.clone());
         parsed
     };
 
-    Ok(SteamAppDetails {
+    Ok(normalize_steam_app_details(SteamAppDetails {
         name: str_field("name"),
         short_description: str_field("short_description"),
         detailed_description: str_field("detailed_description"),
@@ -230,5 +233,5 @@ pub async fn fetch_steam_app_details_from_store(app_id: &str) -> Result<SteamApp
         pc_requirements_minimum,
         pc_requirements_recommended,
         media,
-    })
+    }))
 }

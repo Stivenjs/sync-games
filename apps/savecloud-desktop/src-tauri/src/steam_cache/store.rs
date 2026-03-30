@@ -5,7 +5,10 @@ use std::sync::LazyLock;
 use moka::sync::Cache;
 
 use crate::steam_cache::key::is_valid_steam_app_id;
-use crate::steam_cache::types::{SteamAppDetails, SteamAppdetailsMedia};
+use crate::steam_cache::types::{
+    normalize_steam_app_details, normalize_steam_appdetails_media, SteamAppDetails,
+    SteamAppdetailsMedia,
+};
 
 /// Capacidad por defecto: equilibrio entre memoria y aciertos en bibliotecas medianas.
 const MEDIA_CACHE_CAPACITY: u64 = 4096;
@@ -47,7 +50,8 @@ impl SteamApiCache {
         if !is_valid_steam_app_id(&app_id) {
             return;
         }
-        self.media.insert(app_id, value);
+        self.media
+            .insert(app_id, normalize_steam_appdetails_media(value));
     }
 
     #[must_use]
@@ -59,6 +63,6 @@ impl SteamApiCache {
         if !is_valid_steam_app_id(&app_id) {
             return;
         }
-        self.details.insert(app_id, value);
+        self.details.insert(app_id, normalize_steam_app_details(value));
     }
 }

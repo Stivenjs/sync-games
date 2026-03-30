@@ -41,6 +41,7 @@ type SettingsPageState = {
   backingUpConfig: boolean;
   restoringConfig: boolean;
   restoreConfirmOpen: boolean;
+  resetSteamCatalogConfirmOpen: boolean;
   steamCatalogBusy: boolean;
 };
 
@@ -76,6 +77,7 @@ type SettingsPageAction =
   | { type: "SET_BACKING_UP_CONFIG"; payload: boolean }
   | { type: "SET_RESTORING_CONFIG"; payload: boolean }
   | { type: "SET_RESTORE_CONFIRM_OPEN"; payload: boolean }
+  | { type: "SET_RESET_STEAM_CATALOG_CONFIRM_OPEN"; payload: boolean }
   | { type: "SET_STEAM_CATALOG_BUSY"; payload: boolean };
 
 const initialState: SettingsPageState = {
@@ -96,6 +98,7 @@ const initialState: SettingsPageState = {
   backingUpConfig: false,
   restoringConfig: false,
   restoreConfirmOpen: false,
+  resetSteamCatalogConfirmOpen: false,
   steamCatalogBusy: false,
 };
 
@@ -153,6 +156,8 @@ function settingsPageReducer(state: SettingsPageState, action: SettingsPageActio
       return { ...state, restoringConfig: action.payload };
     case "SET_RESTORE_CONFIRM_OPEN":
       return { ...state, restoreConfirmOpen: action.payload };
+    case "SET_RESET_STEAM_CATALOG_CONFIRM_OPEN":
+      return { ...state, resetSteamCatalogConfirmOpen: action.payload };
     case "SET_STEAM_CATALOG_BUSY":
       return { ...state, steamCatalogBusy: action.payload };
     default:
@@ -417,15 +422,16 @@ export function useSettingsPage() {
     }
   };
 
-  const handleResetSteamCatalogSync = async () => {
-    const ok = window.confirm(
-      "¿Quieres volver a descargar todo el listado de juegos? La próxima sincronización traerá el catálogo completo y puede tardar un poco."
-    );
-    if (!ok) return;
+  const handleResetSteamCatalogSync = () => {
+    dispatch({ type: "SET_RESET_STEAM_CATALOG_CONFIRM_OPEN", payload: true });
+  };
+
+  const confirmResetSteamCatalogSync = async () => {
     dispatch({ type: "SET_STEAM_CATALOG_BUSY", payload: true });
     try {
       await resetSteamCatalogSync();
       toastSuccess("Listado restablecido", "La próxima vez se descargará el catálogo completo de nuevo.");
+      dispatch({ type: "SET_RESET_STEAM_CATALOG_CONFIRM_OPEN", payload: false });
     } catch (e) {
       toastError("Error al restablecer", e instanceof Error ? e.message : String(e));
     } finally {
@@ -454,6 +460,7 @@ export function useSettingsPage() {
     handleFullBackupStreamingDryRunChange,
     handleSyncSteamCatalog,
     handleResetSteamCatalogSync,
+    confirmResetSteamCatalogSync,
     openCreateConfigModal,
     setCreateApiBaseUrl: (v: string) => dispatch({ type: "SET_CREATE_API_BASE_URL", payload: v }),
     setCreateApiKey: (v: string) => dispatch({ type: "SET_CREATE_API_KEY", payload: v }),
@@ -461,6 +468,8 @@ export function useSettingsPage() {
     setCreateSteamWebApiKey: (v: string) => dispatch({ type: "SET_CREATE_STEAM_WEB_API_KEY", payload: v }),
     setCreateConfigModalOpen: (open: boolean) => dispatch({ type: "SET_CREATE_MODAL", open }),
     setRestoreConfirmOpen: (v: boolean) => dispatch({ type: "SET_RESTORE_CONFIRM_OPEN", payload: v }),
+    setResetSteamCatalogConfirmOpen: (v: boolean) =>
+      dispatch({ type: "SET_RESET_STEAM_CATALOG_CONFIRM_OPEN", payload: v }),
     setPullFriendConfigModalOpen: (open: boolean) => dispatch({ type: "SET_PULL_FRIEND_MODAL", open }),
     setPullFriendUserId: (id: string) => dispatch({ type: "SET_PULL_FRIEND_USER_ID", payload: id }),
   };

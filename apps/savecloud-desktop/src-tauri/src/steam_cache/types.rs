@@ -1,5 +1,36 @@
 //! DTOs cacheables devueltos por comandos Tauri y rellenados desde `steam_search`.
 
+/// Quita el query string (p. ej. `?t=epoch` en CDN de Steam). Estabiliza claves de caché y filas en SQLite.
+#[must_use]
+pub fn normalize_steam_cdn_url(url: &str) -> String {
+    if url.is_empty() {
+        return String::new();
+    }
+    url.split_once('?')
+        .map(|(base, _)| base.to_string())
+        .unwrap_or_else(|| url.to_string())
+}
+
+/// Normaliza URLs de medios antes de guardar o devolver al frontend.
+#[must_use]
+pub fn normalize_steam_appdetails_media(mut m: SteamAppdetailsMedia) -> SteamAppdetailsMedia {
+    m.media_urls = m
+        .media_urls
+        .into_iter()
+        .map(|u| normalize_steam_cdn_url(&u))
+        .collect();
+    m.video_url = m.video_url.map(|u| normalize_steam_cdn_url(&u));
+    m
+}
+
+/// Normaliza `header_image` y el bloque `media` de una ficha completa.
+#[must_use]
+pub fn normalize_steam_app_details(mut d: SteamAppDetails) -> SteamAppDetails {
+    d.header_image = normalize_steam_cdn_url(&d.header_image);
+    d.media = normalize_steam_appdetails_media(d.media);
+    d
+}
+
 /// Respuesta ligera de Store `appdetails`: galería, vídeo y metadatos de lista (nombre Steam, géneros).
 ///
 /// Una sola petición con filtros `basic,screenshots,movies,genres` — sin ficha completa.
@@ -34,4 +65,25 @@ pub struct SteamAppDetails {
     pub pc_requirements_minimum: Option<String>,
     pub pc_requirements_recommended: Option<String>,
     pub media: SteamAppdetailsMedia,
+}
+
+#[cfg(test)]
+mod normalize_tests {
+    use super::*;
+
+    #[test]
+    fn normalize_steam_cdn_url_strips_query() {
+        assert_eq!(
+            normalize_steam_cdn_url(
+                "https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg?t=1770822722"
+            ),
+            "https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg"
+        );
+    }
+
+    #[test]
+    fn normalize_steam_cdn_url_keeps_path_without_query() {
+        let u = "https://x/y.png";
+        assert_eq!(normalize_steam_cdn_url(u), u);
+    }
 }

@@ -121,6 +121,9 @@ export function useSteamCatalogQueries() {
     refetchOnWindowFocus: false,
   });
 
+  /** Hasta que el batch de portadas termine (1.ª vez por clave), las cards quedaban sin media y parecían rotas. */
+  const isMediaBatchPending = steamAppIdsForBatch.length > 0 && !mediaQuery.isFetched;
+
   const isLoading = searchMode ? searchQuery.isPending : browseQuery.isPending;
   const isError = searchMode ? searchQuery.isError : browseQuery.isError;
   const errorMsg = (searchMode ? searchQuery.error : browseQuery.error) as Error | undefined;
@@ -170,6 +173,7 @@ export function useSteamCatalogQueries() {
     items,
     totalBrowse,
     mediaBySteamAppId: mediaQuery.data ?? null,
+    isMediaBatchPending,
     isLoading,
     isError,
     errorMsg,

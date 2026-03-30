@@ -20,4 +20,7 @@ mod types;
 
 pub use key::normalize_steam_app_id;
 pub use store::steam_api_cache;
-pub use types::{SteamAppDetails, SteamAppdetailsMedia};
+pub use types::{
+    normalize_steam_app_details, normalize_steam_appdetails_media, SteamAppDetails,
+    SteamAppdetailsMedia,
+};

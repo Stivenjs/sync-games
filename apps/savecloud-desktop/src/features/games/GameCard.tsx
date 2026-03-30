@@ -68,6 +68,8 @@ export interface GameCardProps {
   cardTitle?: string;
   /** Navegación al pulsar la tarjeta; por defecto va a `/games/:id`. */
   onCardNavigate?: (game: ConfiguredGame) => void;
+  /** `catalog`: sin menú ni barra de sync; sin tilt/sombra ni overlay de stats del pie; el desplegable de medios (imágenes/vídeo) se mantiene. */
+  variant?: "library" | "catalog";
 }
 
 export const GameCard = memo(function GameCard(props: GameCardProps) {
@@ -84,8 +86,11 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     onActionsMenuOpenChange: onActionsMenuFromParent,
     cardTitle,
     onCardNavigate,
+    variant = "library",
     ...cardRest
   } = props;
+
+  const isCatalog = variant === "catalog";
 
   const syncProgress = useSyncStore((state) => {
     if (state.syncOperation?.mode === "single" && state.syncOperation.gameId === game.id) {
@@ -152,24 +157,18 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     );
   }
 
-  return (
-    <GameCardHoverCard
-      game={game}
-      mediaUrls={mediaUrls}
-      videoUrl={videoUrl}
-      genres={genres}
-      storeName={steamStoreName || undefined}
-      stats={stats}>
-      <GameCardHoverMotion>
-        <div
-          className="cursor-pointer"
-          onClick={handleCardClick}
-          onMouseEnter={onHoverStart}
-          onMouseLeave={onHoverEnd}
-          role="link"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && handleCardClick()}>
-          <Card className="group relative overflow-hidden border-none shadow-none" radius="lg">
+  const cardContent = (
+    <GameCardHoverMotion disableMotion={isCatalog}>
+      <div
+        className="cursor-pointer"
+        onClick={handleCardClick}
+        onMouseEnter={onHoverStart}
+        onMouseLeave={onHoverEnd}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && handleCardClick()}>
+        <Card className="group relative overflow-hidden border-none shadow-none" radius="lg">
+          {!isCatalog && (
             <GameCardActions
               {...cardRest}
               game={game}
@@ -177,69 +176,73 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
               isUploadTooLarge={isUploadTooLarge}
               onActionsMenuOpenChange={onActionsMenuFromParent ? handleActionsMenuOpenChange : undefined}
             />
+          )}
 
-            {syncProgress && <GameCardSyncProgress progress={syncProgress} />}
+          {!isCatalog && syncProgress && <GameCardSyncProgress progress={syncProgress} />}
 
-            <ViewTransition name={`game-hero-${game.id}`} share="hero-morph" default="none">
-              <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large bg-default-100">
-                {(isEffectivelyLoading || (displayImageUrl && !imgLoaded && !imgError)) && (
-                  <Skeleton className="absolute inset-0 z-10 size-full" />
-                )}
-
-                {displayImageUrl && !imgError ? (
-                  <img
-                    key={displayImageUrl}
-                    src={displayImageUrl}
-                    loading="lazy"
-                    alt={game.id}
-                    className={`size-full object-cover object-center transition-opacity duration-300 ${
-                      imgLoaded ? "opacity-100" : "opacity-0"
-                    }`}
-                    onLoad={handleImgLoad}
-                    onError={handleImgError}
-                  />
-                ) : (
-                  !isEffectivelyLoading && (
-                    <div className="flex size-full items-center justify-center">
-                      <Gamepad2 size={48} className="text-default-400" strokeWidth={1.5} />
-                    </div>
-                  )
-                )}
-              </div>
-            </ViewTransition>
-
-            <CardFooter className="flex flex-col items-center justify-center gap-0.5 border-t border-default-200/80 bg-default-100 px-3 py-2 dark:bg-default-50/80">
-              <p className="truncate w-full text-center text-xs font-bold uppercase tracking-wider text-foreground">
-                {cardTitle ?? formatGameDisplayName(game.id)}
-              </p>
-              {genres.length > 0 && (
-                <div className="flex max-w-full flex-wrap justify-center gap-0.5">
-                  {genres.slice(0, 3).map((g, i) => (
-                    <Chip
-                      key={`${g}-${i}`}
-                      size="sm"
-                      variant="flat"
-                      className="h-4 min-h-4 max-w-28 truncate px-1 py-0 text-[9px]">
-                      {g}
-                    </Chip>
-                  ))}
-                </div>
+          <ViewTransition name={`game-hero-${game.id}`} share="hero-morph" default="none">
+            <div className="relative aspect-460/215 w-full overflow-hidden rounded-t-large bg-default-100">
+              {(isEffectivelyLoading || (displayImageUrl && !imgLoaded && !imgError)) && (
+                <Skeleton className="absolute inset-0 z-10 size-full" />
               )}
 
+              {displayImageUrl && !imgError ? (
+                <img
+                  key={displayImageUrl}
+                  src={displayImageUrl}
+                  loading="lazy"
+                  alt={game.id}
+                  className={`size-full object-cover object-center transition-opacity duration-300 ${
+                    imgLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                  onLoad={handleImgLoad}
+                  onError={handleImgError}
+                />
+              ) : (
+                !isEffectivelyLoading && (
+                  <div className="flex size-full items-center justify-center">
+                    <Gamepad2 size={48} className="text-default-400" strokeWidth={1.5} />
+                  </div>
+                )
+              )}
+            </div>
+          </ViewTransition>
+
+          <CardFooter className="flex flex-col items-center justify-center gap-0.5 border-t border-default-200/80 bg-default-100 px-3 py-2 dark:bg-default-50/80">
+            <p className="truncate w-full text-center text-xs font-bold uppercase tracking-wider text-foreground">
+              {cardTitle ?? formatGameDisplayName(game.id)}
+            </p>
+            {genres.length > 0 && (
+              <div className="flex max-w-full flex-wrap justify-center gap-0.5">
+                {genres.slice(0, 3).map((g, i) => (
+                  <Chip
+                    key={`${g}-${i}`}
+                    size="sm"
+                    variant="flat"
+                    className="h-4 min-h-4 max-w-28 truncate px-1 py-0 text-[9px]">
+                    {g}
+                  </Chip>
+                ))}
+              </div>
+            )}
+
+            {!isCatalog && (
               <GameCardStatusBar
                 isGameRunning={isGameRunning}
                 syncStatus={syncStatus}
                 cloudBackupCount={cloudBackupCount}
               />
+            )}
 
-              {isUploadTooLarge && cardRest.onFullBackupUpload && (
-                <Tooltip content="Demasiado grande: usa Empaquetar." placement="top">
-                  <span className="mt-0.5 inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning text-center">
-                    Requiere empaquetar
-                  </span>
-                </Tooltip>
-              )}
+            {!isCatalog && isUploadTooLarge && cardRest.onFullBackupUpload && (
+              <Tooltip content="Demasiado grande: usa Empaquetar." placement="top">
+                <span className="mt-0.5 inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning text-center">
+                  Requiere empaquetar
+                </span>
+              </Tooltip>
+            )}
 
+            {!isCatalog && (
               <div className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-3 py-2 backdrop-blur-md opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-20">
                 {stats && (
                   <>
@@ -265,10 +268,22 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
                   <p className="w-full truncate text-center text-[10px] text-white/70">{game.editionLabel}</p>
                 )}
               </div>
-            </CardFooter>
-          </Card>
-        </div>
-      </GameCardHoverMotion>
+            )}
+          </CardFooter>
+        </Card>
+      </div>
+    </GameCardHoverMotion>
+  );
+
+  return (
+    <GameCardHoverCard
+      game={game}
+      mediaUrls={mediaUrls}
+      videoUrl={videoUrl}
+      genres={genres}
+      storeName={steamStoreName || undefined}
+      stats={stats}>
+      {cardContent}
     </GameCardHoverCard>
   );
 });
