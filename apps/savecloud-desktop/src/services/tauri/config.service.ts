@@ -259,13 +259,21 @@ export async function resetSteamCatalogSync(): Promise<void> {
   await invoke("reset_steam_catalog_sync");
 }
 
-/** Ítem del catálogo local (SQLite); mismo criterio camelCase que el backend. */
+/**
+ * Actualiza el orden de “tendencia” desde la tienda pública (más vendidos, ofertas, novedades).
+ * No requiere clave Steam Web API. Devuelve cuántas apps quedaron en el ranking local.
+ */
+export async function syncSteamStoreTrending(): Promise<number> {
+  return invoke<number>("sync_steam_store_trending");
+}
+
+/** Ítem del catálogo local; mismo criterio camelCase que el backend. */
 export interface CatalogListItem {
   steamAppId: string;
   name: string;
 }
 
-/** Página del catálogo local con total global. */
+/** Página del catálogo local con total global (o total filtrado si hay géneros/etiquetas). */
 export interface CatalogPage {
   total: number;
   offset: number;
@@ -273,19 +281,49 @@ export interface CatalogPage {
   items: CatalogListItem[];
 }
 
+/** Faceta de filtro (género o etiqueta) con número de juegos enriquecidos que la tienen. */
+export interface CatalogFilterFacet {
+  label: string;
+  count: number;
+}
+
+export interface CatalogFilterFacets {
+  genres: CatalogFilterFacet[];
+  tags: CatalogFilterFacet[];
+}
+
+/** Facetas para filtros del catálogo (solo juegos con ficha descargada). */
+export async function getSteamCatalogFilterFacets(): Promise<CatalogFilterFacets> {
+  return invoke<CatalogFilterFacets>("get_steam_catalog_filter_facets");
+}
+
 /** Búsqueda por nombre sobre el catálogo sincronizado (mín. 2 caracteres en el backend). */
-export async function searchSteamCatalog(query: string, limit?: number): Promise<CatalogListItem[]> {
+export async function searchSteamCatalog(
+  query: string,
+  limit?: number,
+  genres?: string[] | null,
+  tags?: string[] | null
+): Promise<CatalogListItem[]> {
   return invoke<CatalogListItem[]>("search_steam_catalog", {
     query,
     limit: limit ?? null,
+    genres: genres?.length ? genres : null,
+    tags: tags?.length ? tags : null,
   });
 }
 
-/** Listado paginado por `app_id` ascendente. */
-export async function listSteamCatalogPage(offset?: number, limit?: number): Promise<CatalogPage> {
+/** Listado paginado: primero según tendencia sincronizada (`syncSteamStoreTrending`), luego por `app_id` descendente. */
+export async function listSteamCatalogPage(
+  offset?: number,
+  limit?: number,
+  genres?: string[] | null,
+  tags?: string[] | null
+): Promise<CatalogPage> {
   return invoke<CatalogPage>("list_steam_catalog_page", {
     offset: offset ?? null,
     limit: limit ?? null,
+    genres: genres?.length ? genres : null,
+    tags: tags?.length ? tags : null,
   });
 }
 

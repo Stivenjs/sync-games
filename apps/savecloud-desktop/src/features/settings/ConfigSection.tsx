@@ -148,20 +148,21 @@ export function ConfigSection({
 
         <Divider className="my-5" />
 
-        {/* Catálogo Steam local */}
+        {/* Catálogo de juegos Steam */}
         <section aria-labelledby="config-steam-catalog" className="space-y-3">
           <div className="flex items-center gap-2">
             <Library size={18} className="text-default-500" />
             <p id="config-steam-catalog" className="text-xs font-semibold uppercase tracking-wider text-default-500">
-              Catálogo Steam (local)
+              Catálogo de juegos Steam
             </p>
           </div>
           <p className="text-sm text-default-600">
-            La clave Steam Web API (misma que en &quot;Configurar conexión&quot;) permite mantener en SQLite el listado
-            de aplicaciones para búsquedas y metadatos. Las sincronizaciones posteriores solo traen cambios.
+            Con la misma clave de Steam que indicas en «Configurar conexión», la app descarga y guarda en tu equipo el
+            listado de juegos para que puedas buscarlos y ver información. Las siguientes veces solo se actualizan los
+            cambios nuevos.
           </p>
           <div className="rounded-lg border border-default-200 bg-default-50/50 px-3 py-2">
-            <span className="text-xs font-medium text-default-500">Clave Steam Web API</span>
+            <span className="text-xs font-medium text-default-500">Clave de Steam</span>
             {isLoadingData ? (
               <Skeleton className="mt-1 h-4 w-40 rounded-lg" />
             ) : (
@@ -190,7 +191,7 @@ export function ConfigSection({
               color="warning"
               isDisabled={steamCatalogBusy}
               onPress={() => onResetSteamCatalogSync?.()}>
-              Restablecer progreso de sync
+              Volver a descargar todo el listado
             </Button>
           </div>
         </section>

@@ -17,3 +17,18 @@ pub struct CatalogPage {
     pub limit: u32,
     pub items: Vec<CatalogListItem>,
 }
+
+/// Entrada de faceta (género o etiqueta Steam) con recuento de apps enriquecidas.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogFilterFacet {
+    pub label: String,
+    pub count: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogFilterFacets {
+    pub genres: Vec<CatalogFilterFacet>,
+    pub tags: Vec<CatalogFilterFacet>,
+}

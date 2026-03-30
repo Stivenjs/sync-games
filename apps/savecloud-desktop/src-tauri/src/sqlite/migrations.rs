@@ -21,6 +21,11 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
         conn.pragma_update(None, "user_version", "3")?;
     }
 
+    if version < 4 {
+        conn.execute_batch(include_str!("sql/004_catalog_trending.sql"))?;
+        conn.pragma_update(None, "user_version", "4")?;
+    }
+
     Ok(())
 }
 

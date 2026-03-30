@@ -1,7 +1,8 @@
 //! Catálogo Steam en SQLite: sync desde la Web API, consultas locales y enriquecimiento con Store `appdetails`.
 //!
 //! - **Sync** ([`sync`]): `IStoreService/GetAppList` → tabla `steam_catalog_apps` (id + nombre).
-//! - **Consultas** ([`query`]): búsqueda por `name_normalized` y paginación estable por `app_id`.
+//! - **Consultas** ([`query`]): búsqueda por `name_normalized` y orden por tendencia de tienda + `app_id`.
+//! - **Tendencia** ([`trending`]): listas públicas de la Store (`featuredcategories`) → tabla `steam_catalog_trending`.
 //! - **Enriquecimiento** ([`enrichment`]): `appdetails` de la Store, persistido en `details_json` y caché RAM.
 //!
 //! Requiere clave [Steam Web API](https://steamcommunity.com/dev/apikey): campo
@@ -14,4 +15,5 @@ mod error;
 mod meta;
 mod query;
 pub mod sync;
+mod trending;
 mod types;
