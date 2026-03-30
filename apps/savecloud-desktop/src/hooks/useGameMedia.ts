@@ -54,10 +54,12 @@ export function useGameMedia({
       };
     }
 
+    // `null`/`undefined`: batch aún no devuelve datos. `{}` es truthy: sin keys parece batch vacío, no "cargando".
+    const batchMapMissing = mediaBySteamAppId == null;
     const isWaiting =
       externalLoading ||
       (!!steamAppId && !mediaFromBatch && isSteamQueryPending) ||
-      (!!steamAppId && mediaFromBatch && !mediaBySteamAppId);
+      (!!steamAppId && mediaFromBatch && batchMapMissing);
 
     if (isWaiting) {
       return { displayImageUrl: null, mediaUrls: [], isEffectivelyLoading: true };

@@ -25,6 +25,7 @@ export function SteamCatalogPage() {
     items,
     totalBrowse,
     mediaBySteamAppId,
+    isMediaBatchPending,
     isLoading,
     isError,
     errorMsg,
@@ -106,22 +107,30 @@ export function SteamCatalogPage() {
                 )}
               </p>
 
-              <SteamCatalogGrid
-                items={items}
-                listKey={
-                  searchMode
-                    ? `search-${debouncedSearch}-${filterSignature}-p${page}`
-                    : `browse-${filterSignature}-p${page}`
-                }
-                mediaBySteamAppId={mediaBySteamAppId}
-              />
+              {isMediaBatchPending ? (
+                <div className="flex min-h-[40vh] items-center justify-center">
+                  <Spinner size="lg" color="primary" label="Cargando portadas y datos de la tienda…" />
+                </div>
+              ) : (
+                <>
+                  <SteamCatalogGrid
+                    items={items}
+                    listKey={
+                      searchMode
+                        ? `search-${debouncedSearch}-${filterSignature}-p${page}`
+                        : `browse-${filterSignature}-p${page}`
+                    }
+                    mediaBySteamAppId={mediaBySteamAppId}
+                  />
 
-              <SteamCatalogPagination
-                totalPages={totalPages}
-                page={page}
-                onChange={setPage}
-                isDisabled={isPageTransition}
-              />
+                  <SteamCatalogPagination
+                    totalPages={totalPages}
+                    page={page}
+                    onChange={setPage}
+                    isDisabled={isPageTransition}
+                  />
+                </>
+              )}
             </>
           )}
         </div>
