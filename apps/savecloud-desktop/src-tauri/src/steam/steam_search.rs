@@ -133,7 +133,7 @@ pub async fn get_steam_app_name(app_id: String) -> Option<String> {
 async fn search_steam_app_id_impl(query: String) -> Option<String> {
     let term = query.replace('-', " ");
     let url = format!(
-        "https://store.steampowered.com/search/suggest?term={}&f=games&cc=US&l=english",
+        "https://store.steampowered.com/search/suggest?term={}&f=games&cc=US&l=spanish",
         urlencoding::encode(&term)
     );
 
@@ -198,7 +198,7 @@ pub async fn search_steam_games(query: String) -> Vec<SteamSearchResult> {
 
     let term = query.replace('-', " ");
     let url = format!(
-        "https://store.steampowered.com/search/suggest?term={}&f=games&cc=US&l=english",
+        "https://store.steampowered.com/search/suggest?term={}&f=games&cc=US&l=spanish",
         urlencoding::encode(&term)
     );
 
