@@ -1,11 +1,18 @@
 //! DTOs cacheables devueltos por comandos Tauri y rellenados desde `steam_search`.
 
-/// URLs de medios de una aplicación de Steam (portada, capturas, vídeo).
+/// Respuesta ligera de Store `appdetails`: galería, vídeo y metadatos de lista (nombre Steam, géneros).
+///
+/// Una sola petición con filtros `basic,screenshots,movies,genres` — sin ficha completa.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SteamAppdetailsMedia {
     pub media_urls: Vec<String>,
     pub video_url: Option<String>,
+    #[serde(default)]
+    pub genres: Vec<String>,
+    /// Nombre en tienda (locale de la petición); puede vaciarse si el filtro no incluye `basic`.
+    #[serde(default)]
+    pub name: String,
 }
 
 /// Ficha completa de una aplicación de Steam.

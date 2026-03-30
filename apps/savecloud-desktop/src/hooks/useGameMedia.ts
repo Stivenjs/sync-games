@@ -99,10 +99,15 @@ export function useGameMedia({
 
   const handleImgError = useCallback(() => setImgError(true), []);
 
+  const genres = mediaSource?.genres?.filter(Boolean) ?? [];
+  const steamStoreName = mediaSource?.name?.trim() ?? "";
+
   return {
     displayImageUrl,
     mediaUrls,
     videoUrl: mediaSource?.videoUrl ?? null,
+    genres,
+    steamStoreName,
     isEffectivelyLoading,
     imgLoaded,
     imgError,

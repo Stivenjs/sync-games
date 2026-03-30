@@ -257,6 +257,8 @@ pub async fn get_steam_appdetails_media_batch(
     let empty = SteamAppdetailsMedia {
         media_urls: Vec::new(),
         video_url: None,
+        genres: Vec::new(),
+        name: String::new(),
     };
 
     let stream = futures_util::stream::iter(ids_to_fetch.into_iter().map(|app_id| {

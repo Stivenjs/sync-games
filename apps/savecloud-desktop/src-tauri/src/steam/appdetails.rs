@@ -89,7 +89,7 @@ fn extract_best_video_url(movie: &serde_json::Value) -> Option<String> {
         .or_else(|| nested("mp4"))
 }
 
-/// Parsea portada, capturas y vídeo desde el campo `data` de `appdetails`.
+/// Parsea portada, capturas, vídeo, géneros y nombre desde el campo `data` de `appdetails`.
 pub fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
     let mut media_urls: Vec<String> = Vec::new();
     let mut video_url: Option<String> = None;
@@ -118,9 +118,19 @@ pub fn parse_media_from_data(data: &serde_json::Value) -> SteamAppdetailsMedia {
         }
     }
 
+    let name = data
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_owned();
+
+    let genres = extract_keyed_string_array(data, "genres", "description");
+
     SteamAppdetailsMedia {
         media_urls,
         video_url,
+        genres,
+        name,
     }
 }
 
@@ -148,17 +158,19 @@ fn extract_keyed_string_array(value: &serde_json::Value, field: &str, sub: &str)
         .unwrap_or_default()
 }
 
-/// Medios vía `appdetails` (inglés, filtros mínimos para capturas/vídeo).
+/// Lista / hover: `basic` (nombre), capturas, tráiler y géneros en una sola petición Store.
 pub async fn fetch_steam_appdetails_media_from_store(
     app_id: &str,
 ) -> Result<SteamAppdetailsMedia, String> {
-    let data = fetch_appdetails_data(app_id, "english", "basic,screenshots,movies").await?;
+    let data = fetch_appdetails_data(app_id, "spanish", "basic,screenshots,movies,genres").await?;
     Ok(data
         .as_ref()
         .map(parse_media_from_data)
         .unwrap_or_else(|| SteamAppdetailsMedia {
             media_urls: Vec::new(),
             video_url: None,
+            genres: Vec::new(),
+            name: String::new(),
         }))
 }
 

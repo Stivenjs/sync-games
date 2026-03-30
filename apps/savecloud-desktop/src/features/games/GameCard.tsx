@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, startTransition, addTransitionType, ViewTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardFooter, Skeleton, Tooltip } from "@heroui/react";
+import { Card, CardFooter, Chip, Skeleton, Tooltip } from "@heroui/react";
 import { GameCardHoverMotion } from "@features/games/GameCardHoverMotion";
 import { Clock, Gamepad2 } from "lucide-react";
 import { formatGameDisplayName, getSteamAppId } from "@utils/gameImage";
@@ -92,6 +92,8 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
     displayImageUrl,
     mediaUrls,
     videoUrl,
+    genres,
+    steamStoreName,
     isEffectivelyLoading,
     imgLoaded,
     imgError,
@@ -138,7 +140,13 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
   }
 
   return (
-    <GameCardHoverCard game={game} mediaUrls={mediaUrls} videoUrl={videoUrl} stats={stats}>
+    <GameCardHoverCard
+      game={game}
+      mediaUrls={mediaUrls}
+      videoUrl={videoUrl}
+      genres={genres}
+      storeName={steamStoreName || undefined}
+      stats={stats}>
       <GameCardHoverMotion>
         <div
           className="cursor-pointer"
@@ -191,6 +199,19 @@ export const GameCard = memo(function GameCard(props: GameCardProps) {
               <p className="truncate w-full text-center text-xs font-bold uppercase tracking-wider text-foreground">
                 {formatGameDisplayName(game.id)}
               </p>
+              {genres.length > 0 && (
+                <div className="flex max-w-full flex-wrap justify-center gap-0.5">
+                  {genres.slice(0, 3).map((g, i) => (
+                    <Chip
+                      key={`${g}-${i}`}
+                      size="sm"
+                      variant="flat"
+                      className="h-4 min-h-4 max-w-28 truncate px-1 py-0 text-[9px]">
+                      {g}
+                    </Chip>
+                  ))}
+                </div>
+              )}
 
               <GameCardStatusBar
                 isGameRunning={isGameRunning}

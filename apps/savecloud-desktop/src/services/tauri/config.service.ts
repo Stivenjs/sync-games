@@ -60,10 +60,17 @@ export async function getSteamAppName(appId: string): Promise<string | null> {
   return invoke<string | null>("get_steam_app_name", { appId });
 }
 
-/** Medios para hovercard: portada, capturas, thumbnails y opcionalmente URL de vídeo (Store API appdetails) */
+/**
+ * Respuesta ligera de Store `appdetails` (una petición por app): galería, vídeo, géneros y nombre en tienda.
+ * No incluye descripciones largas ni requisitos — adecuado para listas tipo biblioteca.
+ */
 export interface SteamAppdetailsMediaResult {
   mediaUrls: string[];
   videoUrl?: string | null;
+  /** Géneros (misma respuesta que medios; sin segunda llamada). */
+  genres?: string[];
+  /** Nombre oficial en Steam (locale del backend, p. ej. español). */
+  name?: string;
 }
 
 /** Obtiene URLs de medios (portada, capturas, thumbnails de vídeos) desde la Store API para el hovercard. */
