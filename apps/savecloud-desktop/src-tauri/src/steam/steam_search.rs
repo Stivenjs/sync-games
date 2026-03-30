@@ -9,7 +9,13 @@
 //! Facilita la integración con servicios que requieren identificación
 //! consistente y enriquecimiento de datos dentro del ecosistema de Steam.
 
+use std::ops::Deref;
+
+use rusqlite::Connection;
+use tauri::State;
+
 use crate::network::STEAM_CLIENT;
+use crate::sqlite::AppDb;
 use crate::steam::appdetails::fetch_steam_app_details_from_store;
 use crate::steam::appdetails::fetch_steam_appdetails_media_from_store;
 use crate::steam_cache::{normalize_steam_app_id, steam_api_cache};
@@ -17,6 +23,7 @@ use futures_util::StreamExt;
 use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
+
 
 pub use crate::steam_cache::{SteamAppDetails, SteamAppdetailsMedia};
 
@@ -31,6 +38,35 @@ static NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"class="[^"]*match_name[^"]*"[^>]*>([^<]+)<"#).unwrap());
 
 const STEAM_CONCURRENCY_LIMIT: usize = 3;
+
+/// Medios ya enriquecidos en el catálogo local (`details_json`); evita golpear la Store.
+fn load_catalog_media_map(
+    conn: &Connection,
+    app_ids: &[String],
+) -> Result<HashMap<String, SteamAppdetailsMedia>, rusqlite::Error> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT details_json FROM steam_catalog_apps WHERE app_id = ?1 \
+         AND details_json IS NOT NULL AND length(trim(details_json)) > 0",
+    )?;
+    let mut out = HashMap::new();
+    for id in app_ids {
+        let Ok(pid) = id.parse::<i64>() else {
+            continue;
+        };
+        let json: Option<String> = match stmt.query_row([pid], |row| row.get::<_, String>(0)) {
+            Ok(s) => Some(s),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(e),
+        };
+        let Some(json) = json else {
+            continue;
+        };
+        if let Ok(details) = serde_json::from_str::<SteamAppDetails>(&json) {
+            out.insert(id.clone(), details.media);
+        }
+    }
+    Ok(out)
+}
 
 async fn fetch_single_app_name(app_id: &str) -> Option<(String, String)> {
     let url = format!(
@@ -219,6 +255,7 @@ pub async fn get_steam_appdetails_media(app_id: String) -> Result<SteamAppdetail
 
 #[tauri::command]
 pub async fn get_steam_appdetails_media_batch(
+    db: State<'_, AppDb>,
     app_ids: Vec<String>,
 ) -> Result<HashMap<String, SteamAppdetailsMedia>, String> {
     let mut seen = HashSet::new();
@@ -239,16 +276,38 @@ pub async fn get_steam_appdetails_media_batch(
     }
 
     let mut final_results = HashMap::new();
-    let mut ids_to_fetch = Vec::new();
+    let mut missing_after_cache = Vec::new();
 
     let cache = steam_api_cache();
     for id in valid_ids {
         if let Some(cached_data) = cache.get_media(&id) {
             final_results.insert(id, cached_data);
         } else {
-            ids_to_fetch.push(id);
+            missing_after_cache.push(id);
         }
     }
+
+    if !missing_after_cache.is_empty() {
+        let db = db.deref().clone();
+        let ids_for_db = missing_after_cache.clone();
+        let from_db = tokio::task::spawn_blocking(move || {
+            db.with_conn(|c| load_catalog_media_map(c, &ids_for_db))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e: crate::sqlite::error::SqliteError| e.to_string())?;
+
+        let api_cache = steam_api_cache();
+        for (id, media) in from_db {
+            api_cache.insert_media(id.clone(), media.clone());
+            final_results.insert(id, media);
+        }
+    }
+
+    let ids_to_fetch: Vec<String> = missing_after_cache
+        .into_iter()
+        .filter(|id| !final_results.contains_key(id))
+        .collect();
 
     if ids_to_fetch.is_empty() {
         return Ok(final_results);
