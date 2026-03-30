@@ -9,6 +9,7 @@ import { LocalBackupInfoCard } from "@features/settings/LocalBackupInfoCard";
 import { NotificationsCard } from "@features/settings/NotificationsCard";
 import { ReleaseNotesCard } from "@features/settings/ReleaseNotesCard";
 import { RestoreConfigModal } from "@features/settings/RestoreConfigModal";
+import { ResetSteamCatalogModal } from "@features/settings/ResetSteamCatalogModal";
 import { PullFriendConfigModal } from "@/features/settings/PullFriendConfigModal";
 import { UpdatesCard } from "@features/settings/UpdatesCard";
 import { useSettingsPage } from "@features/settings/useSettingsPage";
@@ -47,6 +48,7 @@ export function SettingsPage() {
     backingUpConfig,
     restoringConfig,
     restoreConfirmOpen,
+    resetSteamCatalogConfirmOpen,
     handleExportConfig,
     handleImportConfig,
     handleCheckUpdates,
@@ -60,6 +62,7 @@ export function SettingsPage() {
     handleFullBackupStreamingDryRunChange,
     handleSyncSteamCatalog,
     handleResetSteamCatalogSync,
+    confirmResetSteamCatalogSync,
     steamCatalogBusy,
     openCreateConfigModal,
     setCreateApiBaseUrl,
@@ -68,6 +71,7 @@ export function SettingsPage() {
     setCreateSteamWebApiKey,
     setCreateConfigModalOpen,
     setRestoreConfirmOpen,
+    setResetSteamCatalogConfirmOpen,
     setPullFriendConfigModalOpen,
     setPullFriendUserId,
   } = useSettingsPage();
@@ -81,6 +85,9 @@ export function SettingsPage() {
         return true;
       case restoreConfirmOpen:
         setRestoreConfirmOpen(false);
+        return true;
+      case resetSteamCatalogConfirmOpen:
+        setResetSteamCatalogConfirmOpen(false);
         return true;
       case pullFriendConfigModalOpen:
         setPullFriendConfigModalOpen(false);
@@ -206,6 +213,12 @@ export function SettingsPage() {
           await performRestoreConfigFromCloud();
           setRestoreConfirmOpen(false);
         }}
+      />
+      <ResetSteamCatalogModal
+        isOpen={resetSteamCatalogConfirmOpen}
+        busy={steamCatalogBusy}
+        onCancel={() => setResetSteamCatalogConfirmOpen(false)}
+        onConfirm={confirmResetSteamCatalogSync}
       />
       <PullFriendConfigModal
         isOpen={pullFriendConfigModalOpen}
