@@ -17,7 +17,13 @@ export function SteamCatalogGrid({ items, listKey, mediaBySteamAppId }: SteamCat
         const game = catalogListItemToConfiguredGame(item);
         return (
           <GamesListMotionItem key={game.id}>
-            <GameCard game={game} cardTitle={item.name} mediaBySteamAppId={mediaBySteamAppId ?? null} mediaFromBatch />
+            <GameCard
+              variant="catalog"
+              game={game}
+              cardTitle={item.name}
+              mediaBySteamAppId={mediaBySteamAppId ?? null}
+              mediaFromBatch
+            />
           </GamesListMotionItem>
         );
       })}
