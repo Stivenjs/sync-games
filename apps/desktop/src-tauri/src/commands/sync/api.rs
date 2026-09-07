@@ -13,6 +13,7 @@ use super::models::{CloudSavesSummaryDto, RemoteSaveDto, RemoteSaveInfoDto};
 use crate::network::API_CLIENT;
 use crate::observability;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::time::Instant;
 
@@ -20,6 +21,35 @@ const S3_ACCELERATE_HOST: &str = "s3-accelerate.amazonaws.com";
 
 static S3_ENDPOINT_CACHE: LazyLock<std::sync::RwLock<Option<String>>> =
     LazyLock::new(|| std::sync::RwLock::new(None));
+
+#[derive(Clone)]
+struct EtagCacheEntry<T> {
+    etag: String,
+    data: T,
+}
+
+static SAVES_CACHE: LazyLock<std::sync::RwLock<HashMap<String, EtagCacheEntry<Vec<RemoteSaveInfoDto>>>>> =
+    LazyLock::new(|| std::sync::RwLock::new(HashMap::new()));
+
+static SUMMARY_CACHE: LazyLock<std::sync::RwLock<HashMap<String, EtagCacheEntry<Vec<CloudSavesSummaryDto>>>>> =
+    LazyLock::new(|| std::sync::RwLock::new(HashMap::new()));
+
+/// Invalida la caché ETag en memoria para un usuario y opcionalmente un juego concreto.
+/// Debe llamarse tras operaciones que modifiquen el estado en S3 (subida, borrado, renombrado).
+pub fn invalidate_remote_saves_cache(user_id: &str, game_id: Option<&str>) {
+    if let Ok(mut cache) = SAVES_CACHE.write() {
+        if let Some(gid) = game_id {
+            let key = format!("{user_id}::{gid}");
+            cache.remove(&key);
+            cache.retain(|k, _| !k.starts_with(&format!("{user_id}::")));
+        } else {
+            cache.retain(|k, _| !k.starts_with(user_id));
+        }
+    }
+    if let Ok(mut cache) = SUMMARY_CACHE.write() {
+        cache.remove(user_id);
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,13 +110,14 @@ fn get_api_context() -> Result<ApiContext, String> {
     super::context::resolve_api_context()
 }
 
-pub(crate) async fn api_request(
+pub(crate) async fn api_request_with_etag(
     base_url: &str,
     user_id: &str,
     api_key: &str,
     method: &str,
     path: &str,
     body: Option<&[u8]>,
+    if_none_match: Option<&str>,
 ) -> Result<reqwest::Response, String> {
     let url = format!("{}/saves{}", base_url.trim_end_matches('/'), path);
 
@@ -94,6 +125,10 @@ pub(crate) async fn api_request(
         .request(method.parse().unwrap(), &url)
         .header("x-user-id", user_id)
         .header("x-api-key", api_key);
+
+    if let Some(etag) = if_none_match {
+        req = req.header("If-None-Match", etag);
+    }
 
     let active_host = crate::config::load_settings()
         .active_cloud_host_user_id
@@ -117,10 +152,11 @@ pub(crate) async fn api_request(
         e.to_string()
     })?;
     let elapsed_ms = start.elapsed().as_millis() as u64;
-    let ok = res.status().is_success();
-    observability::record_saves_api_timing(elapsed_ms, ok, path);
-    if !ok {
-        let st = res.status().as_u16();
+    let status = res.status();
+    let is_ok = status.is_success() || status == reqwest::StatusCode::NOT_MODIFIED;
+    observability::record_saves_api_timing(elapsed_ms, is_ok, path);
+    if !is_ok {
+        let st = status.as_u16();
         observability::record_error(
             "sync_api_http",
             &format!("path={} status={}", path, st),
@@ -128,6 +164,17 @@ pub(crate) async fn api_request(
         );
     }
     Ok(res)
+}
+
+pub(crate) async fn api_request(
+    base_url: &str,
+    user_id: &str,
+    api_key: &str,
+    method: &str,
+    path: &str,
+    body: Option<&[u8]>,
+) -> Result<reqwest::Response, String> {
+    api_request_with_etag(base_url, user_id, api_key, method, path, body, None).await
 }
 
 pub(crate) async fn get_upload_urls(
@@ -236,9 +283,32 @@ async fn list_remote_saves_for_user(
         Some(t) if t == authenticated_user_id => String::new(),
         Some(t) => format!("?targetUserId={}", urlencoding::encode(t)),
     };
-    let res = api_request(api_base, authenticated_user_id, api_key, "GET", &path, None)
-        .await
-        .map_err(|e| format!("GET /saves: {}", e))?;
+
+    let cache_key = format!("{authenticated_user_id}::{target_user_id:?}");
+    let cached_entry = SAVES_CACHE
+        .read()
+        .ok()
+        .and_then(|c| c.get(&cache_key).cloned());
+
+    let if_none_match = cached_entry.as_ref().map(|e| e.etag.as_str());
+
+    let res = api_request_with_etag(
+        api_base,
+        authenticated_user_id,
+        api_key,
+        "GET",
+        &path,
+        None,
+        if_none_match,
+    )
+    .await
+    .map_err(|e| format!("GET /saves: {}", e))?;
+
+    if res.status() == reqwest::StatusCode::NOT_MODIFIED {
+        if let Some(entry) = cached_entry {
+            return Ok(entry.data);
+        }
+    }
 
     if !res.status().is_success() {
         return Err(format!(
@@ -247,6 +317,12 @@ async fn list_remote_saves_for_user(
             res.text().await.unwrap_or_default()
         ));
     }
+
+    let etag_header = res
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
 
     let raw: Vec<RemoteSaveDto> = res.json().await.map_err(|e| e.to_string())?;
     let out: Vec<RemoteSaveInfoDto> = raw
@@ -267,6 +343,19 @@ async fn list_remote_saves_for_user(
             }
         })
         .collect();
+
+    if let Some(etag) = etag_header {
+        if let Ok(mut cache) = SAVES_CACHE.write() {
+            cache.insert(
+                cache_key,
+                EtagCacheEntry {
+                    etag,
+                    data: out.clone(),
+                },
+            );
+        }
+    }
+
     Ok(out)
 }
 
@@ -280,10 +369,25 @@ async fn list_remote_saves_for_user_and_game(
     if trimmed_game_id.is_empty() {
         return Err("gameId vacío".into());
     }
+
+    let cache_key = format!("{user_id}::{trimmed_game_id}");
+    let cached_entry = SAVES_CACHE
+        .read()
+        .ok()
+        .and_then(|c| c.get(&cache_key).cloned());
+
+    let if_none_match = cached_entry.as_ref().map(|e| e.etag.as_str());
+
     let path = format!("?gameId={}", urlencoding::encode(trimmed_game_id));
-    let res = api_request(api_base, user_id, api_key, "GET", &path, None)
+    let res = api_request_with_etag(api_base, user_id, api_key, "GET", &path, None, if_none_match)
         .await
         .map_err(|e| format!("GET /saves?gameId: {}", e))?;
+
+    if res.status() == reqwest::StatusCode::NOT_MODIFIED {
+        if let Some(entry) = cached_entry {
+            return Ok(entry.data);
+        }
+    }
 
     if !res.status().is_success() {
         return Err(format!(
@@ -292,6 +396,12 @@ async fn list_remote_saves_for_user_and_game(
             res.text().await.unwrap_or_default()
         ));
     }
+
+    let etag_header = res
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
 
     let raw: Vec<RemoteSaveDto> = res.json().await.map_err(|e| e.to_string())?;
     let out: Vec<RemoteSaveInfoDto> = raw
@@ -312,6 +422,19 @@ async fn list_remote_saves_for_user_and_game(
             }
         })
         .collect();
+
+    if let Some(etag) = etag_header {
+        if let Ok(mut cache) = SAVES_CACHE.write() {
+            cache.insert(
+                cache_key,
+                EtagCacheEntry {
+                    etag,
+                    data: out.clone(),
+                },
+            );
+        }
+    }
+
     Ok(out)
 }
 
@@ -329,9 +452,31 @@ async fn list_remote_saves_summary_for_user(
     api_key: &str,
     user_id: &str,
 ) -> Result<Vec<CloudSavesSummaryDto>, String> {
-    let res = api_request(api_base, user_id, api_key, "GET", "/summary", None)
-        .await
-        .map_err(|e| format!("GET /saves/summary: {}", e))?;
+    let cache_key = user_id.to_string();
+    let cached_entry = SUMMARY_CACHE
+        .read()
+        .ok()
+        .and_then(|c| c.get(&cache_key).cloned());
+
+    let if_none_match = cached_entry.as_ref().map(|e| e.etag.as_str());
+
+    let res = api_request_with_etag(
+        api_base,
+        user_id,
+        api_key,
+        "GET",
+        "/summary",
+        None,
+        if_none_match,
+    )
+    .await
+    .map_err(|e| format!("GET /saves/summary: {}", e))?;
+
+    if res.status() == reqwest::StatusCode::NOT_MODIFIED {
+        if let Some(entry) = cached_entry {
+            return Ok(entry.data);
+        }
+    }
 
     if !res.status().is_success() {
         return Err(format!(
@@ -341,8 +486,14 @@ async fn list_remote_saves_summary_for_user(
         ));
     }
 
+    let etag_header = res
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
     let raw: Vec<CloudSavesSummaryItem> = res.json().await.map_err(|e| e.to_string())?;
-    Ok(raw
+    let out: Vec<CloudSavesSummaryDto> = raw
         .into_iter()
         .map(|s| CloudSavesSummaryDto {
             game_id: s.game_id,
@@ -350,7 +501,21 @@ async fn list_remote_saves_summary_for_user(
             total_size_bytes: s.total_size_bytes,
             last_modified: s.last_modified,
         })
-        .collect())
+        .collect();
+
+    if let Some(etag) = etag_header {
+        if let Ok(mut cache) = SUMMARY_CACHE.write() {
+            cache.insert(
+                cache_key,
+                EtagCacheEntry {
+                    etag,
+                    data: out.clone(),
+                },
+            );
+        }
+    }
+
+    Ok(out)
 }
 
 #[tauri::command]
@@ -418,6 +583,7 @@ pub async fn sync_delete_game_from_cloud(game_id: String, permanent: Option<bool
             res.text().await.unwrap_or_default()
         ));
     }
+    invalidate_remote_saves_cache(&ctx.user_id, Some(game_id.trim()));
     Ok(())
 }
 

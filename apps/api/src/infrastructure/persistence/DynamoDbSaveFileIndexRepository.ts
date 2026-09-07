@@ -25,6 +25,12 @@ export class DynamoDbSaveFileIndexRepository implements SaveFileIndexRepository 
         new QueryCommand({
           TableName: this.tableName,
           KeyConditionExpression: "userId = :u",
+          ProjectionExpression: "userId, #k, gameId, #s, #lm",
+          ExpressionAttributeNames: {
+            "#k": "objectKey",
+            "#s": "size",
+            "#lm": "lastModified",
+          },
           ExpressionAttributeValues: {
             ":u": userId,
           },
@@ -49,8 +55,11 @@ export class DynamoDbSaveFileIndexRepository implements SaveFileIndexRepository 
         new QueryCommand({
           TableName: this.tableName,
           KeyConditionExpression: "userId = :u AND begins_with(#k, :prefix)",
+          ProjectionExpression: "userId, #k, gameId, #s, #lm",
           ExpressionAttributeNames: {
             "#k": "objectKey",
+            "#s": "size",
+            "#lm": "lastModified",
           },
           ExpressionAttributeValues: {
             ":u": userId,
@@ -76,6 +85,12 @@ export class DynamoDbSaveFileIndexRepository implements SaveFileIndexRepository 
         Key: {
           userId,
           objectKey,
+        },
+        ProjectionExpression: "userId, #k, gameId, #s, #lm",
+        ExpressionAttributeNames: {
+          "#k": "objectKey",
+          "#s": "size",
+          "#lm": "lastModified",
         },
       })
     );

@@ -35,6 +35,14 @@ import {
   ListSavesResponseSchema,
   GameSummaryResponseSchema,
   ErrorResponseSchema,
+  UploadUrlResponseSchema,
+  UploadUrlsBatchResponseSchema,
+  DownloadUrlResponseSchema,
+  DownloadUrlsBatchResponseSchema,
+  ListBackupsResponseSchema,
+  InitMultipartResponseSchema,
+  InitMultipartWithPartUrlsResponseSchema,
+  GetPartUrlsResponseSchema,
 } from "@interfaces/schema/saves";
 import type { GetUploadUrlUseCase } from "@application/use-cases/GetUploadUrlUseCase";
 import type { GetUploadUrlsUseCase } from "@application/use-cases/GetUploadUrlsUseCase";
@@ -231,7 +239,14 @@ export async function registerSavesRoutes(
 
   app.get<{ Querystring: ListBackupsQuery }>(
     "/saves/backups",
-    { schema: { querystring: ListBackupsQuerySchema } },
+    {
+      schema: {
+        querystring: ListBackupsQuerySchema,
+        response: {
+          200: ListBackupsResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       const storageUserId = await getStorageUserIdFromRequest(request);
       const gameId = request.query.gameId.trim();
@@ -346,7 +361,15 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: UploadUrlBody }>(
     "/saves/upload-url",
-    { schema: { body: UploadUrlSchema } },
+    {
+      schema: {
+        body: UploadUrlSchema,
+        response: {
+          200: UploadUrlResponseSchema,
+          500: ErrorResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const userId = await getStorageUserIdFromRequest(request);
@@ -367,7 +390,15 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: UploadUrlsBatchBody }>(
     "/saves/upload-urls",
-    { schema: { body: UploadUrlsBatchSchema } },
+    {
+      schema: {
+        body: UploadUrlsBatchSchema,
+        response: {
+          200: UploadUrlsBatchResponseSchema,
+          500: ErrorResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const userId = await getStorageUserIdFromRequest(request);
@@ -384,7 +415,17 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: DownloadUrlBody }>(
     "/saves/download-url",
-    { schema: { body: DownloadUrlSchema } },
+    {
+      schema: {
+        body: DownloadUrlSchema,
+        response: {
+          200: DownloadUrlResponseSchema,
+          400: ErrorResponseSchema,
+          403: ErrorResponseSchema,
+          500: ErrorResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const requesterUserId = getUserId(request);
@@ -427,7 +468,15 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: DownloadUrlsBatchBody }>(
     "/saves/download-urls",
-    { schema: { body: DownloadUrlsBatchSchema } },
+    {
+      schema: {
+        body: DownloadUrlsBatchSchema,
+        response: {
+          200: DownloadUrlsBatchResponseSchema,
+          500: ErrorResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const userId = await getStorageUserIdFromRequest(request);
@@ -444,7 +493,14 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: UploadUrlBody }>(
     "/saves/multipart/init",
-    { schema: { body: UploadUrlSchema } },
+    {
+      schema: {
+        body: UploadUrlSchema,
+        response: {
+          200: InitMultipartResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       const userId = await getStorageUserIdFromRequest(request);
       const { gameId, filename } = request.body;
@@ -460,7 +516,14 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: InitMultipartPartUrlsBody }>(
     "/saves/multipart/init-with-part-urls",
-    { schema: { body: InitMultipartPartUrlsSchema } },
+    {
+      schema: {
+        body: InitMultipartPartUrlsSchema,
+        response: {
+          200: InitMultipartWithPartUrlsResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       const userId = await getStorageUserIdFromRequest(request);
       const { gameId, filename, partCount } = request.body;
@@ -477,7 +540,14 @@ export async function registerSavesRoutes(
 
   app.post<{ Body: GetPartUrlsBody }>(
     "/saves/multipart/part-urls",
-    { schema: { body: GetPartUrlsSchema } },
+    {
+      schema: {
+        body: GetPartUrlsSchema,
+        response: {
+          200: GetPartUrlsResponseSchema,
+        },
+      },
+    },
     async (request, reply) => {
       const { key, uploadId, partNumbers } = request.body;
 
