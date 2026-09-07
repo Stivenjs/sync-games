@@ -173,30 +173,38 @@ static AXES_ALL: &[Axis] = &[
 /// (`GetAncestor(..., GA_ROOT)`) con `GetForegroundWindow()` para alinear con lo que el SO
 /// considera ventana activa.
 pub fn relevant_app_focus(app: &AppHandle) -> bool {
-    [
-        "main",
-        "settings-window",
-        "big-picture-window",
-        "friends-window",
-    ]
-    .into_iter()
-    .any(|label| {
-        let Some(w) = app.get_webview_window(label) else {
-            return false;
-        };
-        if w.is_focused().unwrap_or(false) {
-            return true;
-        }
-        #[cfg(windows)]
-        {
+    #[cfg(windows)]
+    {
+        [
+            "main",
+            "settings-window",
+            "big-picture-window",
+            "friends-window",
+        ]
+        .into_iter()
+        .any(|label| {
+            let Some(w) = app.get_webview_window(label) else {
+                return false;
+            };
             webview_root_matches_foreground(&w).unwrap_or(false)
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = w;
-            false
-        }
-    })
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        [
+            "main",
+            "settings-window",
+            "big-picture-window",
+            "friends-window",
+        ]
+        .into_iter()
+        .any(|label| {
+            let Some(w) = app.get_webview_window(label) else {
+                return false;
+            };
+            w.is_focused().unwrap_or(false)
+        })
+    }
 }
 
 #[cfg(windows)]

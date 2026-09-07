@@ -423,6 +423,12 @@ pub fn initialize_profile_storage(profile: &super::profiles::Profile) -> Result<
         audio_output_device: None,
         overlay_sound_enabled: true,
         overlay_notification_volume: 0.6,
+        gamepad_ignore_background: true,
+        torrent_download_limit_kbs: None,
+        torrent_upload_limit_kbs: None,
+        torrent_seeding_mode: "stop_on_complete".to_string(),
+        auto_sync_on_game_exit: true,
+        overlay_notification_position: "bottom-right".to_string(),
     };
 
     save_settings_for_profile(&profile.id, &settings)?;

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { AnimatePresence, motion, type Transition } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Gamepad2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "@hooks/useConfig";
@@ -37,20 +37,20 @@ const MAX_NOTIFICATIONS = 5;
 /** Delay para ocultar overlay al finalizar animación de salida (ms) */
 const OVERLAY_HIDE_DELAY = 350;
 
-/** Configuración de animación - estilo Steam: slide desde la derecha */
-const ANIMATION_CONFIG: {
-  initial: { opacity: number; x: number };
-  animate: { opacity: number; x: number };
-  exit: { opacity: number; x: number };
-  transition: Transition;
-} = {
-  initial: { opacity: 0, x: 320 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: 320 },
-  transition: { type: "tween", duration: 0.3, ease: [0.4, 0, 0.2, 1] },
-} as const;
+interface NotificationCardProps extends OverlayNotification {
+  isLeft?: boolean;
+}
 
-const NotificationCard: React.FC<OverlayNotification> = ({ id, title, body, avatar, gameId, imageUrl, steamAppId }) => {
+const NotificationCard: React.FC<NotificationCardProps> = ({
+  id,
+  title,
+  body,
+  avatar,
+  gameId,
+  imageUrl,
+  steamAppId,
+  isLeft = false,
+}) => {
   const { config } = useConfig();
 
   const detectedGameId = useMemo(
@@ -68,8 +68,16 @@ const NotificationCard: React.FC<OverlayNotification> = ({ id, title, body, avat
     [body, detectedGameId, config?.games]
   );
 
+  const slideX = isLeft ? -320 : 320;
+
   return (
-    <motion.div key={id} {...ANIMATION_CONFIG} className="pointer-events-auto">
+    <motion.div
+      key={id}
+      initial={{ opacity: 0, x: slideX }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: slideX }}
+      transition={{ type: "tween", duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+      className="pointer-events-auto">
       {/* Contenedor principal estilo Steam Toast */}
       <div className="flex bg-[#171a21]/95 border border-white/10 rounded-sm overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.7)] backdrop-blur-md">
         {/* Barra verde lateral de acento */}
@@ -195,6 +203,7 @@ function useOverlayNotifications() {
 export function OverlayApp() {
   const { t } = useTranslation();
   const { notifications, addNotification, cleanup } = useOverlayNotifications();
+  const { settings } = useOverlaySoundSettings();
   const hasSignaledReadyRef = useRef(false);
 
   useEffect(() => {
@@ -248,17 +257,35 @@ export function OverlayApp() {
     };
   }, [notifications.length]);
 
+  const currentPosition = settings.position;
+
+  const isLeft = currentPosition.endsWith("-left");
+
+  const positionClasses = useMemo(() => {
+    switch (currentPosition) {
+      case "top-left":
+        return "top-4 left-4 flex flex-col items-start gap-2.5 pointer-events-none";
+      case "top-right":
+        return "top-4 right-4 flex flex-col items-end gap-2.5 pointer-events-none";
+      case "bottom-left":
+        return "bottom-17 left-4 flex flex-col items-start gap-2.5 pointer-events-none";
+      case "bottom-right":
+      default:
+        return "bottom-17 right-4 flex flex-col items-end gap-2.5 pointer-events-none";
+    }
+  }, [currentPosition]);
+
   return (
     <div className="fixed inset-0 m-0 p-0 pointer-events-none bg-transparent overflow-hidden">
-      {/* Contenedor de notificaciones - posicionado sobre la barra de tareas estilo Steam */}
+      {/* Contenedor de notificaciones - posicionado dinámicamente según preferencia */}
       <div
-        className="absolute bottom-17 right-4 flex flex-col items-end gap-2.5 pointer-events-none"
+        className={`absolute ${positionClasses}`}
         role="region"
         aria-label={t("overlay.ariaLabel", "Notificaciones de overlay")}
         aria-live="polite">
         <AnimatePresence mode="popLayout">
           {notifications.map((notification) => (
-            <NotificationCard key={notification.id} {...notification} />
+            <NotificationCard key={notification.id} {...notification} isLeft={isLeft} />
           ))}
         </AnimatePresence>
       </div>

@@ -58,3 +58,33 @@ export async function downloadTorrentFromCloud(gameId: string, torrentKey: strin
 export async function deleteCloudTorrent(gameId: string, torrentKey: string): Promise<void> {
   await invoke("delete_cloud_torrent", { gameId, torrentKey });
 }
+
+export interface TorrentRateLimits {
+  downloadLimitKbs: number | null;
+  uploadLimitKbs: number | null;
+}
+
+export type TorrentSeedingMode = "stop_on_complete" | "seed_ratio_1";
+
+/** Obtiene los límites de velocidad de descarga y subida del motor torrent */
+export async function getTorrentRateLimits(): Promise<TorrentRateLimits> {
+  return invoke<TorrentRateLimits>("get_torrent_rate_limits");
+}
+
+/** Guarda y aplica límites de velocidad al motor torrent */
+export async function setTorrentRateLimits(limits: TorrentRateLimits): Promise<void> {
+  await invoke("set_torrent_rate_limits", {
+    downloadLimitKbs: limits.downloadLimitKbs,
+    uploadLimitKbs: limits.uploadLimitKbs,
+  });
+}
+
+/** Obtiene la política de seeding tras completar la descarga */
+export async function getTorrentSeedingMode(): Promise<TorrentSeedingMode> {
+  return invoke<TorrentSeedingMode>("get_torrent_seeding_mode");
+}
+
+/** Configura la política de seeding tras completar la descarga */
+export async function setTorrentSeedingMode(mode: TorrentSeedingMode): Promise<void> {
+  await invoke("set_torrent_seeding_mode", { mode });
+}

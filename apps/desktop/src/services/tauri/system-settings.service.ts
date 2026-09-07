@@ -74,6 +74,14 @@ export interface OverlaySoundSettings {
   volume: number; // 0.0 - 1.0
 }
 
+export type OverlayPosition = "bottom-right" | "top-right" | "top-left" | "bottom-left";
+
+export interface OverlaySettings {
+  enabled: boolean;
+  volume: number; // 0.0 - 1.0
+  position: OverlayPosition;
+}
+
 /** Obtiene la configuración de sonido del overlay en juego. */
 export async function getOverlaySoundSettings(): Promise<OverlaySoundSettings> {
   return invoke<OverlaySoundSettings>("get_overlay_sound_settings");
@@ -85,4 +93,48 @@ export async function setOverlaySoundSettings(settings: OverlaySoundSettings): P
     enabled: settings.enabled,
     volume: settings.volume,
   });
+}
+
+/** Obtiene la posición configurada para las notificaciones de overlay. */
+export async function getOverlayPosition(): Promise<OverlayPosition> {
+  return invoke<OverlayPosition>("get_overlay_position");
+}
+
+/** Guarda la posición de las notificaciones de overlay. */
+export async function setOverlayPosition(position: OverlayPosition): Promise<void> {
+  await invoke("set_overlay_position", { position });
+}
+
+/** Obtiene la configuración completa del overlay. */
+export async function getOverlaySettings(): Promise<OverlaySettings> {
+  return invoke<OverlaySettings>("get_overlay_settings");
+}
+
+/** Guarda la configuración completa del overlay (sonido, volumen y posición). */
+export async function setOverlaySettings(settings: OverlaySettings): Promise<void> {
+  await invoke("set_overlay_settings", {
+    enabled: settings.enabled,
+    volume: settings.volume,
+    position: settings.position,
+  });
+}
+
+/** Obtiene si se ignora la navegación de mando cuando SaveCloud no tiene el foco. */
+export async function getGamepadIgnoreBackground(): Promise<boolean> {
+  return invoke<boolean>("get_gamepad_ignore_background");
+}
+
+/** Configura si se debe ignorar el mando cuando la ventana pierde el foco. */
+export async function setGamepadIgnoreBackground(ignore: boolean): Promise<void> {
+  await invoke("set_gamepad_ignore_background", { ignore });
+}
+
+/** Obtiene si la subida automática a la nube al salir del juego está activa. */
+export async function getAutoSyncOnGameExit(): Promise<boolean> {
+  return invoke<boolean>("get_auto_sync_on_game_exit");
+}
+
+/** Activa o desactiva la subida automática al salir del juego. */
+export async function setAutoSyncOnGameExit(enabled: boolean): Promise<void> {
+  await invoke("set_auto_sync_on_game_exit", { enabled });
 }

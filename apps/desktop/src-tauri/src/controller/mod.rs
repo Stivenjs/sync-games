@@ -42,17 +42,19 @@ pub fn start_gamepad_loop(app_handle: AppHandle) {
 
         loop {
             let focused = tester::relevant_app_focus(&app_handle);
+            let ignore_bg = crate::config::with_config(|cfg| cfg.gamepad_ignore_background);
+            let active_input = if ignore_bg { focused } else { true };
 
             tester::drain_ff_queue(&mut gilrs, &ff_rx);
 
-            if !focused {
+            if !active_input {
                 input_state.clear();
                 #[cfg(windows)]
                 xinput_guide::sync_after_unfocused();
             }
 
             #[cfg(windows)]
-            if focused {
+            if active_input {
                 xinput_guide::inject_guide_synthetic_events(&mut gilrs);
             }
 
@@ -61,7 +63,7 @@ pub fn start_gamepad_loop(app_handle: AppHandle) {
                     EventType::Connected | EventType::Disconnected => {
                         tester::sync_gamepad_list_cache_emit(&app_handle, &gilrs);
                     }
-                    _ if !focused => {}
+                    _ if !active_input => {}
                     evt => {
                         let player_id: usize = id.into();
                         crate::streaming::input_relay::relay_event(player_id, &evt);
@@ -105,7 +107,7 @@ pub fn start_gamepad_loop(app_handle: AppHandle) {
                 }
             }
 
-            if focused {
+            if active_input {
                 for (player_id, action) in input_state.get_repeats() {
                     emit_action(&app_handle, player_id, action);
                 }

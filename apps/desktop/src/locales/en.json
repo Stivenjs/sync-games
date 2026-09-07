@@ -732,6 +732,36 @@
     }
   },
   "settings": {
+    "torrent": {
+      "title": "Torrent Network & Transfer (P2P)",
+      "subtitle": "Control librqbit transfer speeds and sharing behavior with other players.",
+      "downloadLimit": "Download speed limit",
+      "downloadLimitDesc": "Avoid maxing out your connection while downloading games.",
+      "uploadLimit": "Upload speed limit",
+      "uploadLimitDesc": "Limit outgoing bandwidth when seeding or sharing.",
+      "unlimited": "Unlimited",
+      "custom": "Custom",
+      "limitsSaved": "Speed limits updated",
+      "seedingModeTitle": "Seeding Behavior",
+      "seedingModeSubtitle": "Choose whether the app releases files immediately or keeps seeding to support other players.",
+      "stopOnComplete": "Stop seeding when download completes",
+      "stopOnCompleteDesc": "Releases files immediately upon reaching 100%. Allows moving, extracting, or playing without file locks.",
+      "seedRatio1": "Keep seeding until ratio 1.0",
+      "seedRatio1Desc": "Continues uploading until reaching ratio 1.0 (uploading as much as was downloaded) to support peers.",
+      "community": "Community"
+    },
+    "sync": {
+      "autoSyncOnExitTitle": "Auto-upload saves on game exit",
+      "autoSyncOnExitSubtitle": "Automatically syncs and backs up your saves to the cloud as soon as a game is detected closing."
+    },
+    "overlay": {
+      "positionTitle": "In-game notification screen position",
+      "positionSubtitle": "Choose which screen corner notifications pop up in to avoid covering mini-maps, HUDs, or in-game chats.",
+      "topLeft": "Top-Left",
+      "topRight": "Top-Right",
+      "bottomLeft": "Bottom-Left",
+      "bottomRight": "Bottom-Right"
+    },
     "cloudDashboard": {
       "loadingConfig": "Loading configuration…",
       "noAccountConfigured": "No cloud account configured for this profile. Configure the API under «Account» to view remote saves and statistics.",
@@ -1187,6 +1217,8 @@
     "gamepad": {
       "title": "Gamepad Layout",
       "subtitle": "Select preferred controller button icons",
+      "ignoreBackgroundTitle": "Ignore gamepad in background",
+      "ignoreBackgroundSubtitle": "Ignores joystick and button inputs when SaveCloud is not focused, preventing accidental navigation while playing games.",
       "auto": "Automatic",
       "xbox": "Xbox",
       "playstation": "PlayStation",

@@ -98,6 +98,15 @@ const ReleaseNotesDialogLazy = lazy(() =>
 const GamepadTesterCardLazy = lazy(() =>
   import("@features/settings/GamepadTesterCard").then((m) => ({ default: m.GamepadTesterCard }))
 );
+const GamepadBehaviorCardLazy = lazy(() =>
+  import("@features/settings/GamepadBehaviorCard").then((m) => ({ default: m.GamepadBehaviorCard }))
+);
+const TorrentSettingsCardLazy = lazy(() =>
+  import("@features/settings/TorrentSettingsCard").then((m) => ({ default: m.TorrentSettingsCard }))
+);
+const GameExitSyncCardLazy = lazy(() =>
+  import("@features/settings/GameExitSyncCard").then((m) => ({ default: m.GameExitSyncCard }))
+);
 
 const SETTINGS_TABS: Array<{
   key: SettingsTabKey;
@@ -322,6 +331,9 @@ export function SettingsPage({ compactWindowMode = false, initialSelectedTab = n
           <div className="space-y-3">
             <LanguageSettingsCard />
             <GameModeCard />
+            <Suspense fallback={null}>
+              <GameExitSyncCardLazy />
+            </Suspense>
             <LowPerformanceModeCard />
             <DisableHardwareAccelerationCard />
             <AutostartCard autostart={autostart} loading={loading} onChange={handleAutostartChange} />
@@ -343,6 +355,7 @@ export function SettingsPage({ compactWindowMode = false, initialSelectedTab = n
           <Suspense fallback={<SourcesTabSkeleton />}>
             <div className="space-y-4">
               <ProxySettingsCardLazy proxyUrl={proxyUrl} onProxyUrlChange={setProxyUrl} onSave={handleSaveProxyUrl} />
+              <TorrentSettingsCardLazy />
               <SourceInstallSettingsCardLazy
                 sourceUrl={sourceUrl}
                 remoteSourceUrl={remoteSourceUrl}
@@ -396,6 +409,7 @@ export function SettingsPage({ compactWindowMode = false, initialSelectedTab = n
         return (
           <Suspense fallback={null}>
             <div className="space-y-3">
+              <GamepadBehaviorCardLazy />
               <GamepadTesterCardLazy />
             </div>
           </Suspense>

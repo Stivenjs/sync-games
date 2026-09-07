@@ -127,6 +127,24 @@ pub struct AppSettings {
     /// Volumen del sonido de notificación del overlay (0.0 a 1.0).
     #[serde(default = "default_overlay_volume")]
     pub overlay_notification_volume: f32,
+    /// Ignorar comandos de mando cuando la ventana de SaveCloud pierde el foco.
+    #[serde(default = "default_true")]
+    pub gamepad_ignore_background: bool,
+    /// Límite de velocidad de descarga en KiB/s (None o 0 = ilimitado).
+    #[serde(default)]
+    pub torrent_download_limit_kbs: Option<u32>,
+    /// Límite de velocidad de subida en KiB/s (None o 0 = ilimitado).
+    #[serde(default)]
+    pub torrent_upload_limit_kbs: Option<u32>,
+    /// Comportamiento de seeding: "stop_on_complete" o "seed_ratio_1".
+    #[serde(default = "default_seeding_mode")]
+    pub torrent_seeding_mode: String,
+    /// Subir automáticamente los guardados a la nube al cerrar un juego.
+    #[serde(default = "default_true")]
+    pub auto_sync_on_game_exit: bool,
+    /// Posición del overlay en pantalla ("bottom-right", "top-right", "top-left", "bottom-left").
+    #[serde(default = "default_overlay_position")]
+    pub overlay_notification_position: String,
 }
 
 fn default_true() -> bool {
@@ -135,6 +153,14 @@ fn default_true() -> bool {
 
 fn default_overlay_volume() -> f32 {
     0.6
+}
+
+fn default_seeding_mode() -> String {
+    "stop_on_complete".to_string()
+}
+
+fn default_overlay_position() -> String {
+    "bottom-right".to_string()
 }
 
 /// Biblioteca local de juegos configurados.
@@ -290,6 +316,18 @@ pub struct Config {
     pub overlay_sound_enabled: bool,
     #[serde(default = "default_overlay_volume")]
     pub overlay_notification_volume: f32,
+    #[serde(default = "default_true")]
+    pub gamepad_ignore_background: bool,
+    #[serde(default)]
+    pub torrent_download_limit_kbs: Option<u32>,
+    #[serde(default)]
+    pub torrent_upload_limit_kbs: Option<u32>,
+    #[serde(default = "default_seeding_mode")]
+    pub torrent_seeding_mode: String,
+    #[serde(default = "default_true")]
+    pub auto_sync_on_game_exit: bool,
+    #[serde(default = "default_overlay_position")]
+    pub overlay_notification_position: String,
 }
 
 /// Objeto de transferencia de datos (DTO) de la configuración principal,
@@ -363,6 +401,18 @@ pub struct ConfigDto {
     pub overlay_sound_enabled: bool,
     #[serde(default = "default_overlay_volume")]
     pub overlay_notification_volume: f32,
+    #[serde(default = "default_true")]
+    pub gamepad_ignore_background: bool,
+    #[serde(default)]
+    pub torrent_download_limit_kbs: Option<u32>,
+    #[serde(default)]
+    pub torrent_upload_limit_kbs: Option<u32>,
+    #[serde(default = "default_seeding_mode")]
+    pub torrent_seeding_mode: String,
+    #[serde(default = "default_true")]
+    pub auto_sync_on_game_exit: bool,
+    #[serde(default = "default_overlay_position")]
+    pub overlay_notification_position: String,
 }
 
 /// DTO para la configuración de sonido del overlay en juego.
@@ -371,6 +421,23 @@ pub struct ConfigDto {
 pub struct OverlaySoundSettingsDto {
     pub enabled: bool,
     pub volume: f32,
+}
+
+/// DTO completo para la configuración del overlay en juego.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlaySettingsDto {
+    pub enabled: bool,
+    pub volume: f32,
+    pub position: String,
+}
+
+/// DTO para límites de velocidad del motor torrent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentRateLimitsDto {
+    pub download_limit_kbs: Option<u32>,
+    pub upload_limit_kbs: Option<u32>,
 }
 
 /// DTO representativo de un juego para el frontend.

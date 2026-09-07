@@ -412,6 +412,12 @@ pub fn get_combined_config() -> Config {
         shadps4_path: settings.shadps4_path,
         overlay_sound_enabled: settings.overlay_sound_enabled,
         overlay_notification_volume: settings.overlay_notification_volume,
+        gamepad_ignore_background: settings.gamepad_ignore_background,
+        torrent_download_limit_kbs: settings.torrent_download_limit_kbs,
+        torrent_upload_limit_kbs: settings.torrent_upload_limit_kbs,
+        torrent_seeding_mode: settings.torrent_seeding_mode,
+        auto_sync_on_game_exit: settings.auto_sync_on_game_exit,
+        overlay_notification_position: settings.overlay_notification_position,
     }
 }
 
@@ -479,6 +485,12 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
     current_settings.proxy_url = cfg.proxy_url.clone();
     current_settings.overlay_sound_enabled = cfg.overlay_sound_enabled;
     current_settings.overlay_notification_volume = cfg.overlay_notification_volume;
+    current_settings.gamepad_ignore_background = cfg.gamepad_ignore_background;
+    current_settings.torrent_download_limit_kbs = cfg.torrent_download_limit_kbs;
+    current_settings.torrent_upload_limit_kbs = cfg.torrent_upload_limit_kbs;
+    current_settings.torrent_seeding_mode = cfg.torrent_seeding_mode.clone();
+    current_settings.auto_sync_on_game_exit = cfg.auto_sync_on_game_exit;
+    current_settings.overlay_notification_position = cfg.overlay_notification_position.clone();
 
     save_settings(&current_settings)?;
     save_library(&GameLibrary {

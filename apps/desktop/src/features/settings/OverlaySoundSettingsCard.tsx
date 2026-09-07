@@ -6,14 +6,27 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Button, Card, CardBody, Slider, Switch } from "@heroui/react";
-import { Volume2 } from "lucide-react";
+import { Volume2, LayoutGrid } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useOverlaySoundSettings } from "@hooks/useOverlaySoundSettings";
+import type { OverlayPosition } from "@services/tauri";
 import { toastError } from "@utils/toast";
+
+const POSITION_OPTIONS: Array<{
+  value: OverlayPosition;
+  labelKey: string;
+  fallback: string;
+}> = [
+  { value: "top-left", labelKey: "settings.overlay.topLeft", fallback: "Superior izquierda" },
+  { value: "top-right", labelKey: "settings.overlay.topRight", fallback: "Superior derecha" },
+  { value: "bottom-left", labelKey: "settings.overlay.bottomLeft", fallback: "Inferior izquierda" },
+  { value: "bottom-right", labelKey: "settings.overlay.bottomRight", fallback: "Inferior derecha" },
+];
 
 export function OverlaySoundSettingsCard() {
   const { t } = useTranslation();
-  const { soundSettings, isLoading, isSaving, updateSettings } = useOverlaySoundSettings();
+  const { soundSettings, position, isLoading, isSavingSound, updateSettings, updatePosition } =
+    useOverlaySoundSettings();
 
   // Volumen transitorio durante el arrastre del slider
   const [dragVolume, setDragVolume] = useState<number | null>(null);
@@ -99,8 +112,8 @@ export function OverlaySoundSettingsCard() {
 
   return (
     <Card>
-      <CardBody className="gap-4">
-        {/* Cabecera con Switch */}
+      <CardBody className="gap-5">
+        {/* Cabecera con Switch de Sonido */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <Volume2 size={20} className="mt-0.5 shrink-0 text-default-500" />
@@ -119,7 +132,7 @@ export function OverlaySoundSettingsCard() {
           <Switch
             isSelected={enabled}
             onValueChange={handleToggleEnabled}
-            isDisabled={isLoading || isSaving}
+            isDisabled={isLoading || isSavingSound}
             aria-label={t("settings.overlaySound.enableSound", "Activar sonido del overlay")}
           />
         </div>
@@ -142,7 +155,7 @@ export function OverlaySoundSettingsCard() {
               value={volumePercentage}
               onChange={handleSliderChange}
               onChangeEnd={handleSliderChangeEnd}
-              isDisabled={!enabled || isLoading || isSaving}
+              isDisabled={!enabled || isLoading}
               aria-label={t("settings.overlaySound.volume", "Volumen")}
               className="max-w-full"
             />
@@ -157,6 +170,60 @@ export function OverlaySoundSettingsCard() {
             className="shrink-0 font-medium cursor-pointer">
             {t("settings.overlaySound.testButton", "Probar sonido")}
           </Button>
+        </div>
+
+        {/* Posición de las notificaciones en pantalla */}
+        <div className="pt-3 border-t border-divider space-y-3">
+          <div className="flex items-center gap-2">
+            <LayoutGrid size={16} className="text-default-500" />
+            <span className="text-sm font-semibold text-foreground">
+              {t("settings.overlay.positionTitle", "Posición de las notificaciones en pantalla")}
+            </span>
+          </div>
+          <p className="text-xs text-default-500">
+            {t(
+              "settings.overlay.positionSubtitle",
+              "Elige la esquina de la pantalla donde aparecerán los avisos para evitar tapar mini-mapas, interfaces o chats de tus juegos."
+            )}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg pt-1">
+            {POSITION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => updatePosition(opt.value)}
+                disabled={isLoading}
+                className={`flex items-center gap-3 p-2.5 rounded-medium border text-left transition-all cursor-pointer ${
+                  position === opt.value
+                    ? "border-primary bg-primary/10 text-primary font-medium shadow-xs"
+                    : "border-divider bg-content2/40 hover:bg-content2/70 text-foreground"
+                }`}>
+                {/* Mini pantalla esquemática con indicador de esquina */}
+                <div className="w-9 h-6 rounded-xs border border-default-300 bg-content1 relative shrink-0">
+                  <div
+                    className={`absolute w-2.5 h-1.5 rounded-[1px] bg-primary ${
+                      opt.value === "top-left"
+                        ? "top-0.5 left-0.5"
+                        : opt.value === "top-right"
+                          ? "top-0.5 right-0.5"
+                          : opt.value === "bottom-left"
+                            ? "bottom-0.5 left-0.5"
+                            : "bottom-0.5 right-0.5"
+                    }`}
+                  />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold truncate">{t(opt.labelKey, opt.fallback)}</span>
+                  {opt.value === "bottom-right" && (
+                    <span className="text-[10px] text-default-400 leading-tight">
+                      {t("common.default", "Por defecto")}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </CardBody>
     </Card>
