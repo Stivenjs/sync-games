@@ -288,18 +288,3 @@ img {
   animation: download-text-swap 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
-
-@keyframes sg-overlay-progress {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-
-.sg-overlay-progress-bar {
-  transform-origin: left center;
-  animation: sg-overlay-progress var(--sg-overlay-duration, 5s) linear forwards;
-  will-change: transform;
-}
