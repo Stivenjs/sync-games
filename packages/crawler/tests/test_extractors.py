@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+from crawler.extractors.akirabox import AkiraBoxExtractor
 from crawler.extractors.base import ExtractionContext
 from crawler.extractors.filekeeper import FileKeeperExtractor
 from crawler.extractors.generic import GenericExtractor
@@ -322,6 +323,48 @@ class TestExtractors(unittest.TestCase):
             self.assertEqual(result, "https://a-2.1fichier.com/c999888777")
             self.assertEqual(context.captured_download_url, "https://a-2.1fichier.com/c999888777")
             self.assertEqual(context.metadata.get("fileName"), "OUTRIDERS-SteamRIP.com.rar")
+
+    def test_akirabox_matches(self):
+        ext = AkiraBoxExtractor()
+        self.assertTrue(ext.matches("https://akirabox.to/BnkmWv0oYGR0/file"))
+        self.assertTrue(ext.matches("https://akirabox.com/file/123"))
+        self.assertTrue(ext.matches("https://eeur1.akirabox.com/uploads/users/abc/file.zip"))
+        self.assertFalse(ext.matches("https://vikingfile.com/f/abc"))
+        self.assertTrue(ext.requires_browser)
+
+    def test_akirabox_on_response(self):
+        ext = AkiraBoxExtractor()
+        context = ExtractionContext(target_url="https://akirabox.to/BnkmWv0oYGR0/file")
+
+        # Test direct CDN response url
+        resp1 = MagicMock()
+        resp1.url = "https://eeur1.akirabox.com/uploads/users/v1RgzRVvzbpB/game.zip"
+        resp1.headers = {}
+        resp1.status = 200
+        ext.on_response(resp1, context)
+        self.assertEqual(context.captured_download_url, "https://eeur1.akirabox.com/uploads/users/v1RgzRVvzbpB/game.zip")
+
+        # Test 302 redirect location
+        context.captured_download_url = None
+        resp2 = MagicMock()
+        resp2.url = "https://akirabox.to/download/token123/game.zip"
+        resp2.status = 302
+        resp2.headers = {"location": "https://eeur1.akirabox.com/uploads/users/v1RgzRVvzbpB/game.zip?access=999"}
+        ext.on_response(resp2, context)
+        self.assertEqual(context.captured_download_url, "https://eeur1.akirabox.com/uploads/users/v1RgzRVvzbpB/game.zip?access=999")
+
+    def test_akirabox_extract_from_content(self):
+        ext = AkiraBoxExtractor()
+        context = ExtractionContext(target_url="https://akirabox.to/BnkmWv0oYGR0/file")
+        sample_html = (
+            '<div>'
+            '<a href="https://akirabox.to/download/payload123/game.zip?expiration=123&amp;signature=456" '
+            'id="download-button" class="btn btn-secondary">Download</a>'
+            '</div>'
+        )
+        res = ext.extract_from_content(sample_html, context)
+        self.assertEqual(res, "https://akirabox.to/download/payload123/game.zip?expiration=123&signature=456")
+        self.assertEqual(context.captured_download_url, "https://akirabox.to/download/payload123/game.zip?expiration=123&signature=456")
 
     def test_generic_matches_anything(self):
         ext = GenericExtractor()
