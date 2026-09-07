@@ -2313,6 +2313,7 @@
       "selectFolderTitle": "Select folder for {{name}}",
       "chooseHoster": "Choose hoster",
       "selectHoster": "Select hoster",
+      "gofileDisabledNotice": "Downloads via Gofile are temporarily disabled. Please choose another source or wait until the service is restored.",
       "hosterProtocol": {
         "http": "HTTP",
         "torrent": "Torrent"
