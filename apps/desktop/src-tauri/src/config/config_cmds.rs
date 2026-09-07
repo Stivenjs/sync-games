@@ -345,7 +345,6 @@ pub fn set_overlay_sound_settings(
         enabled,
         volume: clamped_volume,
     };
-    let _ = app.emit("config-changed", ());
     let _ = app.emit("overlay-sound-settings-changed", payload);
     log::info!(
         "[Overlay] Sonido actualizado: activado={}, volumen={:.2}",

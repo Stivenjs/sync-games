@@ -54,9 +54,6 @@ export function useOverlaySoundSettings() {
         qc.setQueryData<OverlaySoundSettings>(OVERLAY_SOUND_QUERY_KEYS.all, context.previous);
       }
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: OVERLAY_SOUND_QUERY_KEYS.all });
-    },
   });
 
   return {
