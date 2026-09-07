@@ -2313,6 +2313,7 @@
       "selectFolderTitle": "Seleccionar carpeta para {{name}}",
       "chooseHoster": "Elegir hoster",
       "selectHoster": "Seleccionar hoster",
+      "gofileDisabledNotice": "Las descargas a través de Gofile se encuentran temporalmente deshabilitadas. Por favor, selecciona otra fuente o espera a que se restablezca el servicio.",
       "hosterProtocol": {
         "http": "HTTP",
         "torrent": "Torrent"

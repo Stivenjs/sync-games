@@ -18,6 +18,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { parseSize } from "@utils/size";
 import type { PeerInstallOffer } from "@services/tauri/inventory.service";
 import { InstallModalGameCover } from "@features/steam-catalog/components/InstallModalGameCover";
+import { featureFlags } from "@/constants/featureFlags";
 
 export interface InstallModalProps {
   isOpen: boolean;
@@ -62,8 +63,15 @@ export function InstallModal({
   const [customPath, setCustomPath] = useState<string | null>(null);
   const [selectedHosterUri, setSelectedHosterUri] = useState<string | null>(null);
 
-  const selectableUris = useMemo(() => uris ?? [], [uris]);
+  const selectableUris = useMemo(() => {
+    const list = uris ?? [];
+    if (!featureFlags.enableGofileHoster) {
+      return list.filter((u) => !u.uri.toLowerCase().includes("gofile.io"));
+    }
+    return list;
+  }, [uris]);
   const showHosterSelect = selectableUris.length > 0;
+  const isAllUrisFilteredOut = Boolean(uris && uris.length > 0 && selectableUris.length === 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -231,6 +239,18 @@ export function InstallModal({
               </div>
 
               <div className="space-y-4">
+                {isAllUrisFilteredOut ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-warning/40 bg-warning/10 p-3.5 text-warning">
+                    <AlertCircle size={18} className="shrink-0 text-warning" />
+                    <span className={cn("text-xs leading-relaxed font-medium", consoleMode ? "text-sm" : "text-xs")}>
+                      {t(
+                        "steamCatalog.installModal.gofileDisabledNotice",
+                        "Las descargas a través de Gofile se encuentran temporalmente deshabilitadas. Por favor, selecciona otra fuente o espera a que se restablezca el servicio."
+                      )}
+                    </span>
+                  </div>
+                ) : null}
+
                 {showHosterSelect ? (
                   <div className="space-y-2">
                     <h4
@@ -545,7 +565,9 @@ export function InstallModal({
 
               <Button
                 color="primary"
-                isDisabled={!effectivePath || !hasEnoughSpace || (peerReachable && !onConfirmPeer)}
+                isDisabled={
+                  !effectivePath || !hasEnoughSpace || (peerReachable && !onConfirmPeer) || isAllUrisFilteredOut
+                }
                 onPress={handleInstall}
                 className={cn(
                   "font-bold shadow-lg shadow-primary/20",

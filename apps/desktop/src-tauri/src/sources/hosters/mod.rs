@@ -75,6 +75,15 @@ pub async fn resolve_download_url_with_client_and_progress<'a>(
     cancel_flag: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     on_event: Option<crate::sources::commands::fetch::CrawlerEventCallback>,
 ) -> Result<ResolvedDownload<'a>, HosterError> {
+    if let Ok(parsed) = reqwest::Url::parse(uri) {
+        let host = normalized_host(&parsed);
+        if host.contains("gofile.io") {
+            return Err(HosterError::ResolutionFailed(
+                "Las descargas de Gofile están temporalmente deshabilitadas. Por favor, selecciona otro servidor.".into(),
+            ));
+        }
+    }
+
     match resolve_hoster_url_internal(app, client, uri, cancel_flag.clone(), on_event.clone()).await
     {
         Ok(res) => Ok(res),
@@ -143,11 +152,18 @@ async fn resolve_hoster_url_internal<'a>(
     }
 
     if host.contains("akirabox.com") || host.contains("akirabox.to") {
-        let (url, _page_url) =
+        let (url, page_url) =
             akirabox::resolve(app, client, uri, cancel_flag.clone(), on_event.clone()).await?;
         return Ok(ResolvedDownload {
             url: Cow::Owned(url),
-            download_profile: ProfilePreset::Passthrough.build(),
+            download_profile: ProfilePreset::BrowserSameOrigin {
+                referer: if page_url.contains("akirabox.to") {
+                    "https://akirabox.to/downloads".to_string()
+                } else {
+                    page_url
+                },
+            }
+            .build(),
             file_name_hint: None,
         });
     }

@@ -64,23 +64,34 @@ pub async fn resolve(
         Err(native_err) => {
             if let Some(app) = app {
                 log::info!("akirabox: intento nativo falló ({native_err:?}), intentando Scrapling fallback");
-                if let Ok(scraped) = crate::sources::commands::fetch::run_scrapling_fetch_with_progress(
+                match crate::sources::commands::fetch::run_scrapling_fetch_with_progress(
                     app,
                     &page_url,
                     cancel_flag,
                     on_event,
                 ) {
-                    let trimmed = scraped.trim();
-                    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-                        return Ok((trimmed.to_string(), page_url));
+                    Ok(scraped) => {
+                        let trimmed = scraped.trim();
+                        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+                            return Ok((trimmed.to_string(), page_url));
+                        }
+                        if let Some(direct) = extract_download_link(
+                            trimmed,
+                            &page_url,
+                            HOST_MARKERS,
+                            &["download", "descargar", "télécharger", "telecharger"],
+                        ) {
+                            return Ok((direct, page_url));
+                        }
+                        return Err(HosterError::ResolutionFailed(format!(
+                            "akirabox: Scrapling no retornó una URL válida: {trimmed}"
+                        )));
                     }
-                    if let Some(direct) = extract_download_link(
-                        trimmed,
-                        &page_url,
-                        HOST_MARKERS,
-                        &["download", "descargar", "télécharger", "telecharger"],
-                    ) {
-                        return Ok((direct, page_url));
+                    Err(scrapling_err) => {
+                        log::error!("akirabox: Scrapling falló: {scrapling_err}");
+                        return Err(HosterError::ResolutionFailed(format!(
+                            "akirabox: Scrapling falló: {scrapling_err}"
+                        )));
                     }
                 }
             }

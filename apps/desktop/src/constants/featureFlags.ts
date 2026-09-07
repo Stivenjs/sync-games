@@ -10,6 +10,8 @@ const envEnableGamepadNavigation =
   import.meta.env.VITE_ENABLE_GAMEPAD_NAVIGATION === undefined ||
   parseBooleanFlag(import.meta.env.VITE_ENABLE_GAMEPAD_NAVIGATION);
 
+const envEnableGofileHoster = parseBooleanFlag(import.meta.env.VITE_ENABLE_GOFILE);
+
 /**
  * Flags globales para funcionalidades experimentales.
  * Regla actual: en desarrollo se habilitan por defecto.
@@ -18,4 +20,5 @@ const envEnableGamepadNavigation =
 export const featureFlags = {
   experimentalCloudStreams: envExperimentalCloudStreams,
   gamepadNavigation: envEnableGamepadNavigation,
+  enableGofileHoster: envEnableGofileHoster,
 } as const;
