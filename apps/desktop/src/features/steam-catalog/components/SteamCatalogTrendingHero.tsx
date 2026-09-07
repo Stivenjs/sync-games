@@ -6,6 +6,7 @@ import type { CatalogListItem, SteamAppdetailsMediaResult } from "@services/taur
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, EffectFade } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
+import "swiper/css";
 import "swiper/css/effect-fade";
 import { useCallback, useMemo, useRef, useEffect } from "react";
 import { SteamCatalogTrendingHeroSkeleton } from "@features/steam-catalog/components/SteamCatalogTrendingHeroSkeleton";
