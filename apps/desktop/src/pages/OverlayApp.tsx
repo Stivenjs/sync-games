@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
@@ -41,85 +41,82 @@ interface NotificationCardProps extends OverlayNotification {
   isLeft?: boolean;
 }
 
-const NotificationCard: React.FC<NotificationCardProps> = ({
-  id,
-  title,
-  body,
-  avatar,
-  gameId,
-  imageUrl,
-  steamAppId,
-  isLeft = false,
-}) => {
-  const { config } = useConfig();
+const NotificationCard: React.FC<NotificationCardProps> = React.memo(
+  ({ id, title, body, avatar, gameId, imageUrl, steamAppId, isLeft = false }) => {
+    const { config } = useConfig();
 
-  const detectedGameId = useMemo(
-    () => detectGameFromText({ gameId, title, body, games: config?.games }),
-    [gameId, body, title, config?.games]
-  );
+    const detectedGameId = useMemo(
+      () => detectGameFromText({ gameId, title, body, games: config?.games }),
+      [gameId, body, title, config?.games]
+    );
 
-  const formattedTitle = useMemo(
-    () => formatTextWithGameNames(title, detectedGameId, config?.games),
-    [title, detectedGameId, config?.games]
-  );
+    const formattedTitle = useMemo(
+      () => formatTextWithGameNames(title, detectedGameId, config?.games),
+      [title, detectedGameId, config?.games]
+    );
 
-  const formattedBody = useMemo(
-    () => formatTextWithGameNames(body, detectedGameId, config?.games),
-    [body, detectedGameId, config?.games]
-  );
+    const formattedBody = useMemo(
+      () => formatTextWithGameNames(body, detectedGameId, config?.games),
+      [body, detectedGameId, config?.games]
+    );
 
-  const slideX = isLeft ? -320 : 320;
+    const slideX = isLeft ? -280 : 280;
 
-  return (
-    <motion.div
-      key={id}
-      initial={{ opacity: 0, x: slideX }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: slideX }}
-      transition={{ type: "tween", duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="pointer-events-auto">
-      {/* Contenedor principal estilo Steam Toast */}
-      <div className="flex bg-[#171a21]/95 border border-white/10 rounded-sm overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,0.7)] backdrop-blur-md">
-        {/* Barra verde lateral de acento */}
-        <div className="w-1 bg-[#5c7e10] shrink-0" />
+    return (
+      <motion.div
+        key={id}
+        initial={{ opacity: 0, x: slideX, scale: 0.92 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        exit={{ opacity: 0, x: slideX * 0.4, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
+        className="pointer-events-auto">
+        <div
+          className={[
+            "relative overflow-hidden rounded-2xl",
+            "bg-zinc-950/80 backdrop-blur-xl",
+            "border border-white/6",
+            "shadow-[0_8px_32px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.08)]",
+          ].join(" ")}>
+          {/* Contenido de la notificación */}
+          <div className="flex items-center gap-3 py-3 px-3.5">
+            {/* Avatar / Portada de juego / Icono fallback */}
+            <div className="shrink-0 flex items-center justify-center">
+              {avatar ? (
+                <div className="w-10 h-10 rounded-xl bg-zinc-800/80 overflow-hidden shrink-0 ring-1 ring-white/6">
+                  <img src={avatar} alt="" className="w-full h-full object-cover" />
+                </div>
+              ) : detectedGameId ? (
+                <PlayingGameThumbnail
+                  gameId={detectedGameId}
+                  imageUrl={imageUrl}
+                  steamAppId={steamAppId}
+                  size="md"
+                  className="h-10 w-16 rounded-xl shadow-[0_0_12px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/20 object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500/10 to-cyan-400/10 overflow-hidden shrink-0 flex items-center justify-center border border-white/6">
+                  <Gamepad2 className="w-5 h-5 text-zinc-400" />
+                </div>
+              )}
+            </div>
 
-        {/* Contenido de la notificación */}
-        <div className="flex items-center gap-3 py-2.5 px-3">
-          {/* Avatar / Portada de juego / Icono */}
-          <div className="shrink-0 flex items-center justify-center">
-            {avatar ? (
-              <div className="w-10 h-10 rounded-[3px] bg-[#2a2e38] overflow-hidden shrink-0">
-                <img src={avatar} alt="" className="w-full h-full object-cover" />
-              </div>
-            ) : detectedGameId ? (
-              <PlayingGameThumbnail
-                gameId={detectedGameId}
-                imageUrl={imageUrl}
-                steamAppId={steamAppId}
-                size="md"
-                className="h-10 w-16 rounded-sm shadow-xs object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-[3px] bg-[#2a2e38] overflow-hidden shrink-0 flex items-center justify-center border border-white/5">
-                <Gamepad2 className="w-5 h-5 text-[#8f98a0]" />
-              </div>
-            )}
-          </div>
-
-          {/* Texto */}
-          <div className="flex flex-col min-w-0">
-            <span className="text-[#c6d4df] text-[14px] font-medium leading-[1.2] truncate max-w-60">
-              {formattedTitle}
-            </span>
-            <span className="text-[#5c7e10] text-[13px] font-normal leading-[1.3] truncate max-w-60">
-              {formattedBody}
-            </span>
+            {/* Texto */}
+            <div className="flex flex-col min-w-0">
+              <span className="text-zinc-100 text-[13.5px] font-semibold leading-tight truncate max-w-64">
+                {formattedTitle}
+              </span>
+              <span className="text-zinc-400 text-[12.5px] font-normal leading-[1.35] truncate max-w-64">
+                {formattedBody}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </motion.div>
-  );
-};
+      </motion.div>
+    );
+  }
+);
+
+NotificationCard.displayName = "NotificationCard";
 
 /**
  * Hook para gestionar las notificaciones del overlay
