@@ -732,6 +732,36 @@
     "stop": "Detener"
   },
   "settings": {
+    "torrent": {
+      "title": "Red y Transferencia Torrent (P2P)",
+      "subtitle": "Controla la velocidad de red de librqbit y el comportamiento de compartición con otros jugadores.",
+      "downloadLimit": "Límite de velocidad de descarga",
+      "downloadLimitDesc": "Evita saturar tu conexión mientras descargas juegos.",
+      "uploadLimit": "Límite de velocidad de subida",
+      "uploadLimitDesc": "Limita el ancho de banda saliente al compartir.",
+      "unlimited": "Ilimitado",
+      "custom": "Personalizado",
+      "limitsSaved": "Límites de velocidad actualizados",
+      "seedingModeTitle": "Comportamiento de Seeding (Compartición)",
+      "seedingModeSubtitle": "Determina si la app libera los archivos de inmediato o continúa sembrando para apoyar a otros jugadores.",
+      "stopOnComplete": "Detener subida al completar",
+      "stopOnCompleteDesc": "Cierra los archivos inmediatamente al llegar al 100%. Permite mover, descomprimir o jugar sin bloqueos de archivo.",
+      "seedRatio1": "Compartir hasta ratio 1.0",
+      "seedRatio1Desc": "Continúa subiendo piezas hasta alcanzar 1.0 (subir la misma cantidad descargada) para ayudar a otros usuarios.",
+      "community": "Comunidad"
+    },
+    "sync": {
+      "autoSyncOnExitTitle": "Subir guardados al salir del juego",
+      "autoSyncOnExitSubtitle": "Sincroniza y respalda tus partidas en la nube automáticamente en cuanto se detecta que un juego se ha cerrado."
+    },
+    "overlay": {
+      "positionTitle": "Posición de las notificaciones en pantalla",
+      "positionSubtitle": "Elige la esquina de la pantalla donde aparecerán los avisos para evitar tapar mini-mapas, interfaces o chats de tus juegos.",
+      "topLeft": "Superior izquierda",
+      "topRight": "Superior derecha",
+      "bottomLeft": "Inferior izquierda",
+      "bottomRight": "Inferior derecha"
+    },
     "cloudDashboard": {
       "loadingConfig": "Cargando configuración…",
       "noAccountConfigured": "No hay cuenta de nube configurada en este perfil. Configura la API en «Cuenta» para ver estadísticas y guardados remotos.",
@@ -1187,6 +1217,8 @@
     "gamepad": {
       "title": "Layout del Mando",
       "subtitle": "Selecciona los iconos de botones preferidos",
+      "ignoreBackgroundTitle": "Ignorar mando en segundo plano",
+      "ignoreBackgroundSubtitle": "Ignora joysticks y botones cuando SaveCloud no esté enfocado, evitando navegación accidental mientras juegas.",
       "auto": "Automático",
       "xbox": "Xbox",
       "playstation": "PlayStation",
@@ -1266,6 +1298,17 @@
       "title": "Notificaciones",
       "subtitle": "Si la app no está visible (minimizada u otra ventana delante), se mostrará una notificación al terminar una subida, descarga o backup completo, o si ocurre un error. Usa el botón para comprobar permisos.",
       "testButton": "Probar notificación"
+    },
+    "overlaySound": {
+      "title": "Sonido del overlay en juego",
+      "subtitle": "Controla el volumen de alerta audible que suena cuando aparece una notificación superpuesta mientras juegas.",
+      "enableSound": "Activar sonido del overlay",
+      "volume": "Volumen",
+      "testButton": "Probar sonido",
+      "mute": "Silenciar",
+      "unmute": "Reactivar sonido",
+      "toastSuccess": "Ajustes de sonido del overlay guardados",
+      "toastError": "No se pudo guardar la configuración de sonido del overlay"
     },
     "proxy": {
       "title": "Servidor Proxy (HTTP/SOCKS5)",

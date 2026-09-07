@@ -21,13 +21,15 @@ pub fn spawn_exit_watcher(
     let app_clone = app.clone();
 
     app.listen("games-running-status", move |event| {
-        let is_configured = config::with_config(|cfg| {
-            cfg.api_base_url
+        let (is_configured, auto_sync_enabled) = config::with_config(|cfg| {
+            let configured = cfg.api_base_url
                 .as_ref()
                 .is_some_and(|s| !s.trim().is_empty())
-                && cfg.user_id.as_ref().is_some_and(|s| !s.trim().is_empty())
+                && cfg.user_id.as_ref().is_some_and(|s| !s.trim().is_empty());
+            let enabled = cfg.auto_sync_on_game_exit;
+            (configured, enabled)
         });
-        if !is_configured {
+        if !is_configured || !auto_sync_enabled {
             return;
         }
 

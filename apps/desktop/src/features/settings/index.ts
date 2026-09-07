@@ -15,4 +15,8 @@ export { useSettingsPage } from "../../hooks/useSettingsPage";
 export { ProxySettingsCard } from "./ProxySettingsCard";
 export { LanguageSettingsCard } from "./LanguageSettingsCard";
 export { AudioOutputSettingsCard } from "./AudioOutputSettingsCard";
+export { OverlaySoundSettingsCard } from "./OverlaySoundSettingsCard";
+export { GamepadBehaviorCard } from "./GamepadBehaviorCard";
+export { GameExitSyncCard } from "./GameExitSyncCard";
+export { TorrentSettingsCard } from "./TorrentSettingsCard";
 export { PluginsSettingsSection } from "./plugins/PluginsSettingsSection";

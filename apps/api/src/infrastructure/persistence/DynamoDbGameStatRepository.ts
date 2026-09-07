@@ -22,6 +22,10 @@ export class DynamoDbGameStatRepository implements GameStatRepository {
       new QueryCommand({
         TableName: this.tableName,
         KeyConditionExpression: "userId = :u",
+        ProjectionExpression: "userId, gameId, fileCount, totalSizeBytes, #lm",
+        ExpressionAttributeNames: {
+          "#lm": "lastModified",
+        },
         ExpressionAttributeValues: {
           ":u": userId,
         },

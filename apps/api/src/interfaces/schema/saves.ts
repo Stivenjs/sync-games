@@ -144,3 +144,79 @@ export const ErrorResponseSchema = Type.Object({
   message: Type.String(),
 });
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
+
+export const UploadUrlResponseSchema = Type.Object({
+  uploadUrl: Type.String(),
+  key: Type.String(),
+});
+export type UploadUrlResponse = Static<typeof UploadUrlResponseSchema>;
+
+export const UploadUrlsBatchItemResponseSchema = Type.Object({
+  uploadUrl: Type.String(),
+  key: Type.String(),
+  gameId: Type.String(),
+  filename: Type.String(),
+});
+
+export const UploadUrlsBatchResponseSchema = Type.Object({
+  urls: Type.Array(UploadUrlsBatchItemResponseSchema),
+});
+export type UploadUrlsBatchResponse = Static<typeof UploadUrlsBatchResponseSchema>;
+
+export const DownloadUrlResponseSchema = Type.Object({
+  downloadUrl: Type.String(),
+  key: Type.String(),
+});
+export type DownloadUrlResponse = Static<typeof DownloadUrlResponseSchema>;
+
+export const DownloadUrlsBatchItemResponseSchema = Type.Object({
+  downloadUrl: Type.String(),
+  gameId: Type.String(),
+  key: Type.String(),
+});
+
+export const DownloadUrlsBatchResponseSchema = Type.Object({
+  urls: Type.Array(DownloadUrlsBatchItemResponseSchema),
+});
+export type DownloadUrlsBatchResponse = Static<typeof DownloadUrlsBatchResponseSchema>;
+
+export const BackupItemResponseSchema = Type.Object({
+  key: Type.String(),
+  lastModified: Type.String(),
+  size: Type.Optional(Type.Number()),
+  filename: Type.String(),
+});
+
+export const ListBackupsResponseSchema = Type.Object({
+  backups: Type.Array(BackupItemResponseSchema),
+});
+export type ListBackupsResponse = Static<typeof ListBackupsResponseSchema>;
+
+export const InitMultipartResponseSchema = Type.Object({
+  uploadId: Type.String(),
+  key: Type.String(),
+});
+export type InitMultipartResponse = Static<typeof InitMultipartResponseSchema>;
+
+export const MultipartPartUrlItemSchema = Type.Object({
+  partNumber: Type.Integer(),
+  uploadUrl: Type.String(),
+});
+
+export const InitMultipartWithPartUrlsResponseSchema = Type.Object({
+  uploadId: Type.String(),
+  key: Type.String(),
+  partUrls: Type.Array(MultipartPartUrlItemSchema),
+});
+export type InitMultipartWithPartUrlsResponse = Static<typeof InitMultipartWithPartUrlsResponseSchema>;
+
+export const GetPartUrlsResponseSchema = Type.Object({
+  partUrls: Type.Array(MultipartPartUrlItemSchema),
+});
+export type GetPartUrlsResponse = Static<typeof GetPartUrlsResponseSchema>;
+
+export const CompleteMultipartResponseSchema = Type.Object({
+  key: Type.String(),
+  location: Type.Optional(Type.String()),
+});
+export type CompleteMultipartResponse = Static<typeof CompleteMultipartResponseSchema>;

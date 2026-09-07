@@ -27,6 +27,8 @@ pub enum TorrentDownloadState {
     Paused,
     #[serde(rename = "completed")]
     Completed,
+    #[serde(rename = "seeding")]
+    Seeding,
 }
 
 /// Información de un archivo .torrent almacenado en la nube.

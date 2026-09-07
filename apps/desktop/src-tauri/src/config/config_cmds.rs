@@ -17,7 +17,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 /// Resuelve interpolaciones del sistema y variables de entorno dentro de una ruta.
 ///
@@ -113,6 +113,14 @@ pub fn get_config() -> ConfigDto {
         language: settings.language.clone(),
         ryujinx_path: settings.ryujinx_path.clone(),
         shadps4_path: settings.shadps4_path.clone(),
+        overlay_sound_enabled: settings.overlay_sound_enabled,
+        overlay_notification_volume: settings.overlay_notification_volume,
+        gamepad_ignore_background: settings.gamepad_ignore_background,
+        torrent_download_limit_kbs: settings.torrent_download_limit_kbs,
+        torrent_upload_limit_kbs: settings.torrent_upload_limit_kbs,
+        torrent_seeding_mode: settings.torrent_seeding_mode,
+        auto_sync_on_game_exit: settings.auto_sync_on_game_exit,
+        overlay_notification_position: settings.overlay_notification_position,
         games: library
             .games
             .into_iter()
@@ -313,6 +321,232 @@ pub fn set_disable_hardware_acceleration(
     settings.disable_hardware_acceleration = enabled;
     config::save_settings(&settings)?;
     let _ = app.emit("config-changed", ());
+    Ok(())
+}
+
+/// Obtiene la configuración de sonido del overlay (activado/desactivado y volumen).
+#[tauri::command]
+pub fn get_overlay_sound_settings() -> Result<crate::config::OverlaySoundSettingsDto, String> {
+    let settings = config::load_settings();
+    Ok(crate::config::OverlaySoundSettingsDto {
+        enabled: settings.overlay_sound_enabled,
+        volume: settings.overlay_notification_volume,
+    })
+}
+
+/// Guarda la configuración de sonido del overlay y notifica en tiempo real a las ventanas.
+#[tauri::command]
+pub fn set_overlay_sound_settings(
+    app: tauri::AppHandle,
+    enabled: bool,
+    volume: f32,
+) -> Result<(), String> {
+    let clamped_volume = volume.clamp(0.0, 1.0);
+    let mut settings = config::load_settings();
+    settings.overlay_sound_enabled = enabled;
+    settings.overlay_notification_volume = clamped_volume;
+    config::save_settings(&settings)?;
+
+    let payload = crate::config::OverlaySoundSettingsDto {
+        enabled,
+        volume: clamped_volume,
+    };
+    let _ = app.emit("overlay-sound-settings-changed", payload);
+    log::info!(
+        "[Overlay] Sonido actualizado: activado={}, volumen={:.2}",
+        enabled,
+        clamped_volume
+    );
+    Ok(())
+}
+
+/// Obtiene la posición configurada para las notificaciones de overlay.
+#[tauri::command]
+pub fn get_overlay_position() -> Result<String, String> {
+    let settings = config::load_settings();
+    Ok(settings.overlay_notification_position)
+}
+
+/// Guarda la posición del overlay y emite el evento en tiempo real.
+#[tauri::command]
+pub fn set_overlay_position(app: tauri::AppHandle, position: String) -> Result<(), String> {
+    let trimmed = position.trim();
+    let valid_positions = ["bottom-right", "top-right", "top-left", "bottom-left"];
+    if !valid_positions.contains(&trimmed) {
+        return Err(format!(
+            "Posición '{}' inválida. Opciones válidas: {:?}",
+            trimmed, valid_positions
+        ));
+    }
+    let mut settings = config::load_settings();
+    settings.overlay_notification_position = trimmed.to_string();
+    config::save_settings(&settings)?;
+
+    let _ = app.emit("overlay-position-changed", trimmed);
+    log::info!("[Overlay] Posición actualizada: {}", trimmed);
+    Ok(())
+}
+
+/// Obtiene la configuración combinada del overlay (sonido, volumen y posición).
+#[tauri::command]
+pub fn get_overlay_settings() -> Result<crate::config::OverlaySettingsDto, String> {
+    let settings = config::load_settings();
+    Ok(crate::config::OverlaySettingsDto {
+        enabled: settings.overlay_sound_enabled,
+        volume: settings.overlay_notification_volume,
+        position: settings.overlay_notification_position,
+    })
+}
+
+/// Guarda la configuración completa del overlay (sonido, volumen y posición).
+#[tauri::command]
+pub fn set_overlay_settings(
+    app: tauri::AppHandle,
+    enabled: bool,
+    volume: f32,
+    position: String,
+) -> Result<(), String> {
+    let clamped_volume = volume.clamp(0.0, 1.0);
+    let trimmed_pos = position.trim();
+    let valid_positions = ["bottom-right", "top-right", "top-left", "bottom-left"];
+    if !valid_positions.contains(&trimmed_pos) {
+        return Err(format!(
+            "Posición '{}' inválida. Opciones válidas: {:?}",
+            trimmed_pos, valid_positions
+        ));
+    }
+
+    let mut settings = config::load_settings();
+    settings.overlay_sound_enabled = enabled;
+    settings.overlay_notification_volume = clamped_volume;
+    settings.overlay_notification_position = trimmed_pos.to_string();
+    config::save_settings(&settings)?;
+
+    let payload = crate::config::OverlaySettingsDto {
+        enabled,
+        volume: clamped_volume,
+        position: trimmed_pos.to_string(),
+    };
+    let _ = app.emit("overlay-settings-changed", payload.clone());
+    let _ = app.emit(
+        "overlay-sound-settings-changed",
+        crate::config::OverlaySoundSettingsDto {
+            enabled,
+            volume: clamped_volume,
+        },
+    );
+    let _ = app.emit("overlay-position-changed", trimmed_pos);
+    log::info!(
+        "[Overlay] Ajustes actualizados: activado={}, volumen={:.2}, posición={}",
+        enabled,
+        clamped_volume,
+        trimmed_pos
+    );
+    Ok(())
+}
+
+/// Obtiene si se ignora el mando en segundo plano cuando la app pierde el foco.
+#[tauri::command]
+pub fn get_gamepad_ignore_background() -> Result<bool, String> {
+    let settings = config::load_settings();
+    Ok(settings.gamepad_ignore_background)
+}
+
+/// Modifica el comportamiento de ignorar el mando cuando SaveCloud no tiene el foco.
+#[tauri::command]
+pub fn set_gamepad_ignore_background(app: tauri::AppHandle, ignore: bool) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.gamepad_ignore_background = ignore;
+    config::save_settings(&settings)?;
+    let _ = app.emit("gamepad-ignore-background-changed", ignore);
+    log::info!("[Gamepad] Ignorar en segundo plano: {}", ignore);
+    Ok(())
+}
+
+/// Obtiene los límites de velocidad de descarga y subida del motor torrent.
+#[tauri::command]
+pub fn get_torrent_rate_limits() -> Result<crate::config::TorrentRateLimitsDto, String> {
+    let settings = config::load_settings();
+    Ok(crate::config::TorrentRateLimitsDto {
+        download_limit_kbs: settings.torrent_download_limit_kbs,
+        upload_limit_kbs: settings.torrent_upload_limit_kbs,
+    })
+}
+
+/// Actualiza los límites de velocidad de descarga y subida del motor torrent en disco y memoria.
+#[tauri::command]
+pub async fn set_torrent_rate_limits(
+    app: tauri::AppHandle,
+    download_limit_kbs: Option<u32>,
+    upload_limit_kbs: Option<u32>,
+) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.torrent_download_limit_kbs = download_limit_kbs;
+    settings.torrent_upload_limit_kbs = upload_limit_kbs;
+    config::save_settings(&settings)?;
+
+    // Aplicar inmediatamente en la sesión activa si el motor torrent está instanciado
+    if let Some(engine_state) = app.try_state::<std::sync::Arc<tokio::sync::Mutex<crate::torrent::engine::TorrentEngine>>>() {
+        let eng = engine_state.lock().await;
+        eng.update_rate_limits(download_limit_kbs, upload_limit_kbs);
+    }
+
+    let payload = crate::config::TorrentRateLimitsDto {
+        download_limit_kbs,
+        upload_limit_kbs,
+    };
+    let _ = app.emit("torrent-rate-limits-changed", payload);
+    log::info!(
+        "[Torrent] Límites actualizados: bajada={:?} KiB/s, subida={:?} KiB/s",
+        download_limit_kbs,
+        upload_limit_kbs
+    );
+    Ok(())
+}
+
+/// Obtiene el modo de seeding actual ("stop_on_complete" o "seed_ratio_1").
+#[tauri::command]
+pub fn get_torrent_seeding_mode() -> Result<String, String> {
+    let settings = config::load_settings();
+    Ok(settings.torrent_seeding_mode)
+}
+
+/// Actualiza la política de seeding tras descarga.
+#[tauri::command]
+pub fn set_torrent_seeding_mode(app: tauri::AppHandle, mode: String) -> Result<(), String> {
+    let trimmed = mode.trim();
+    if trimmed != "stop_on_complete" && trimmed != "seed_ratio_1" {
+        return Err(format!(
+            "Modo de seeding '{}' inválido. Debe ser 'stop_on_complete' o 'seed_ratio_1'.",
+            trimmed
+        ));
+    }
+
+    let mut settings = config::load_settings();
+    settings.torrent_seeding_mode = trimmed.to_string();
+    config::save_settings(&settings)?;
+
+    let _ = app.emit("torrent-seeding-mode-changed", trimmed);
+    log::info!("[Torrent] Modo seeding actualizado: {}", trimmed);
+    Ok(())
+}
+
+/// Obtiene si está habilitada la subida automática a la nube al cerrar un juego.
+#[tauri::command]
+pub fn get_auto_sync_on_game_exit() -> Result<bool, String> {
+    let settings = config::load_settings();
+    Ok(settings.auto_sync_on_game_exit)
+}
+
+/// Configura la subida automática de partidas al salir del juego.
+#[tauri::command]
+pub fn set_auto_sync_on_game_exit(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.auto_sync_on_game_exit = enabled;
+    config::save_settings(&settings)?;
+
+    let _ = app.emit("auto-sync-on-game-exit-changed", enabled);
+    log::info!("[Sync] Subir al salir del juego: {}", enabled);
     Ok(())
 }
 

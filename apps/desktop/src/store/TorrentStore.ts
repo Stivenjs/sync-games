@@ -5,7 +5,7 @@ import { getActiveTorrentDownloads } from "@services/tauri/config.service";
 import { formatGameDisplayName } from "@utils/gameImage";
 import i18n from "@lib/i18n";
 
-export type TorrentDownloadState = "starting" | "checking" | "downloading" | "paused" | "completed";
+export type TorrentDownloadState = "starting" | "checking" | "downloading" | "paused" | "completed" | "seeding";
 
 export interface TorrentProgressState {
   infoHash: string;

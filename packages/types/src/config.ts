@@ -73,4 +73,20 @@ export interface Config {
   readonly language?: string;
   readonly ryujinxPath?: string;
   readonly shadps4Path?: string;
+  /** Si el sonido del overlay está habilitado. */
+  readonly overlaySoundEnabled?: boolean;
+  /** Volumen del sonido del overlay (0.0 a 1.0). */
+  readonly overlayNotificationVolume?: number;
+  /** Ignorar comandos de mando en segundo plano cuando la app pierde el foco. */
+  readonly gamepadIgnoreBackground?: boolean;
+  /** Límite de velocidad de descarga torrent en KiB/s (null = ilimitado). */
+  readonly torrentDownloadLimitKbs?: number | null;
+  /** Límite de velocidad de subida torrent en KiB/s (null = ilimitado). */
+  readonly torrentUploadLimitKbs?: number | null;
+  /** Modo de compartición de torrent tras completar descarga. */
+  readonly torrentSeedingMode?: "stop_on_complete" | "seed_ratio_1";
+  /** Subir guardados automáticamente al salir del juego. */
+  readonly autoSyncOnGameExit?: boolean;
+  /** Posición de las notificaciones de overlay en pantalla. */
+  readonly overlayNotificationPosition?: "bottom-right" | "top-right" | "top-left" | "bottom-left";
 }

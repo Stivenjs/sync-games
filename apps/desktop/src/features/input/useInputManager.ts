@@ -5,6 +5,7 @@ import type { SemanticAction } from "@features/input/types";
 import { featureFlags } from "@/constants/featureFlags";
 import { toggleSettingsWindowFromBigPicture } from "@/windows/settingsWindow";
 import { useShellUiStore } from "@store/ShellUiStore";
+import { useConfig } from "@hooks/useConfig";
 
 const NAVIGATION_THROTTLE_MS = 120;
 
@@ -35,6 +36,9 @@ function isTypingInInput(target: EventTarget | null): boolean {
  */
 export function useInputManager() {
   const { setInputMode, navigate, confirm } = useNavigationStore();
+  const { config } = useConfig();
+  const configRef = useRef(config);
+  configRef.current = config;
   const mouseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGamepadInput = useRef<number>(0);
   const lastKeyInput = useRef<number>(0);
@@ -158,6 +162,11 @@ export function useInputManager() {
     document.addEventListener("keydown", handleKeyDown, true);
 
     const unlisten = listen<{ action: SemanticAction; player: number }>("controller_action", (event) => {
+      const ignoreBackground = configRef.current?.gamepadIgnoreBackground ?? true;
+      if (ignoreBackground && typeof document !== "undefined" && !document.hasFocus()) {
+        return;
+      }
+
       const action = event.payload.action;
 
       switch (action) {

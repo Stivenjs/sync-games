@@ -34,10 +34,12 @@
 //!    tier `All` para maximizar la red de peers disponibles.
 
 use std::collections::HashSet;
+use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use librqbit::api::TorrentIdOrHash;
+use librqbit::limits::LimitsConfig;
 use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions, TorrentStatsState};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
@@ -50,6 +52,20 @@ use super::torrent_enrichment::{
 use crate::commands::logs::sync_logger;
 use crate::setup::TorrentShutdownGuard;
 use crate::utils::transfer_metrics::compute_eta;
+
+fn build_limits_config(
+    download_limit_kbs: Option<u32>,
+    upload_limit_kbs: Option<u32>,
+) -> LimitsConfig {
+    LimitsConfig {
+        download_bps: download_limit_kbs
+            .filter(|&k| k > 0)
+            .and_then(|k| NonZeroU32::new(k.saturating_mul(1024))),
+        upload_bps: upload_limit_kbs
+            .filter(|&k| k > 0)
+            .and_then(|k| NonZeroU32::new(k.saturating_mul(1024))),
+    }
+}
 
 /// Evento emitido periódicamente mientras un torrent está activo.
 ///
@@ -178,11 +194,19 @@ impl TorrentEngine {
     /// El segundo intento se realiza sin `fastresume` para evitar cargar
     /// cualquier otro estado persistente potencialmente dañado.
     pub async fn new(output_folder: PathBuf) -> Result<Self, TorrentError> {
+        let initial_limits = crate::config::with_config(|cfg| {
+            build_limits_config(
+                cfg.torrent_download_limit_kbs,
+                cfg.torrent_upload_limit_kbs,
+            )
+        });
+
         let options = SessionOptions {
             listen_port_range: Some(LISTEN_PORT_RANGE),
             enable_upnp_port_forwarding: true,
             fastresume: true,
             concurrent_init_limit: Some(3),
+            ratelimits: initial_limits,
             ..Default::default()
         };
 
@@ -216,6 +240,7 @@ impl TorrentEngine {
                     enable_upnp_port_forwarding: true,
                     fastresume: false,
                     concurrent_init_limit: Some(3),
+                    ratelimits: initial_limits,
                     ..Default::default()
                 };
 
@@ -312,6 +337,31 @@ impl TorrentEngine {
     /// vector vacío como señal para solicitar los trackers de forma síncrona.
     pub fn cached_trackers(&self) -> Vec<String> {
         self.cached_trackers.clone()
+    }
+
+    /// Actualiza dinámicamente los límites de velocidad de descarga y subida en la sesión activa.
+    pub fn update_rate_limits(
+        &self,
+        download_limit_kbs: Option<u32>,
+        upload_limit_kbs: Option<u32>,
+    ) {
+        let download_bps = download_limit_kbs
+            .filter(|&k| k > 0)
+            .and_then(|k| NonZeroU32::new(k.saturating_mul(1024)));
+        let upload_bps = upload_limit_kbs
+            .filter(|&k| k > 0)
+            .and_then(|k| NonZeroU32::new(k.saturating_mul(1024)));
+
+        self.session.ratelimits.set_download_bps(download_bps);
+        self.session.ratelimits.set_upload_bps(upload_bps);
+
+        sync_logger::log_operation(
+            "TorrentEngine::update_rate_limits",
+            &format!(
+                "Límites actualizados: bajada={:?} B/s, subida={:?} B/s",
+                download_bps, upload_bps
+            ),
+        );
     }
 }
 
@@ -752,6 +802,7 @@ pub fn spawn_progress_monitor(
         // Bandera que garantiza que el escalado de trackers ocurre como máximo
         // una vez durante toda la vida de esta tarea de monitoreo.
         let mut tracker_escalation_done = false;
+        let mut done_notified = false;
 
         loop {
             interval.tick().await;
@@ -901,34 +952,60 @@ pub fn spawn_progress_monitor(
                 peers_connected,
             };
 
-            // Si el torrent está terminado, no emitir evento de progreso para evitar
-            // condiciones de carrera en el frontend. Solo emitir el evento de done.
+            // Si el torrent está terminado de descargar:
             if is_finished {
-                let _ = app.emit(TORRENT_DONE_EVENT, &payload);
-                crate::notifications::writer::try_record_torrent_done(&app, &name, &info_hash);
+                if !done_notified {
+                    done_notified = true;
+                    let done_payload = TorrentProgressPayload {
+                        state: TorrentDownloadState::Completed,
+                        ..payload.clone()
+                    };
+                    let _ = app.emit(TORRENT_DONE_EVENT, &done_payload);
+                    crate::notifications::writer::try_record_torrent_done(&app, &name, &info_hash);
 
-                // Notificar al sistema de sources que este torrent ha completado.
-                crate::sources::torrent_complete_notify(&app, &info_hash, total_bytes);
+                    // Notificar al sistema de sources que este torrent ha completado su descarga
+                    crate::sources::torrent_complete_notify(&app, &info_hash, total_bytes);
+                }
 
-                if let Some(engine) = &engine_state {
-                    let mut eng = engine.lock().await;
-                    eng.unregister_active(&info_hash);
+                let seeding_mode = crate::config::with_config(|cfg| {
+                    cfg.torrent_seeding_mode.clone()
+                });
 
-                    if eng.active_hashes().is_empty() {
-                        if let Some(guard_state) = app.try_state::<TorrentShutdownGuard>() {
-                            if let Ok(mut g) = guard_state.0.lock() {
-                                if let Some(guard) = g.take() {
-                                    guard.complete();
+                let should_stop_seeding = if seeding_mode == "seed_ratio_1" {
+                    stats.uploaded_bytes >= total_bytes
+                } else {
+                    true
+                };
+
+                if should_stop_seeding {
+                    if let Some(engine) = &engine_state {
+                        let mut eng = engine.lock().await;
+                        eng.unregister_active(&info_hash);
+
+                        if eng.active_hashes().is_empty() {
+                            if let Some(guard_state) = app.try_state::<TorrentShutdownGuard>() {
+                                if let Ok(mut g) = guard_state.0.lock() {
+                                    if let Some(guard) = g.take() {
+                                        guard.complete();
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Liberar el torrent de la sesión para que no mantenga los archivos
-                // abiertos. Esto permite que el usuario instale el juego de inmediato.
-                let _ = session.delete(id, false).await;
-                break;
+                    // Liberar el torrent de la sesión para que no mantenga los archivos
+                    // abiertos. Esto permite que el usuario instale el juego de inmediato.
+                    let _ = session.delete(id, false).await;
+                    break;
+                } else {
+                    // Modo seed_ratio_1 activo: seguimos compartiendo hasta alcanzar ratio 1.0
+                    let seeding_payload = TorrentProgressPayload {
+                        state: TorrentDownloadState::Seeding,
+                        ..payload
+                    };
+                    let _ = app.emit(TORRENT_PROGRESS_EVENT, &seeding_payload);
+                    continue;
+                }
             }
 
             let _ = app.emit(TORRENT_PROGRESS_EVENT, &payload);
