@@ -1267,6 +1267,17 @@
       "subtitle": "If the app is not visible (minimized or behind another window), a notification will be shown when an upload, download, or full backup completes, or if an error occurs. Use the button to check permissions.",
       "testButton": "Test notification"
     },
+    "overlaySound": {
+      "title": "In-Game Overlay Sound",
+      "subtitle": "Control the chime volume that plays when an overlay notification appears while playing games.",
+      "enableSound": "Enable overlay sound",
+      "volume": "Volume",
+      "testButton": "Test sound",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "toastSuccess": "Overlay sound settings saved",
+      "toastError": "Failed to save overlay sound settings"
+    },
     "proxy": {
       "title": "Proxy Server (HTTP/SOCKS5)",
       "desc": "Routes downloads from hosters (like Gofile or Pixeldrain) and requests to third-party APIs through a proxy to avoid IP limitations or temporary blocks.",

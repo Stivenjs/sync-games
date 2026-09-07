@@ -88,6 +88,9 @@ const VoiceCommandsCardLazy = lazy(() =>
 const AudioOutputSettingsCardLazy = lazy(() =>
   import("@features/settings/AudioOutputSettingsCard").then((m) => ({ default: m.AudioOutputSettingsCard }))
 );
+const OverlaySoundSettingsCardLazy = lazy(() =>
+  import("@features/settings/OverlaySoundSettingsCard").then((m) => ({ default: m.OverlaySoundSettingsCard }))
+);
 
 const ReleaseNotesDialogLazy = lazy(() =>
   import("@features/settings/ReleaseNotesDialog").then((module) => ({ default: module.ReleaseNotesDialog }))
@@ -379,6 +382,7 @@ export function SettingsPage({ compactWindowMode = false, initialSelectedTab = n
           <Suspense fallback={<IntegrationsTabSkeleton />}>
             <div className="space-y-4">
               <AudioOutputSettingsCardLazy />
+              <OverlaySoundSettingsCardLazy />
               <NotificationsCard
                 testingNotification={testingNotification}
                 onTestNotification={handleTestNotification}

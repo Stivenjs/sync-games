@@ -113,6 +113,8 @@ pub fn get_config() -> ConfigDto {
         language: settings.language.clone(),
         ryujinx_path: settings.ryujinx_path.clone(),
         shadps4_path: settings.shadps4_path.clone(),
+        overlay_sound_enabled: settings.overlay_sound_enabled,
+        overlay_notification_volume: settings.overlay_notification_volume,
         games: library
             .games
             .into_iter()
@@ -313,6 +315,43 @@ pub fn set_disable_hardware_acceleration(
     settings.disable_hardware_acceleration = enabled;
     config::save_settings(&settings)?;
     let _ = app.emit("config-changed", ());
+    Ok(())
+}
+
+/// Obtiene la configuración de sonido del overlay (activado/desactivado y volumen).
+#[tauri::command]
+pub fn get_overlay_sound_settings() -> Result<crate::config::OverlaySoundSettingsDto, String> {
+    let settings = config::load_settings();
+    Ok(crate::config::OverlaySoundSettingsDto {
+        enabled: settings.overlay_sound_enabled,
+        volume: settings.overlay_notification_volume,
+    })
+}
+
+/// Guarda la configuración de sonido del overlay y notifica en tiempo real a las ventanas.
+#[tauri::command]
+pub fn set_overlay_sound_settings(
+    app: tauri::AppHandle,
+    enabled: bool,
+    volume: f32,
+) -> Result<(), String> {
+    let clamped_volume = volume.clamp(0.0, 1.0);
+    let mut settings = config::load_settings();
+    settings.overlay_sound_enabled = enabled;
+    settings.overlay_notification_volume = clamped_volume;
+    config::save_settings(&settings)?;
+
+    let payload = crate::config::OverlaySoundSettingsDto {
+        enabled,
+        volume: clamped_volume,
+    };
+    let _ = app.emit("config-changed", ());
+    let _ = app.emit("overlay-sound-settings-changed", payload);
+    log::info!(
+        "[Overlay] Sonido actualizado: activado={}, volumen={:.2}",
+        enabled,
+        clamped_volume
+    );
     Ok(())
 }
 

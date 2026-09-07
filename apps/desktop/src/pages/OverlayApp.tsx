@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useConfig } from "@hooks/useConfig";
 import { detectGameFromText, formatTextWithGameNames } from "@utils/gameImage";
 import { PlayingGameThumbnail } from "@features/games/PlayingGameThumbnail";
+import { useOverlaySoundSettings } from "@hooks/useOverlaySoundSettings";
 
 /**
  * Payload recibido del evento de notificación
@@ -120,6 +121,9 @@ const NotificationCard: React.FC<OverlayNotification> = ({ id, title, body, avat
 function useOverlayNotifications() {
   const [notifications, setNotifications] = useState<OverlayNotification[]>([]);
   const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const { soundSettings } = useOverlaySoundSettings();
+  const soundSettingsRef = useRef(soundSettings);
+  soundSettingsRef.current = soundSettings;
 
   /**
    * Agrega una nueva notificación y programa su eliminación automática
@@ -128,12 +132,15 @@ function useOverlayNotifications() {
     const id = window.crypto.randomUUID();
     const notification: OverlayNotification = { id, ...payload };
 
-    try {
-      const audio = new Audio("/sounds/2575.wav");
-      audio.volume = 0.6;
-      audio.play().catch((e) => console.warn("[Overlay] Audio autoplay blocked or failed:", e));
-    } catch (e) {
-      console.warn("[Overlay] Failed to play audio:", e);
+    const { enabled, volume } = soundSettingsRef.current;
+    if (enabled && volume > 0) {
+      try {
+        const audio = new Audio("/sounds/2575.wav");
+        audio.volume = Math.max(0, Math.min(1, volume));
+        audio.play().catch((e) => console.warn("[Overlay] Audio autoplay blocked or failed:", e));
+      } catch (e) {
+        console.warn("[Overlay] Failed to play audio:", e);
+      }
     }
 
     setNotifications((prev) => {

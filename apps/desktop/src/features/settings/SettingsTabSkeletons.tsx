@@ -111,6 +111,32 @@ export function IntegrationsTabSkeleton() {
         </CardBody>
       </Card>
 
+      {/* OverlaySoundSettingsCard Skeleton */}
+      <Card className="shadow-sm border border-default-200/60">
+        <CardBody className="gap-4 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1">
+              <Skeleton className="h-5 w-5 shrink-0 rounded-md mt-0.5" />
+              <div className="space-y-1.5 flex-1">
+                <Skeleton className="h-4 w-44 rounded-md" />
+                <Skeleton className="h-3 w-80 rounded-md" />
+              </div>
+            </div>
+            <Skeleton className="h-6 w-11 rounded-full shrink-0" />
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+            <div className="flex-1 space-y-2 max-w-md">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-3 w-16 rounded-md" />
+                <Skeleton className="h-3 w-8 rounded-md" />
+              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-lg shrink-0" />
+          </div>
+        </CardBody>
+      </Card>
+
       {/* NotificationsCard Skeleton */}
       <Card className="shadow-sm border border-default-200/60">
         <CardBody className="gap-4 p-5">

@@ -73,4 +73,8 @@ export interface Config {
   readonly language?: string;
   readonly ryujinxPath?: string;
   readonly shadps4Path?: string;
+  /** Si el sonido del overlay está habilitado. */
+  readonly overlaySoundEnabled?: boolean;
+  /** Volumen del sonido del overlay (0.0 a 1.0). */
+  readonly overlayNotificationVolume?: number;
 }

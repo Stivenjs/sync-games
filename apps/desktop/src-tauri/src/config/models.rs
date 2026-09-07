@@ -121,10 +121,20 @@ pub struct AppSettings {
     /// Ruta al ejecutable de ShadPS4
     #[serde(default)]
     pub shadps4_path: Option<String>,
+    /// Si el sonido del overlay en juego está habilitado.
+    #[serde(default = "default_true")]
+    pub overlay_sound_enabled: bool,
+    /// Volumen del sonido de notificación del overlay (0.0 a 1.0).
+    #[serde(default = "default_overlay_volume")]
+    pub overlay_notification_volume: f32,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_overlay_volume() -> f32 {
+    0.6
 }
 
 /// Biblioteca local de juegos configurados.
@@ -276,6 +286,10 @@ pub struct Config {
     pub ryujinx_path: Option<String>,
     #[serde(default)]
     pub shadps4_path: Option<String>,
+    #[serde(default = "default_true")]
+    pub overlay_sound_enabled: bool,
+    #[serde(default = "default_overlay_volume")]
+    pub overlay_notification_volume: f32,
 }
 
 /// Objeto de transferencia de datos (DTO) de la configuración principal,
@@ -345,6 +359,18 @@ pub struct ConfigDto {
     pub ryujinx_path: Option<String>,
     #[serde(default)]
     pub shadps4_path: Option<String>,
+    #[serde(default = "default_true")]
+    pub overlay_sound_enabled: bool,
+    #[serde(default = "default_overlay_volume")]
+    pub overlay_notification_volume: f32,
+}
+
+/// DTO para la configuración de sonido del overlay en juego.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlaySoundSettingsDto {
+    pub enabled: bool,
+    pub volume: f32,
 }
 
 /// DTO representativo de un juego para el frontend.

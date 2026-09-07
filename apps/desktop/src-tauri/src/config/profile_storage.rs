@@ -421,6 +421,8 @@ pub fn initialize_profile_storage(profile: &super::profiles::Profile) -> Result<
         ryujinx_path: None,
         shadps4_path: None,
         audio_output_device: None,
+        overlay_sound_enabled: true,
+        overlay_notification_volume: 0.6,
     };
 
     save_settings_for_profile(&profile.id, &settings)?;

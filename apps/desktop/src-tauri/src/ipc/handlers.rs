@@ -23,6 +23,8 @@ pub fn register_all_commands(builder: Builder<Wry>) -> Builder<Wry> {
         crate::config::config_cmds::set_developer_mode,
         crate::config::config_cmds::set_low_performance_mode,
         crate::config::config_cmds::set_disable_hardware_acceleration,
+        crate::config::config_cmds::get_overlay_sound_settings,
+        crate::config::config_cmds::set_overlay_sound_settings,
         crate::devtools_cmds::open_webview_devtools,
         crate::devtools_cmds::close_webview_devtools,
         crate::config::config_cmds::get_preferred_gamepad_layout,

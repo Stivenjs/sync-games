@@ -68,3 +68,21 @@ export async function setGameModeBoostDetectedGameCpu(enabled: boolean): Promise
 export async function setAutoExtractDownloads(enabled: boolean): Promise<void> {
   await invoke("set_auto_extract_downloads", { enabled });
 }
+
+export interface OverlaySoundSettings {
+  enabled: boolean;
+  volume: number; // 0.0 - 1.0
+}
+
+/** Obtiene la configuración de sonido del overlay en juego. */
+export async function getOverlaySoundSettings(): Promise<OverlaySoundSettings> {
+  return invoke<OverlaySoundSettings>("get_overlay_sound_settings");
+}
+
+/** Guarda la configuración de sonido del overlay (activado y volumen 0.0-1.0). */
+export async function setOverlaySoundSettings(settings: OverlaySoundSettings): Promise<void> {
+  await invoke("set_overlay_sound_settings", {
+    enabled: settings.enabled,
+    volume: settings.volume,
+  });
+}

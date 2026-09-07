@@ -410,6 +410,8 @@ pub fn get_combined_config() -> Config {
         proxy_url: settings.proxy_url,
         ryujinx_path: settings.ryujinx_path,
         shadps4_path: settings.shadps4_path,
+        overlay_sound_enabled: settings.overlay_sound_enabled,
+        overlay_notification_volume: settings.overlay_notification_volume,
     }
 }
 
@@ -475,6 +477,8 @@ pub fn apply_combined_config(cfg: &Config) -> Result<(), String> {
 
     current_settings.developer_mode = cfg.developer_mode;
     current_settings.proxy_url = cfg.proxy_url.clone();
+    current_settings.overlay_sound_enabled = cfg.overlay_sound_enabled;
+    current_settings.overlay_notification_volume = cfg.overlay_notification_volume;
 
     save_settings(&current_settings)?;
     save_library(&GameLibrary {

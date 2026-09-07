@@ -1267,6 +1267,17 @@
       "subtitle": "Si la app no está visible (minimizada u otra ventana delante), se mostrará una notificación al terminar una subida, descarga o backup completo, o si ocurre un error. Usa el botón para comprobar permisos.",
       "testButton": "Probar notificación"
     },
+    "overlaySound": {
+      "title": "Sonido del overlay en juego",
+      "subtitle": "Controla el volumen de alerta audible que suena cuando aparece una notificación superpuesta mientras juegas.",
+      "enableSound": "Activar sonido del overlay",
+      "volume": "Volumen",
+      "testButton": "Probar sonido",
+      "mute": "Silenciar",
+      "unmute": "Reactivar sonido",
+      "toastSuccess": "Ajustes de sonido del overlay guardados",
+      "toastError": "No se pudo guardar la configuración de sonido del overlay"
+    },
     "proxy": {
       "title": "Servidor Proxy (HTTP/SOCKS5)",
       "desc": "Enruta las descargas de hosters (como Gofile o Pixeldrain) y las peticiones a APIs de terceros a través de un proxy para evitar limitaciones de IP o bloqueos temporales.",
