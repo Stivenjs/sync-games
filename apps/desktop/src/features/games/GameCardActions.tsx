@@ -19,6 +19,10 @@ export interface GameCardActionsProps {
   onEdit?: (game: ConfiguredGame) => void;
   onTorrent?: (game: ConfiguredGame) => void;
   onShare?: (game: ConfiguredGame) => void;
+  onUploadClip?: (game: ConfiguredGame) => void;
+  onOpenClips?: (game: ConfiguredGame) => void;
+  onRefreshDetails?: (game: ConfiguredGame) => void;
+  isUploadingClip?: boolean;
   actionsMenuOpen?: boolean;
   onActionsMenuOpenChange?: (isOpen: boolean) => void;
 }
@@ -38,6 +42,10 @@ export function GameCardActions({
   onEdit,
   onTorrent,
   onShare,
+  onUploadClip,
+  onOpenClips,
+  onRefreshDetails,
+  isUploadingClip,
   actionsMenuOpen,
   onActionsMenuOpenChange,
 }: GameCardActionsProps) {
@@ -65,6 +73,7 @@ export function GameCardActions({
           isSyncing={isSyncing}
           isDownloading={isDownloading}
           isFullBackupUploading={isFullBackupUploading}
+          isUploadingClip={isUploadingClip}
           onEdit={onEdit}
           onTorrent={onTorrent}
           onOpenFolder={onOpenFolder}
@@ -72,6 +81,9 @@ export function GameCardActions({
           onFullBackupUpload={onFullBackupUpload}
           onRecoverFromCloud={onRecoverFromCloud}
           onShare={onShare}
+          onUploadClip={onUploadClip}
+          onOpenClips={onOpenClips}
+          onRefreshDetails={onRefreshDetails}
           onRemove={onRemove}
         />
       </Dropdown>
