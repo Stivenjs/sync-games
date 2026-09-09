@@ -129,6 +129,11 @@
     },
     "actionsMenu": {
       "ariaLabel": "Acciones para {{gameId}}",
+      "sections": {
+        "saves": "Guardados",
+        "share": "Compartir",
+        "clips": "Clips"
+      },
       "edit": "Editar juego",
       "torrent": "Torrent",
       "openSourceUrl": "Ir a la web del juego",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { DropdownItem, DropdownMenu } from "@heroui/react";
+import { DropdownItem, DropdownMenu, DropdownSection } from "@heroui/react";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
@@ -22,6 +22,12 @@ import {
   runGameAction,
 } from "@features/games/game-actions/gameActionMenuModel";
 
+const sectionClassNames = {
+  base: "mb-0.5 last:mb-0",
+  heading: "text-[10px] font-bold uppercase tracking-wider text-default-400 pl-1 mb-1",
+  divider: "my-1 bg-default-100/70",
+};
+
 export function GameActionsDropdownMenu(props: GameActionsMenuModelProps) {
   const { t } = useTranslation();
   const { game } = props;
@@ -39,122 +45,174 @@ export function GameActionsDropdownMenu(props: GameActionsMenuModelProps) {
 
   const disabledKeys = useMemo(
     () => getGameActionsDisabledKeys(props),
-    [props.isDownloading, props.isSyncing, props.isFullBackupUploading, props.isGameRunning]
+    [props.isDownloading, props.isSyncing, props.isFullBackupUploading, props.isGameRunning, props.isUploadingClip]
   );
 
   const folderLabel = getFolderMenuLabel(props.surface);
 
+  const showEdit = !isGameActionItemHidden("edit", props);
+  const showFolder = !isGameActionItemHidden("folder", props);
+  const showRefreshSteam = !isGameActionItemHidden("refreshDetails", props);
+  const showSource = !isGameActionItemHidden("source", props);
+
+  const showRecover = !isGameActionItemHidden("recoverFromCloud", props);
+  const showSync = !isGameActionItemHidden("sync", props);
+  const showFullBackup = !isGameActionItemHidden("fullBackup", props);
+
+  const showShare = !isGameActionItemHidden("share", props);
+  const showTorrent = !isGameActionItemHidden("torrent", props);
+
+  const showUploadClip = !isGameActionItemHidden("uploadClip", props);
+  const showClips = !isGameActionItemHidden("clips", props);
+
+  const showRemove = !isGameActionItemHidden("remove", props);
+
+  const hasGeneralItems = showEdit || showFolder || showRefreshSteam || showSource;
+  const hasSavesItems = showRecover || showSync || showFullBackup;
+  const hasShareItems = showShare || showTorrent;
+  const hasClipsItems = showUploadClip || showClips;
+  const hasDangerItems = showRemove;
+
   return (
     <DropdownMenu
       aria-label={t("library.actionsMenu.ariaLabel", { gameId: game.id })}
+      variant="flat"
+      className="min-w-62 p-1.5"
       onAction={handleAction}
       disabledKeys={disabledKeys}>
-      <DropdownItem
-        key="edit"
-        className={isGameActionItemHidden("edit", props) ? "hidden" : ""}
-        startContent={<Pencil size={16} />}>
-        {t("library.actionsMenu.edit")}
-      </DropdownItem>
+      {hasGeneralItems ? (
+        <DropdownSection
+          aria-label="General"
+          showDivider={hasSavesItems || hasShareItems || hasClipsItems || hasDangerItems}
+          classNames={sectionClassNames}>
+          {showEdit ? (
+            <DropdownItem key="edit" startContent={<Pencil size={15} />}>
+              {t("library.actionsMenu.edit")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="torrent"
-        className={isGameActionItemHidden("torrent", props) ? "hidden" : ""}
-        startContent={<Magnet size={16} />}>
-        {t("library.actionsMenu.torrent")}
-      </DropdownItem>
+          {showFolder ? (
+            <DropdownItem key="folder" startContent={<FolderOpen size={15} />}>
+              {folderLabel}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="source"
-        className={!game.sourceUrl ? "hidden" : "text-primary"}
-        startContent={<ExternalLink size={16} />}>
-        {t("library.actionsMenu.openSourceUrl")}
-      </DropdownItem>
+          {showRefreshSteam ? (
+            <DropdownItem key="refreshDetails" startContent={<RefreshCw size={15} />}>
+              {t("library.actionsMenu.refreshSteam")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="folder"
-        className={isGameActionItemHidden("folder", props) ? "hidden" : ""}
-        startContent={<FolderOpen size={16} />}>
-        {folderLabel}
-      </DropdownItem>
+          {showSource ? (
+            <DropdownItem
+              key="source"
+              className="text-primary"
+              startContent={<ExternalLink size={15} className="text-primary" />}>
+              {t("library.actionsMenu.openSourceUrl")}
+            </DropdownItem>
+          ) : null}
+        </DropdownSection>
+      ) : null}
 
-      <DropdownItem
-        key="recoverFromCloud"
-        className={isGameActionItemHidden("recoverFromCloud", props) ? "hidden" : ""}
-        startContent={
-          props.isDownloading || props.isSyncing || props.isFullBackupUploading ? (
-            <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <CloudDownload size={16} />
-          )
-        }>
-        {t("library.actionsMenu.recoverSaves")}
-      </DropdownItem>
+      {hasSavesItems ? (
+        <DropdownSection
+          title={t("library.actionsMenu.sections.saves", "Guardados")}
+          showDivider={hasShareItems || hasClipsItems || hasDangerItems}
+          classNames={sectionClassNames}>
+          {showRecover ? (
+            <DropdownItem
+              key="recoverFromCloud"
+              startContent={
+                props.isDownloading || props.isSyncing || props.isFullBackupUploading ? (
+                  <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <CloudDownload size={15} />
+                )
+              }>
+              {t("library.actionsMenu.recoverSaves")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="sync"
-        className={isGameActionItemHidden("sync", props) ? "hidden" : ""}
-        startContent={<CloudUpload size={16} />}>
-        {t("library.actionsMenu.uploadToCloud")}
-      </DropdownItem>
+          {showSync ? (
+            <DropdownItem key="sync" startContent={<CloudUpload size={15} />}>
+              {t("library.actionsMenu.uploadToCloud")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="fullBackup"
-        className={
-          isGameActionItemHidden("fullBackup", props) ? "hidden" : props.isUploadTooLarge ? "text-warning" : ""
-        }
-        startContent={
-          props.isFullBackupUploading ? (
-            <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <Archive size={16} />
-          )
-        }>
-        {props.isUploadTooLarge
-          ? t("library.actionsMenu.packageUploadRequired")
-          : t("library.actionsMenu.packageUpload")}
-      </DropdownItem>
+          {showFullBackup ? (
+            <DropdownItem
+              key="fullBackup"
+              className={props.isUploadTooLarge ? "text-warning" : ""}
+              startContent={
+                props.isFullBackupUploading ? (
+                  <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <Archive size={15} />
+                )
+              }>
+              {props.isUploadTooLarge
+                ? t("library.actionsMenu.packageUploadRequired")
+                : t("library.actionsMenu.packageUpload")}
+            </DropdownItem>
+          ) : null}
+        </DropdownSection>
+      ) : null}
 
-      <DropdownItem
-        key="share"
-        className={isGameActionItemHidden("share", props) ? "hidden" : ""}
-        startContent={<Link2 size={16} />}>
-        {t("library.actionsMenu.shareLink")}
-      </DropdownItem>
+      {hasShareItems ? (
+        <DropdownSection
+          title={t("library.actionsMenu.sections.share", "Compartir")}
+          showDivider={hasClipsItems || hasDangerItems}
+          classNames={sectionClassNames}>
+          {showShare ? (
+            <DropdownItem key="share" startContent={<Link2 size={15} />}>
+              {t("library.actionsMenu.shareLink")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="uploadClip"
-        className={isGameActionItemHidden("uploadClip", props) ? "hidden" : ""}
-        startContent={
-          props.isUploadingClip ? (
-            <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <Film size={16} />
-          )
-        }>
-        {t("library.actionsMenu.uploadClip")}
-      </DropdownItem>
+          {showTorrent ? (
+            <DropdownItem key="torrent" startContent={<Magnet size={15} />}>
+              {t("library.actionsMenu.torrent")}
+            </DropdownItem>
+          ) : null}
+        </DropdownSection>
+      ) : null}
 
-      <DropdownItem
-        key="clips"
-        className={isGameActionItemHidden("clips", props) ? "hidden" : ""}
-        startContent={<Film size={16} />}>
-        {t("library.actionsMenu.viewClips")}
-      </DropdownItem>
+      {hasClipsItems ? (
+        <DropdownSection
+          title={t("library.actionsMenu.sections.clips", "Clips")}
+          showDivider={hasDangerItems}
+          classNames={sectionClassNames}>
+          {showUploadClip ? (
+            <DropdownItem
+              key="uploadClip"
+              startContent={
+                props.isUploadingClip ? (
+                  <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <Film size={15} />
+                )
+              }>
+              {t("library.actionsMenu.uploadClip")}
+            </DropdownItem>
+          ) : null}
 
-      <DropdownItem
-        key="refreshDetails"
-        className={isGameActionItemHidden("refreshDetails", props) ? "hidden" : ""}
-        startContent={<RefreshCw size={16} />}>
-        {t("library.actionsMenu.refreshSteam")}
-      </DropdownItem>
+          {showClips ? (
+            <DropdownItem key="clips" startContent={<Film size={15} />}>
+              {t("library.actionsMenu.viewClips")}
+            </DropdownItem>
+          ) : null}
+        </DropdownSection>
+      ) : null}
 
-      <DropdownItem
-        key="remove"
-        className={isGameActionItemHidden("remove", props) ? "hidden" : "text-danger"}
-        color="danger"
-        startContent={<Trash2 size={16} />}>
-        {t("library.actionsMenu.remove")}
-      </DropdownItem>
+      {hasDangerItems ? (
+        <DropdownSection aria-label="Danger" classNames={sectionClassNames}>
+          {showRemove ? (
+            <DropdownItem key="remove" className="text-danger" color="danger" startContent={<Trash2 size={15} />}>
+              {t("library.actionsMenu.remove")}
+            </DropdownItem>
+          ) : null}
+        </DropdownSection>
+      ) : null}
     </DropdownMenu>
   );
 }
